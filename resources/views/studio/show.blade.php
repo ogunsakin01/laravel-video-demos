@@ -66,7 +66,18 @@
           </li>
         @endforeach
       </ul>
-      <span class="vd-small">Fix {{ count($video->issues) === 1 ? 'it' : 'them' }} in your app, then try again. No AI was spent on the broken {{ count($video->issues) === 1 ? 'page' : 'pages' }}.</span>
+      @if ($video->sample_data)
+        <span class="vd-small">The AI couldn't add the data {{ count($video->issues) === 1 ? 'this page needs' : 'these pages need' }} to the sample database. Fix {{ count($video->issues) === 1 ? 'it' : 'them' }} in your app, or say in the description what the user needs, then try again.</span>
+      @else
+        <span class="vd-small">No AI was spent on the broken {{ count($video->issues) === 1 ? 'page' : 'pages' }}. If {{ count($video->issues) === 1 ? 'it works' : 'they work' }} for users with the right data, such as a role, a permission or a finished profile, record on sample data instead: a copy of your database where the AI adds what the pages need. Your own data isn't touched. Otherwise, fix {{ count($video->issues) === 1 ? 'it' : 'them' }} in your app and try again.</span>
+        @unless ($video->status->isWorking())
+          <form method="post" action="{{ route('video-demo.studio.retry', $video) }}">@csrf
+            <input type="hidden" name="mode" value="plan">
+            <input type="hidden" name="sample_data" value="1">
+            <button class="vd-btn vd-btn-primary">Try again on sample data</button>
+          </form>
+        @endunless
+      @endif
     </div>
   @endif
 
@@ -191,6 +202,7 @@
             <div class="vd-stat"><dt>Max steps</dt><dd class="vd-num">{{ $video->max_steps }}</dd></div>
           @endif
           <div class="vd-stat"><dt>Recorded as</dt><dd>{{ $video->record_as_label ?: \Ogunsakin01\VideoDemo\Recording\RecordAs::label($video->record_as) }}</dd></div>
+          <div class="vd-stat"><dt>Data</dt><dd>{{ $video->sample_data ? 'Sample data' : 'Your local database' }}</dd></div>
           <div class="vd-stat"><dt>Model</dt><dd>{{ \Ogunsakin01\VideoDemo\Ai\Pricing::model($video->model)['label'] ?? $video->model }}, {{ $video->effort }}</dd></div>
           <div class="vd-stat"><dt>Length</dt><dd class="vd-num">{{ $video->duration_seconds ? round($video->duration_seconds).'s of '.$video->target_seconds.'s target' : $video->target_seconds.'s target' }}</dd></div>
         </dl>
@@ -270,6 +282,11 @@
                     <option value="{{ $value }}" @selected(abs($video->playbackSpeed() - $value) < 0.01)>{{ $label }}</option>
                   @endforeach
                 </select>
+            </div>
+            <div class="vd-stack-sm">
+              <input type="hidden" name="sample_data" value="0">
+              <label class="vd-check-row"><input type="checkbox" name="sample_data" value="1" @checked($video->sample_data)> Record on sample data</label>
+              <span class="vd-hint">A copy of your database where the AI adds what the pages need, instead of your own data.</span>
             </div>
             <button class="vd-btn vd-btn-block">Ask the AI for a new plan</button>
           </form>

@@ -185,16 +185,19 @@ class VideoDemo
     }
 
     /**
-     * Make a video again: with a new plan, or by recording its plan again at no AI cost.
+     * Make a video again: with a new plan, or by recording its plan again at
+     * no AI cost. $sampleData switches recording on sample data on or off;
+     * a switch always gets a new plan.
      */
-    public function retry(Video $video, bool $newPlan = true): Video
+    public function retry(Video $video, bool $newPlan = true, ?bool $sampleData = null): Video
     {
         if ($video->status->isWorking()) {
             throw new RuntimeException('This video is still being made.');
         }
 
-        $replan = $newPlan || empty($video->plan['steps']);
-        $video->update(['status' => VideoStatus::Queued, 'error' => null, 'stop_requested' => false]);
+        $switch = $sampleData !== null && $sampleData !== $video->sample_data;
+        $replan = $newPlan || $switch || empty($video->plan['steps']);
+        $video->update(['status' => VideoStatus::Queued, 'error' => null, 'stop_requested' => false, ...($switch ? ['sample_data' => $sampleData] : [])]);
         $video->addLog($replan ? 'Trying again with a new plan' : 'Recording the same plan again');
         GenerateVideo::dispatch($video, replan: $replan);
 

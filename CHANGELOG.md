@@ -2,6 +2,12 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/). While the version is 0.x, minor releases may include breaking changes; they will be listed here.
 
+## v0.8.3 - 2026-10-14
+
+### Added
+
+- A video made before sample data, or without it, can switch: **Try again on sample data** on the "A page in your app has a problem" message, a **Record on sample data** box under "Make it again", and `VideoDemo::retry($video, sampleData: true)`. Switching always makes a new plan. The video page shows which data it was recorded on, and the error for a failing page suggests sample data.
+
 ## v0.8.2 - 2026-10-14
 
 ### Fixed

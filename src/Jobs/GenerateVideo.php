@@ -274,9 +274,12 @@ class GenerateVideo implements ShouldQueue
             $video->update(['issues' => $problems]);
             $first = $problems[0];
 
-            throw new RuntimeException(count($problems) === 1
+            // Pages that only work for users with the right data may work on sample data.
+            $hint = $video->sample_data ? '' : ' If it works for users with the right data (a role, a permission, a finished profile), try again on sample data.';
+
+            throw new RuntimeException((count($problems) === 1
                 ? "A page isn't working, so nothing was recorded: {$first['path']}: {$first['problem']}."
-                : count($problems)." pages aren't working, so nothing was recorded. See the list at the top.");
+                : count($problems)." pages aren't working, so nothing was recorded. See the list at the top.").$hint);
         }
 
         $this->stopIfAsked($video);

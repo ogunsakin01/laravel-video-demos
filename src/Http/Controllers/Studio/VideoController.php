@@ -253,7 +253,9 @@ class VideoController extends Controller
                 'max_cost' => ['nullable', 'numeric', 'min:0.01', 'max:100'],
                 'max_steps' => ['nullable', 'integer', 'min:3', 'max:250'],
                 'speed' => ['nullable', 'numeric', 'min:0.25', 'max:4'],
+                'sample_data' => ['nullable', 'boolean'],
             ]),
+            'sample_data' => $request->has('sample_data') ? $request->boolean('sample_data') : $video->sample_data,
             'status' => VideoStatus::Queued,
             'error' => null,
             'stop_requested' => false,
@@ -301,10 +303,12 @@ class VideoController extends Controller
     {
         abort_if($video->status->isWorking(), 409, 'This video is still being made.');
 
-        $replan = $request->input('mode') !== 'record' || empty($video->plan['steps']);
+        // Switching to sample data needs a new plan: the old one was made for other data.
+        $toSample = $request->boolean('sample_data') && ! $video->sample_data;
+        $replan = $toSample || $request->input('mode') !== 'record' || empty($video->plan['steps']);
 
-        $video->update(['status' => VideoStatus::Queued, 'error' => null, 'stop_requested' => false]);
-        $video->addLog($replan ? 'Trying again with a new plan' : 'Trying again: recording the same plan');
+        $video->update(['status' => VideoStatus::Queued, 'error' => null, 'stop_requested' => false, 'issues' => null, ...($toSample ? ['sample_data' => true] : [])]);
+        $video->addLog($toSample ? 'Trying again on sample data, with a new plan' : ($replan ? 'Trying again with a new plan' : 'Trying again: recording the same plan'));
         GenerateVideo::dispatch($video, replan: $replan);
 
         return redirect()->route('video-demo.studio.show', $video);

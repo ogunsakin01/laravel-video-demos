@@ -14,6 +14,7 @@ use Ogunsakin01\VideoDemo\Ai\AccessRules;
 use Ogunsakin01\VideoDemo\Ai\CodeTools;
 use Ogunsakin01\VideoDemo\Ai\Planner;
 use Ogunsakin01\VideoDemo\Enums\VideoStatus;
+use Ogunsakin01\VideoDemo\Jobs\GenerateVideo;
 use Ogunsakin01\VideoDemo\Models\Video;
 use Ogunsakin01\VideoDemo\Models\VideoStyle;
 use Ogunsakin01\VideoDemo\SampleData\Builder;
@@ -320,6 +321,41 @@ class SampleDataTest extends TestCase
         $this->get('/video-demo/studio/create')->assertSee('Record on sample data');
         $this->assertTrue(app(VideoDemo::class)->make('x', ['sample_data' => true])->sample_data);
         $this->assertFalse(app(VideoDemo::class)->make('y')->sample_data);
+    }
+
+    public function test_a_video_whose_page_failed_can_try_again_on_sample_data(): void
+    {
+        Queue::fake();
+        $video = Video::create([
+            'prompt' => 'How a member finds people', 'target_seconds' => 30, 'model' => 'claude-sonnet-5-5', 'effort' => 'high',
+            'status' => VideoStatus::Failed, 'record_as' => 'type:member', 'error' => 'A page isn\'t working',
+            'plan' => ['title' => 'x', 'summary' => '', 'steps' => [['action' => 'goto', 'url' => '/people']]],
+            'issues' => [['path' => '/dashboard/talents', 'problem' => 'The page returned HTTP 403', 'status' => 403, 'url' => null, 'detail' => 'Add your photo to meet people here']],
+        ]);
+
+        $this->get("/video-demo/studio/{$video->id}")->assertSee('Try again on sample data')->assertSee('Your local database');
+
+        // Switching to sample data always gets a new plan, even when asked to record the old one.
+        $this->post("/video-demo/studio/{$video->id}/retry", ['mode' => 'record', 'sample_data' => '1'])->assertRedirect();
+        $video->refresh();
+        $this->assertTrue($video->sample_data);
+        $this->assertNull($video->issues);
+        Queue::assertPushed(GenerateVideo::class, fn ($job) => $job->replan);
+
+        $video->update(['status' => VideoStatus::Failed]);
+        $this->get("/video-demo/studio/{$video->id}")->assertDontSee('Try again on sample data')->assertSee('Sample data');
+
+        // "Make it again" can switch it off and on.
+        $form = ['prompt' => 'x', 'target_seconds' => 30, 'effort' => 'high'];
+        $this->post("/video-demo/studio/{$video->id}/regenerate", [...$form, 'sample_data' => '0'])->assertRedirect();
+        $this->assertFalse($video->fresh()->sample_data);
+        $video->refresh()->update(['status' => VideoStatus::Failed]);
+        $this->post("/video-demo/studio/{$video->id}/regenerate", [...$form, 'sample_data' => '1'])->assertRedirect();
+        $this->assertTrue($video->fresh()->sample_data);
+
+        // And from code.
+        $video->refresh()->update(['status' => VideoStatus::Failed]);
+        $this->assertFalse(app(VideoDemo::class)->retry($video->fresh(), newPlan: false, sampleData: false)->sample_data);
     }
 
     public function test_install_sets_everything_up_in_one_command(): void
