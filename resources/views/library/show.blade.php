@@ -55,7 +55,7 @@
 
   <x-slot:scripts>
     <script>
-      // Switch between the recorded versions, keeping the place in the video
+      // Switch between the recorded versions, keeping the place in the video.
       document.querySelectorAll('#vd-versions [data-device]').forEach(b => b.addEventListener('click', () => {
         const v = document.getElementById('vd-player');
         const at = v.currentTime, playing = !v.paused;

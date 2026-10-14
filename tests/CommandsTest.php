@@ -16,7 +16,9 @@ use Ogunsakin01\VideoDemo\Recording\Recorder;
 use Ogunsakin01\VideoDemo\Recording\RecordingResult;
 use Ogunsakin01\VideoDemo\Tests\Concerns\FakesAnthropic;
 
-/** The commands AI agents and scripts use to make videos without the studio's page */
+/**
+ * Tests the commands AI agents and scripts use to make videos without the studio.
+ */
 class CommandsTest extends TestCase
 {
     use FakesAnthropic;
@@ -52,7 +54,7 @@ class CommandsTest extends TestCase
         $this->assertSame(['desktop', 'mobile'], $video->devices);
         $this->assertSame([45, '/jobs', 'private'], [$video->target_seconds, $video->start_path, $video->visibility]);
         $this->assertSame([0.4, 20, 'guest', 'Guest (signed out)'], [$video->spendLimit(), $video->max_steps, $video->record_as, $video->record_as_label]);
-        // Without --model, the cheapest reliable model
+        // Without --model, the cheapest reliable model is used.
         $this->assertSame('claude-sonnet-5-5', $video->model);
         $this->assertStringContainsString('/video-demo/studio/'.$video->id, $result['studio_url']);
         Queue::assertPushed(GenerateVideo::class);
@@ -77,7 +79,7 @@ class CommandsTest extends TestCase
         Storage::fake('local');
         $this->startFakeAnthropic();
 
-        // Claude submits a plan straight away
+        // Claude submits a plan straight away.
         $this->respond(1, [['type' => 'tool_use', 'id' => 'tu_plan', 'name' => 'submit_plan', 'input' => [
             'title' => 'Post a job', 'summary' => 'Posting a job.', 'steps' => [[
                 'action' => 'goto', 'why' => 'x', 'url' => '/jobs', 'target' => null, 'value' => null,
@@ -85,7 +87,7 @@ class CommandsTest extends TestCase
             ]],
         ]]]);
 
-        // Stand-ins for the browser and ffmpeg, so this runs anywhere
+        // Stand-ins for the browser and ffmpeg, so this runs anywhere.
         $this->app->instance(Recorder::class, new class extends Recorder
         {
             public function record(Plan $plan, string $dir, array $style = [], string $device = 'desktop', ?string $recordAs = null, ?\Closure $shouldStop = null): RecordingResult

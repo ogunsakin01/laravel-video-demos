@@ -53,7 +53,7 @@ class RecorderTest extends TestCase
         $plan = new Plan('Post a job', 'Posting a job.', [
             $this->step('card', ['title' => 'Post a job', 'ms' => 1200]),
             $this->step('goto', ['url' => '/index.html', 'chapter' => 'Fill it in']),
-            // Overlays must work on real pages, not only the blank page before the first goto
+            // Overlays must work on real pages, not only the blank page before the first goto.
             $this->step('caption', ['title' => 'Start with the basics', 'ms' => 600]),
             $this->step('type', ['target' => ['label' => 'Job title'], 'value' => 'Laravel developer']),
             $this->step('select', ['target' => ['label' => 'Contract'], 'value' => 'Contract']),
@@ -72,7 +72,7 @@ class RecorderTest extends TestCase
         $this->assertGreaterThan(10_000, filesize("$this->out/video.mp4"));
 
         // Played back at 2x: the file is as long as the result says, about
-        // half the time the recording took
+        // half the time the recording took.
         $this->assertEqualsWithDelta($result->seconds, $this->duration("$this->out/video.mp4"), 0.6);
         $this->assertFileExists("$this->out/poster.jpg");
     }
@@ -97,7 +97,7 @@ class RecorderTest extends TestCase
     {
         $plan = new Plan('Post a job', 'Posting a job.', [
             $this->step('goto', ['url' => '/index.html']),
-            // Only phones: the step would fail anywhere, so passing proves it ran
+            // Only phones: the step would fail anywhere, so passing proves it ran.
             $this->step('wait', ['target' => ['text' => 'Your job is live.'], 'only_on' => ['desktop']]),
             $this->step('type', ['target' => ['label' => 'Job title'], 'value' => 'Designer']),
             $this->step('click', ['target' => ['role' => 'button', 'name' => 'Publish job']]),
@@ -113,7 +113,7 @@ class RecorderTest extends TestCase
         $this->assertSame('dark', $job['style']['theme']);
 
         (new Encoder)->encode($result->video, "$this->out/mobile.mp4", "$this->out/mobile.jpg", $result->trimSeconds, Recorder::speed());
-        // Recorded at the phone's screen size, filling the frame
+        // Recorded at the phone's screen size, filling the frame.
         [$width, $height] = getimagesize("$this->out/mobile.jpg");
         $this->assertSame([390, 844], [$width, $height]);
     }
@@ -131,7 +131,7 @@ class RecorderTest extends TestCase
         $result = (new Recorder)->record($plan, $this->out);
         $this->assertTrue($result->ok, $result->summary());
 
-        // When a field in a frame can't be found, Claude is shown the frame and what's in it
+        // When a field in a frame can't be found, the AI model is shown the frame and what's in it.
         $plan = new Plan('Pay', 'Paying by card.', [
             $this->step('goto', ['url' => '/checkout.html']),
             $this->step('type', ['target' => ['label' => 'Card number'], 'value' => '4242 4242 4242 4242']),
@@ -162,13 +162,13 @@ class RecorderTest extends TestCase
             $this->assertStringContainsString("reading 'render'", $problems['/chart']['detail']);
             $this->assertSame(404, $problems['/missing']['status']);
 
-            // The start-page list keeps only pages that answer with HTML, titled by their heading
+            // The start-page list keeps only pages that answer with HTML, titled by their heading.
             $scan = (new Recorder)->scanPages(['/', '/reports', '/settings', '/chart', '/missing', '/feed.json'], 'guest');
             $this->assertSame([['path' => '/', 'title' => 'Welcome'], ['path' => '/chart', 'title' => 'Chart']], collect($scan['pages'])->sortBy('path')->values()->all());
             $this->assertSame(['/feed.json' => 'not a page (application/json)', '/missing' => 'HTTP 404', '/reports' => 'HTTP 500', '/settings' => 'redirects'],
                 collect($scan['skipped'])->sortBy('path')->pluck('reason', 'path')->all());
 
-            // During recording, an error from the app stops the job instead of asking the AI to repair the plan
+            // During recording, an error from the app stops the job instead of asking the AI model to repair the plan.
             $result = (new Recorder)->record(new Plan('x', 'x', [
                 $this->step('goto', ['url' => '/server-recording']),
                 $this->step('click', ['target' => ['role' => 'button', 'name' => 'Save']]),

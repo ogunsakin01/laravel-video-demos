@@ -33,10 +33,19 @@ use Ogunsakin01\VideoDemo\VideoDemoServiceProvider;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Throwable;
 
+/**
+ * Creates, records and publishes videos in the studio.
+ */
 class VideoController extends Controller
 {
+    /**
+     * The effort levels a video can be planned with.
+     */
     protected const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
 
+    /**
+     * Display the studio's list of videos.
+     */
     public function index(): View
     {
         return view('video-demo::studio.index', [
@@ -46,6 +55,9 @@ class VideoController extends Controller
         ]);
     }
 
+    /**
+     * Display the new-video form.
+     */
     public function create(Request $request): View
     {
         return view('video-demo::studio.create', [
@@ -74,7 +86,9 @@ class VideoController extends Controller
         ]);
     }
 
-    /** Sample videos made with this package, to show what yours will look like */
+    /**
+     * Display sample videos made with this package.
+     */
     public function examples(): View
     {
         abort_unless(Examples::enabled(), 404);
@@ -85,6 +99,9 @@ class VideoController extends Controller
         ]);
     }
 
+    /**
+     * Estimate what a video will cost to make.
+     */
     public function estimate(Request $request, CostEstimator $estimator, CodeTools $code): JsonResponse
     {
         $data = $request->validate($this->rules(forEstimate: true));
@@ -92,7 +109,9 @@ class VideoController extends Controller
         return response()->json($estimator->estimate($data['model'], $data['effort'], (int) $data['target_seconds'], $code->routeCount()));
     }
 
-    /** Pages a video can start on, as the chosen user, for the start-page list */
+    /**
+     * List the pages a video can start on, as the chosen user.
+     */
     public function pages(Request $request, Pages $pages): JsonResponse
     {
         $data = $request->validate([
@@ -109,7 +128,9 @@ class VideoController extends Controller
         }
     }
 
-    /** "Complete with AI": turns a rough note into the form's fields */
+    /**
+     * Fill in the new-video form from a rough note, using the AI model.
+     */
     public function complete(Request $request, FormAssistant $assistant): JsonResponse
     {
         $data = $request->validate([
@@ -126,6 +147,9 @@ class VideoController extends Controller
         }
     }
 
+    /**
+     * Store a new video and queue it to be made.
+     */
     public function store(Request $request, CostEstimator $estimator, CodeTools $code): RedirectResponse
     {
         $data = $request->validate($this->rules());
@@ -154,6 +178,9 @@ class VideoController extends Controller
         return redirect()->route('video-demo.studio.show', $video);
     }
 
+    /**
+     * Display the given video.
+     */
     public function show(Video $video): View
     {
         return view('video-demo::studio.show', [
@@ -164,6 +191,9 @@ class VideoController extends Controller
         ]);
     }
 
+    /**
+     * Get the given video's progress, for the page to poll.
+     */
     public function status(Video $video): JsonResponse
     {
         return response()->json([
@@ -178,16 +208,22 @@ class VideoController extends Controller
         ]);
     }
 
+    /**
+     * Send a recorded video or poster from the work disk.
+     */
     public function file(Video $video, string $device, string $kind): BinaryFileResponse
     {
         $path = $video->workFile($device, $kind);
         $disk = Storage::disk(config('video-demo.storage.work_disk'));
         abort_unless($disk->exists($path), 404);
 
-        // A file response supports range requests, which browsers need to seek in video
+        // A file response supports range requests, which browsers need to seek in a video.
         return response()->file($disk->path($path), ['Cache-Control' => 'no-store']);
     }
 
+    /**
+     * Update the given video's title and visibility.
+     */
     public function update(Request $request, Video $video): RedirectResponse
     {
         $video->update($request->validate([
@@ -198,6 +234,9 @@ class VideoController extends Controller
         return back()->with('status', $video->isPublished() ? 'Saved. Publish again to update the library.' : 'Saved.');
     }
 
+    /**
+     * Queue the given video to be planned and recorded again.
+     */
     public function regenerate(Request $request, Video $video): RedirectResponse
     {
         abort_if($video->status->isWorking(), 409, 'This video is still being made.');
@@ -220,6 +259,9 @@ class VideoController extends Controller
         return redirect()->route('video-demo.studio.show', $video);
     }
 
+    /**
+     * Queue the given video's plan to be recorded again.
+     */
     public function rerecord(Request $request, Video $video): RedirectResponse
     {
         abort_if($video->status->isWorking(), 409, 'This video is still being made.');
@@ -243,8 +285,10 @@ class VideoController extends Controller
     }
 
     /**
-     * Tries a failed video again with the same settings: a fresh plan, or,
-     * when recording failed, the same plan recorded again (free)
+     * Try a failed video again with the same settings.
+     *
+     * When recording failed, the same plan can be recorded again at no AI cost;
+     * otherwise the video gets a new plan.
      */
     public function retry(Request $request, Video $video): RedirectResponse
     {
@@ -260,8 +304,10 @@ class VideoController extends Controller
     }
 
     /**
-     * Stops a video being made. A queued video stops at once; a running one
-     * at its next safe point (between AI requests, or by closing the browser)
+     * Stop the given video being made.
+     *
+     * A queued video stops at once. A running one stops at its next safe point:
+     * between AI requests, or by closing the browser.
      */
     public function stop(Video $video): RedirectResponse
     {
@@ -276,6 +322,9 @@ class VideoController extends Controller
         return back();
     }
 
+    /**
+     * Publish the given video to the library.
+     */
     public function publish(Video $video, Publisher $publisher): RedirectResponse
     {
         try {
@@ -288,8 +337,9 @@ class VideoController extends Controller
     }
 
     /**
-     * Publishes or unpublishes the videos ticked on the list. Videos that
-     * aren't ready, or are already as asked, are skipped and counted.
+     * Publish or unpublish the videos ticked on the list.
+     *
+     * Videos that aren't ready, or are already as asked, are skipped and counted.
      */
     public function bulk(Request $request, Publisher $publisher, Manifest $manifest): RedirectResponse
     {
@@ -338,6 +388,9 @@ class VideoController extends Controller
             ->with('error', $failed ? 'Could not publish '.implode('; ', $failed) : null);
     }
 
+    /**
+     * Remove the given video from the library.
+     */
     public function unpublish(Video $video, Publisher $publisher): RedirectResponse
     {
         $publisher->unpublish($video);
@@ -345,6 +398,9 @@ class VideoController extends Controller
         return back()->with('status', 'Removed from the library.');
     }
 
+    /**
+     * Remove the given video and its working files.
+     */
     public function destroy(Video $video, Publisher $publisher): RedirectResponse
     {
         if ($video->isPublished()) {
@@ -356,7 +412,11 @@ class VideoController extends Controller
         return redirect()->route('video-demo.studio.index')->with('status', 'Video deleted.');
     }
 
-    /** Questions users asked in the library: from production when it is set up, else from this app */
+    /**
+     * List the videos users asked for in the library.
+     *
+     * They come from production when it is set up, and from this app otherwise.
+     */
     public function requests(): JsonResponse
     {
         $production = config('video-demo.studio.production_url');
@@ -377,6 +437,9 @@ class VideoController extends Controller
         ]);
     }
 
+    /**
+     * Get the validation rules for the new-video form.
+     */
     protected function rules(bool $forEstimate = false): array
     {
         $rules = [

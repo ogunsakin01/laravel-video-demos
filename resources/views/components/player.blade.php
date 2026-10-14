@@ -26,7 +26,7 @@
     style="{{ $attributes->get('style', 'width:100%;border-radius:12px;background:#0e0e0d;display:block;max-height:82vh') }};aspect-ratio:{{ $first['width'] }}/{{ $first['height'] }}"></video>
   @once
     <script>
-      // Plays the recorded version closest to this screen: phone, tablet, desktop or TV
+      // Play the recorded version closest to this screen: phone, tablet, desktop or TV.
       window.videoDemoPick = window.videoDemoPick || function (sources, forced) {
         if (forced && sources[forced]) return forced;
         const w = window.innerWidth;

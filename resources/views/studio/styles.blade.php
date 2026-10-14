@@ -20,7 +20,7 @@
       @foreach ($styles as $style)
         @php($dark = $style->theme === 'dark')
         <article class="vd-card" style="display:grid;grid-template-columns:132px minmax(0,1fr);gap:18px;align-items:start">
-          {{-- A small picture of the style's title card --}}
+          {{-- A small preview of the style's title card. --}}
           <div aria-hidden="true" style="position:relative;overflow:hidden;aspect-ratio:16/10;border-radius:8px;border:1px solid var(--vd-border);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:{{ $dark ? '#141412' : '#faf8f3' }}">
             @if ($style->art === 'abstract')
               <svg viewBox="0 0 160 100" style="position:absolute;inset:0;width:100%;height:100%" fill="none" stroke="{{ $dark ? 'rgba(250,250,248,.22)' : '#d6d2c8' }}" stroke-width="1">

@@ -51,7 +51,7 @@
 
   <x-slot:scripts>
     <script>
-      // Switch an example between its versions
+      // Switch an example between its versions.
       document.querySelectorAll('[data-example]').forEach(example => {
         const player = example.querySelector('[data-player]');
         example.querySelectorAll('[data-src]').forEach(b => b.addEventListener('click', () => {

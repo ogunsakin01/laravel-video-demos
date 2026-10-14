@@ -9,21 +9,29 @@ use Illuminate\Support\Str;
 use Ogunsakin01\VideoDemo\Recording\Recorder;
 
 /**
- * The pages a video can start on, for the new-video form: the app's GET
- * routes that need no parameters, checked in a browser as the chosen user
- * so only real HTML pages are offered, each with its heading or title.
+ * Finds the pages a video can start on, for the new-video form. The app's GET
+ * routes without required parameters are opened in a browser as the chosen
+ * user, so only real HTML pages are offered, each with its heading or title.
  */
 class Pages
 {
-    /** Routes that are never pages, or that change something when opened */
+    /**
+     * URI prefixes of routes that are never pages, or that change something when opened.
+     */
     protected const SKIP_URIS = ['_', 'api/', 'sanctum/', 'telescope', 'horizon', 'livewire', 'broadcasting/', 'storage/', 'up', 'video-demo'];
 
+    /**
+     * Words in a route's URI or name that mark it as unsafe to open or not a page.
+     */
     protected const SKIP_WORDS = '/(^|[\s\/._-])(logout|log-out|signout|sign-out|delete|destroy|remove|export|download|impersonate|webhooks?|callback|unsubscribe)([\s\/._-]|$)/i';
 
+    /**
+     * Create a new page finder instance.
+     */
     public function __construct(protected Recorder $recorder) {}
 
     /**
-     * Paths worth checking, with their route names
+     * Get the paths worth checking, with their route names.
      *
      * @return array<string, ?string> path => route name
      */
@@ -45,7 +53,7 @@ class Pages
                 continue;
             }
 
-            // Optional parameters are left off; required ones can't be guessed
+            // Optional parameters are left off; required ones can't be guessed.
             $path = '/'.trim(preg_replace('/\{[^}]+\?\}/', '', $uri), '/');
             if (str_contains($path, '{') || str_contains($path, '//')) {
                 continue;
@@ -59,8 +67,10 @@ class Pages
     }
 
     /**
-     * The pages this user can open. Kept for a while, as checking takes a
-     * few seconds; $fresh checks again.
+     * Get the pages the given user can open.
+     *
+     * The result is cached for 30 minutes, as checking takes a few seconds.
+     * Pass $fresh to check again.
      *
      * @return array{pages: list<array{path: string, title: string, name: ?string}>, skipped: int, checked_at: string}
      */

@@ -7,6 +7,9 @@ use Ogunsakin01\VideoDemo\VideoDemoServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
 use Prism\Prism\PrismServiceProvider;
 
+/**
+ * The base test case: the package in a Testbench app, with an in-memory setup.
+ */
 abstract class TestCase extends Orchestra
 {
     use RefreshDatabase {
@@ -15,7 +18,7 @@ abstract class TestCase extends Orchestra
 
     protected function getPackageProviders($app): array
     {
-        // Prism is optional; in apps that install it, Laravel discovers it
+        // Prism is optional; in apps that install it, Laravel discovers it.
         return array_filter([
             VideoDemoServiceProvider::class,
             class_exists(PrismServiceProvider::class) ? PrismServiceProvider::class : null,
@@ -27,22 +30,27 @@ abstract class TestCase extends Orchestra
         $app['config']->set('app.env', 'local');
         $app['config']->set('app.key', 'base64:'.base64_encode(str_repeat('k', 32)));
         $app['config']->set('database.default', 'testing');
-        // testbench.yaml configures the demo app; tests keep everything in memory
+        // testbench.yaml configures the demo app; tests keep everything in memory.
         $app['config']->set('cache.default', 'array');
         $app['config']->set('session.driver', 'array');
         $app['config']->set('video-demo.studio.enabled', true);
         $app['config']->set('video-demo.library.private.middleware', ['web']);
         $app['config']->set('video-demo.ai.api_key', 'test-key');
-        // Tests don't open real browsers unless they ask to (see RecorderTest)
+        // Tests don't open real browsers unless they ask to (see RecorderTest).
         $app['config']->set('video-demo.recorder.check_pages', false);
     }
 
-    /** Lets the production tests migrate without asking for confirmation */
+    /**
+     * Let the production tests migrate without asking for confirmation.
+     */
     protected function migrateFreshUsing(): array
     {
         return [...$this->baseMigrateFreshUsing(), '--force' => true];
     }
 
+    /**
+     * Build a library manifest entry for a published video.
+     */
     protected function manifestVideo(array $overrides = []): array
     {
         return [

@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * A video the AI suggested making, kept until replaced or deleted
+ * A video the AI model suggested making, kept until replaced or deleted.
  *
  * @property int $id
  * @property string $title
@@ -25,12 +25,19 @@ class VideoIdea extends Model
 
     protected $guarded = ['id'];
 
+    /**
+     * Get the attributes that should be cast.
+     */
     protected function casts(): array
     {
         return ['cost' => 'float'];
     }
 
-    /** @return BelongsTo<Video, $this> */
+    /**
+     * Get the video made from this idea.
+     *
+     * @return BelongsTo<Video, $this>
+     */
     public function video(): BelongsTo
     {
         return $this->belongsTo(Video::class);

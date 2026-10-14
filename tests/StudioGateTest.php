@@ -7,6 +7,9 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
 use Orchestra\Testbench\Attributes\DefineEnvironment;
 
+/**
+ * Tests who can open the studio outside a local machine.
+ */
 class StudioGateTest extends TestCase
 {
     public function test_open_on_a_local_machine_without_a_gate(): void
@@ -35,7 +38,7 @@ class StudioGateTest extends TestCase
     public function test_the_recorders_signed_link_is_not_behind_the_gate(): void
     {
         // User 1 doesn't exist, so the controller answers 404; what matters
-        // is that the gate is never asked
+        // is that the gate is never asked.
         Gate::define('viewVideoDemoStudio', fn () => throw new \LogicException('The gate should not be checked.'));
         $link = URL::temporarySignedRoute('video-demo.studio.recorder-login', now()->addMinutes(5), ['user' => 1], absolute: false);
 

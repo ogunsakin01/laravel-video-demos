@@ -9,9 +9,8 @@ use RuntimeException;
 use Symfony\Component\Finder\Finder;
 
 /**
- * The tools Claude uses to read the app while planning. Reading is limited to
- * the folders in video-demo.ai.code.paths, and files matching
- * video-demo.ai.code.deny (such as .env) are never returned.
+ * The tools the model uses to read the app while planning. Reading is limited to the folders
+ * in video-demo.ai.code.paths, and files matching video-demo.ai.code.deny (such as .env) are never returned.
  */
 class CodeTools
 {
@@ -21,6 +20,9 @@ class CodeTools
 
     protected Redactor $redactor;
 
+    /**
+     * Create a new code tools instance.
+     */
     public function __construct(protected ?string $root = null, ?Redactor $redactor = null)
     {
         $this->redactor = $redactor ?? new Redactor;
@@ -28,7 +30,9 @@ class CodeTools
         $this->root = rtrim(realpath($root) ?: $root, '/');
     }
 
-    /** Tool definitions: name, description and a JSON schema for the input */
+    /**
+     * Get the tool definitions: a name, description and JSON schema for each tool's input.
+     */
     public function definitions(): array
     {
         $paths = implode(', ', $this->allowedPaths());
@@ -73,12 +77,19 @@ class CodeTools
         ];
     }
 
+    /**
+     * Determine if the given tool is one of these code tools.
+     */
     public function handles(string $tool): bool
     {
         return in_array($tool, ['list_files', 'read_file', 'search_code'], true);
     }
 
-    /** Runs a tool and returns its text result, secrets hidden; a RuntimeException means the input was refused */
+    /**
+     * Run a tool and return its text result, with secrets hidden.
+     *
+     * @throws RuntimeException When the input is refused.
+     */
     public function run(string $tool, array $input): string
     {
         return $this->redactor->redact(match ($tool) {
@@ -89,13 +100,17 @@ class CodeTools
         });
     }
 
-    /** How many secrets the last tool calls hid */
+    /**
+     * Get how many secrets the tool calls hid since the last check.
+     */
     public function hiddenSecrets(): int
     {
         return $this->redactor->takeCount();
     }
 
-    /** The app's routes, one per line, sent with the first request */
+    /**
+     * Get the app's routes, one per line, to send with the first request.
+     */
     public function routeList(): string
     {
         return collect(Router::getRoutes()->getRoutes())
@@ -113,6 +128,9 @@ class CodeTools
             ->implode("\n");
     }
 
+    /**
+     * Get the number of routes the app registers.
+     */
     public function routeCount(): int
     {
         return count(Router::getRoutes()->getRoutes());
@@ -188,7 +206,9 @@ class CodeTools
         return $matches ? implode("\n", $matches) : 'No matches.';
     }
 
-    /** Turns a path from Claude into a real path inside an allowed folder, or refuses it */
+    /**
+     * Resolve a path from the model to a real path inside an allowed folder, or refuse it.
+     */
     protected function resolve(string $path, bool $mustBeDir = false): string
     {
         $real = realpath($this->root.'/'.ltrim($path, '/'));
@@ -215,6 +235,9 @@ class CodeTools
         return $real;
     }
 
+    /**
+     * Determine if the path matches the deny list, by file name or relative path.
+     */
     protected function denied(string $relative): bool
     {
         $name = basename($relative);
@@ -233,7 +256,11 @@ class CodeTools
         return ltrim(Str::after($absolute, $this->root), '/');
     }
 
-    /** @return list<string> */
+    /**
+     * Get the folders the model may read, relative to the app's root.
+     *
+     * @return list<string>
+     */
     protected function allowedPaths(): array
     {
         return array_values(array_map(fn ($p) => trim($p, '/'), config('video-demo.ai.code.paths', [])));

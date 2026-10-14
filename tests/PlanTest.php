@@ -7,6 +7,9 @@ use Ogunsakin01\VideoDemo\Ai\Drivers\Drivers;
 use Ogunsakin01\VideoDemo\Ai\Planner;
 use Ogunsakin01\VideoDemo\Recording\Plan;
 
+/**
+ * Tests the plan: its steps, timing and JSON schema.
+ */
 class PlanTest extends TestCase
 {
     protected function step(string $action, array $fields = []): array
@@ -37,11 +40,11 @@ class PlanTest extends TestCase
         $longer = $plan->fitTo((int) ceil($before * 1.5));
         $this->assertEqualsWithDelta($before * 1.5, $longer->estimatedSeconds(), 1.0);
 
-        // Never stretched past three times, however long the target
+        // Never stretched past three times, however long the target.
         $capped = $plan->fitTo(600);
         $this->assertSame(3500 * 3, $capped->steps[0]['ms']);
 
-        // Actions keep their own speed
+        // Actions keep their own speed.
         $this->assertNull($capped->steps[4]['ms']);
     }
 
@@ -113,7 +116,7 @@ class PlanTest extends TestCase
         $reading = (3500 + 3000 + 1500) / 1000;
         $this->assertEqualsWithDelta($reading + ($normal - $reading) / 2, $fast, 0.1);
 
-        // Fitting to a length at 2x leaves more room for captions and cards
+        // Fitting to a length at 2x leaves more room for captions and cards.
         $this->assertGreaterThan($plan->fitTo(12)->steps[0]['ms'], $plan->fitTo(12, 2)->steps[0]['ms']);
     }
 

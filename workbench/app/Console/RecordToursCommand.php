@@ -12,8 +12,8 @@ use Ogunsakin01\VideoDemo\Recording\Recorder;
 
 /**
  * Records the package's own videos with its recorder, from the plans in
- * workbench/tours. The plans are hand-written in the format Claude writes,
- * so this costs nothing. Each plan file may also set:
+ * workbench/tours. The plans are hand-written in the format the AI model
+ * writes, so this costs nothing. Each plan file may also set:
  *   "devices": versions to record (default ["desktop"])
  *   "out": folder to write to (default "docs"), as <name>[-<device>].mp4 and .jpg
  *   "site": "app" for the demo app (default), "fixture" for tests/fixtures/app
@@ -29,6 +29,9 @@ class RecordToursCommand extends Command
 
     protected $description = 'Record the package tour videos and sample clips';
 
+    /**
+     * Execute the console command.
+     */
     public function handle(Recorder $recorder, Encoder $encoder): int
     {
         $root = realpath(__DIR__.'/../../..');
@@ -62,7 +65,7 @@ class RecordToursCommand extends Command
                     $this->preview("$out/$name.mp4", "$out/$name.gif", $device === 'mobile' ? 260 : 720);
                 }
                 if (isset($data['out'])) {
-                    // Sample clips keep their length and chapters for the demo seeder
+                    // Sample clips keep their length and chapters for the demo seeder.
                     File::put("$out/$name.json", json_encode(['seconds' => $result->seconds, 'chapters' => $result->chapters]));
                 }
                 File::deleteDirectory($work);
@@ -74,8 +77,8 @@ class RecordToursCommand extends Command
     }
 
     /**
-     * An animated preview for the README, at the video's own speed: GitHub
-     * doesn't play videos stored in the repository, but it does play GIFs.
+     * Make an animated GIF preview for the README, at the video's own speed.
+     * GitHub doesn't play videos stored in the repository, but it does play GIFs.
      */
     protected function preview(string $mp4, string $gif, int $width): void
     {

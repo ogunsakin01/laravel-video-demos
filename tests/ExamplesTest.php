@@ -4,6 +4,9 @@ namespace Ogunsakin01\VideoDemo\Tests;
 
 use Ogunsakin01\VideoDemo\Models\VideoStyle;
 
+/**
+ * Tests the studio's Examples page.
+ */
 class ExamplesTest extends TestCase
 {
     public function test_the_studio_shows_sample_videos_from_the_package(): void

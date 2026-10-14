@@ -20,7 +20,10 @@ use Prism\Prism\ValueObjects\Messages\UserMessage;
 use Prism\Prism\ValueObjects\ToolCall;
 use Prism\Prism\ValueObjects\Usage;
 
-/** Models from other providers, through Prism, planning the same way Claude does */
+/**
+ * Tests planning with models from other providers through Prism, the same way
+ * the Anthropic driver plans.
+ */
 class PrismDriverTest extends TestCase
 {
     protected function setUp(): void
@@ -97,13 +100,13 @@ class PrismDriverTest extends TestCase
             $this->assertSame(['list_files', 'read_file', 'search_code', 'submit_plan'], array_map(fn ($t) => $t->name(), $first->tools()));
             $this->assertInstanceOf(UserMessage::class, $first->messages()[0]);
 
-            // The file Claude asked for came back as a tool result
+            // The file the model asked for came back as a tool result.
             $second = $requests[1]->messages();
             $this->assertInstanceOf(AssistantMessage::class, $second[1]);
             $this->assertInstanceOf(ToolResultMessage::class, $second[2]);
             $this->assertStringContainsString('1  <label for="t">Job title</label>', $second[2]->toolResults[0]->result);
 
-            // The failed recording went back as the result of submit_plan
+            // The failed recording went back as the result of submit_plan.
             $repair = $requests[2]->messages();
             $last = end($repair);
             $this->assertSame('c2', $last->toolResults[0]->toolCallId);
@@ -111,7 +114,7 @@ class PrismDriverTest extends TestCase
             $this->assertStringContainsString('button "Post job"', $last->toolResults[0]->result);
         });
 
-        // 3 replies of 1,000 prompt and 200 completion tokens at $1 and $4 per million
+        // 3 replies of 1,000 prompt and 200 completion tokens at $1 and $4 per million.
         $this->assertEqualsWithDelta(3 * (1_000 * 1.00 + 200 * 4.00) / 1_000_000, $video->fresh()->cost, 0.000001);
     }
 

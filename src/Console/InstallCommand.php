@@ -6,16 +6,34 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 
+/**
+ * Publishes the config and installs Playwright and Chromium for the recorder.
+ */
 class InstallCommand extends Command
 {
+    /**
+     * The name and signature of the console command.
+     *
+     * @var string
+     */
     protected $signature = 'video-demo:install
         {--no-browser : Only publish the config, without installing Playwright}';
 
+    /**
+     * The console command description.
+     *
+     * @var string
+     */
     protected $description = 'Publish the config and install Playwright and its browser for recording';
 
-    /** Playwright version the recorder is tested with */
+    /**
+     * The Playwright version the recorder is tested with.
+     */
     protected const PLAYWRIGHT = '1.64.0';
 
+    /**
+     * Execute the console command.
+     */
     public function handle(): int
     {
         $this->call('vendor:publish', ['--tag' => 'video-demo-config']);
@@ -56,6 +74,9 @@ class InstallCommand extends Command
         return self::SUCCESS;
     }
 
+    /**
+     * Run a command in the given directory, printing its error output when it fails.
+     */
     protected function runInDir(array $command, string $dir): bool
     {
         $result = Process::path($dir)->timeout(900)->run($command);

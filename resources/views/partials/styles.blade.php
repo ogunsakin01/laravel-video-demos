@@ -1,6 +1,6 @@
 @php
   $accent = config('video-demo.ui.accent') ?: '#171717';
-  // The default near-black accent turns light in dark mode; a custom colour is kept
+  // The default near-black accent turns light in dark mode; a custom colour is kept.
   $darkAccent = in_array(strtolower($accent), ['#171717', '#000', '#000000'], true) ? '#f5f4ef' : $accent;
   $darkAccentInk = $darkAccent === '#f5f4ef' ? '#171717' : '#ffffff';
 @endphp
@@ -54,7 +54,7 @@
   .vd-nav { display: flex; gap: 8px; }
   .vd-brand { white-space: nowrap; min-width: 0; }
   .vd-tag { white-space: nowrap; }
-  /* Phones: the name on top, the menu on its own row below, scrolling sideways if it must */
+  /* Phones: the name on top, the menu on its own row below, scrolling sideways if it must. */
   @media (max-width: 640px) {
     .vd-top .vd-wrap { flex-wrap: wrap; gap: 0 10px; min-height: 0; padding-top: 10px; }
     .vd-tag { display: none; }
@@ -65,7 +65,7 @@
     .vd-nav .vd-btn { min-height: 32px; padding: 0 10px; font-size: 13px; flex: none; white-space: nowrap; }
   }
 
-  /* Page heading strip, with a dot texture on the right (an SVG pattern, no gradients) */
+  /* Page heading strip, with a dot texture on the right (an SVG pattern, no gradients). */
   .vd-main { padding: 24px 0 72px; }
   .vd-hero { position: relative; overflow: hidden; background: var(--vd-card); border: 1px solid var(--vd-border); border-radius: var(--vd-radius-lg);
     padding: 22px 24px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; box-shadow: var(--vd-shadow); }
@@ -143,7 +143,7 @@
   .vd-toggle:has(input:focus-visible) { outline: 2px solid var(--vd-strong); outline-offset: 2px; }
   .vd-ai-note { font-size: 12.5px; color: var(--vd-muted-ink); }
   .vd-ai-note[data-error] { color: var(--vd-bad); }
-  /* A busy button swaps its icon for a ring spinner */
+  /* A busy button swaps its icon for a ring spinner. */
   .vd-btn[aria-busy="true"], .vd-btn[aria-busy="true"][disabled] { cursor: progress; opacity: .85; }
   .vd-btn[aria-busy="true"] svg { display: none; }
   .vd-btn[aria-busy="true"]::before { content: ""; flex: none; width: 14px; height: 14px; border-radius: 50%;

@@ -5,13 +5,28 @@ namespace Ogunsakin01\VideoDemo\Console;
 use Illuminate\Console\Command;
 use Ogunsakin01\VideoDemo\Models\Video;
 
-/** The studio's videos, for people and for AI agents (--json) */
+/**
+ * Lists the studio's videos, as a table or as JSON for scripts and AI agents.
+ */
 class ListCommand extends Command
 {
+    /**
+     * The name and signature of the console command.
+     *
+     * @var string
+     */
     protected $signature = 'video-demo:list {--json : Print the videos as JSON}';
 
+    /**
+     * The console command description.
+     *
+     * @var string
+     */
     protected $description = 'List the videos made in the studio';
 
+    /**
+     * Execute the console command.
+     */
     public function handle(): int
     {
         $videos = Video::latest()->get()->map(fn (Video $v) => [

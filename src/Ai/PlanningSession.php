@@ -6,28 +6,27 @@ use Ogunsakin01\VideoDemo\Ai\Drivers\ToolOutput;
 use Ogunsakin01\VideoDemo\Recording\Plan;
 
 /**
- * One planning conversation with the model. Kept for the life of a
- * generation job so a failed recording can be repaired in the same
- * conversation, with the code already read still in context (and, for
- * Claude, in the prompt cache).
+ * One planning conversation with the model, kept for the life of a generation job so a failed
+ * recording can be repaired with the code already read still in context (and, for Claude, in the prompt cache).
  */
 class PlanningSession
 {
     /**
-     * Messages so far, in the driver's own format; only ever appended to, so
-     * the prompt cache keeps working
+     * The messages so far, in the driver's own format.
+     *
+     * Only ever appended to, so the prompt cache and thinking blocks stay valid.
      */
     public array $messages = [];
 
     /**
-     * The submit_plan call still waiting for its result (the recording outcome)
+     * The submit_plan call still waiting for its result (the recording outcome).
      *
      * @var array{id: string, name: string, input: array}|null
      */
     public ?array $pendingSubmit = null;
 
     /**
-     * Results for other tool calls made alongside submit_plan, sent back with it
+     * The results for other tool calls made alongside submit_plan, sent back with it.
      *
      * @var list<ToolOutput>
      */

@@ -19,6 +19,9 @@ trait FakesAnthropic
 
     protected Process $server;
 
+    /**
+     * Start the fake API server and point the Claude client at it.
+     */
     protected function startFakeAnthropic(): void
     {
         $this->dir = sys_get_temp_dir().'/video-demo-api-'.uniqid();
@@ -27,7 +30,7 @@ trait FakesAnthropic
         $this->server = new Process([PHP_BINARY, '-S', "127.0.0.1:$port", __DIR__.'/../fixtures/fake-anthropic.php'], null, ['FAKE_DIR' => $this->dir]);
         $this->server->start();
         // Stop the server even if a test dies with a fatal error, or the
-        // orphaned server keeps the whole test run waiting
+        // orphaned server keeps the whole test run waiting.
         $server = $this->server;
         register_shutdown_function(fn () => $server->isRunning() && $server->stop(0));
         for ($i = 0; $i < 50 && ! @fsockopen('127.0.0.1', $port); $i++) {
@@ -41,12 +44,18 @@ trait FakesAnthropic
         )));
     }
 
+    /**
+     * Stop the fake API server and delete its files.
+     */
     protected function stopFakeAnthropic(): void
     {
         $this->server->stop();
         File::deleteDirectory($this->dir);
     }
 
+    /**
+     * Script the fake API's reply to the n-th request.
+     */
     protected function respond(int $n, array $content, string $stopReason = 'tool_use', array $usage = [], string $model = 'claude-opus-5-5'): void
     {
         File::put("$this->dir/response-$n.json", json_encode([
@@ -64,12 +73,17 @@ trait FakesAnthropic
         ]));
     }
 
+    /**
+     * Get the n-th request as it was sent.
+     */
     protected function request(int $n): array
     {
         return json_decode(File::get("$this->dir/request-$n.json"), true);
     }
 
-    /** Whether the n-th request was sent at all */
+    /**
+     * Determine whether the n-th request was sent at all.
+     */
     protected function sent(int $n): bool
     {
         return File::exists("$this->dir/request-$n.json");

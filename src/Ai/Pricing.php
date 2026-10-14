@@ -6,12 +6,16 @@ use InvalidArgumentException;
 use Ogunsakin01\VideoDemo\Ai\Drivers\Drivers;
 
 /**
- * Prices from config('video-demo.ai.models'), in US dollars per million
- * tokens. A model without prices still works; its cost shows as unknown.
+ * Model prices from config('video-demo.ai.models'), in US dollars per million tokens.
+ * A model without prices still works; its cost shows as unknown.
  */
 class Pricing
 {
-    /** @return array{label?: string, provider?: string, reliable?: bool, input?: ?float, output?: ?float, cache_read?: ?float, long_context?: array{above: int, multiplier: float|int}} */
+    /**
+     * Get a model's settings, or fail when the model is not configured.
+     *
+     * @return array{label?: string, provider?: string, reliable?: bool, input?: ?float, output?: ?float, cache_read?: ?float, long_context?: array{above: int, multiplier: float|int}}
+     */
     public static function for(string $model): array
     {
         $entry = static::model($model);
@@ -24,8 +28,9 @@ class Pricing
     }
 
     /**
-     * A model's settings, or null. Looked up by key, not with config()'s dot
-     * notation, as model names such as "gpt-6.1-sol" contain dots.
+     * Get a model's settings, or null when it is not configured.
+     *
+     * Looked up by key, not with config()'s dot notation, as model names such as "gpt-6.1-sol" contain dots.
      */
     public static function model(string $model): ?array
     {
@@ -34,7 +39,9 @@ class Pricing
         return is_array($entry) ? $entry : null;
     }
 
-    /** Whether the model has prices, so costs and estimates can be shown */
+    /**
+     * Determine if the model has prices, so costs and estimates can be shown.
+     */
     public static function known(string $model): bool
     {
         $p = static::model($model);
@@ -43,10 +50,11 @@ class Pricing
     }
 
     /**
-     * What one request cost. $cacheWrite is written to the 5-minute cache,
-     * $cacheWrite1h to the 1-hour cache. Models with a long-context rate
-     * (Haiku) pay it on the whole request when its prompt, cached tokens
-     * included, is over the threshold.
+     * Get what one request cost, in US dollars.
+     *
+     * $cacheWrite is written to the 5-minute cache, $cacheWrite1h to the 1-hour cache. Models with a
+     * long-context rate (Haiku) pay it on the whole request when its prompt, cached tokens included,
+     * is over the threshold.
      */
     public static function cost(string $model, int $input, int $cacheWrite, int $cacheRead, int $output, int $cacheWrite1h = 0): float
     {
@@ -73,8 +81,9 @@ class Pricing
     }
 
     /**
-     * The model new videos start with: video-demo.ai.model when set, else
-     * the cheapest model marked reliable, else the cheapest with prices
+     * Get the model new videos start with.
+     *
+     * That is video-demo.ai.model when set, else the cheapest model marked reliable, else the cheapest with prices.
      */
     public static function defaultModel(): string
     {
@@ -83,7 +92,7 @@ class Pricing
         }
 
         $models = collect(config('video-demo.ai.models'))->filter(fn ($p, $id) => static::known($id));
-        // Only models whose provider has a key, when any has
+        // Prefer models whose provider has a key, when any has one.
         $usable = $models->filter(fn ($p, $id) => Drivers::hasKey($id));
         $models = $usable->isNotEmpty() ? $usable : $models;
         $reliable = $models->filter(fn ($p) => $p['reliable'] ?? false);
@@ -92,11 +101,14 @@ class Pricing
         return $pick->keys()->first() ?? array_key_first(config('video-demo.ai.models'));
     }
 
-    /** @return array<string, string> model id => label */
+    /**
+     * Get the models to offer, preferring those whose provider has a key.
+     *
+     * @return array<string, string> model id => label
+     */
     public static function options(): array
     {
         $models = collect(config('video-demo.ai.models'));
-        // Only models that can be used, when any can
         $usable = $models->filter(fn ($p, $id) => Drivers::hasKey($id));
 
         return ($usable->isNotEmpty() ? $usable : $models)->map(fn ($p, $id) => $p['label'] ?? $id)->all();

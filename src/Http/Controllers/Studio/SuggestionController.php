@@ -14,9 +14,15 @@ use Ogunsakin01\VideoDemo\Models\VideoIdea;
 use Ogunsakin01\VideoDemo\Models\VideoStyle;
 use Throwable;
 
-/** "Ideas": videos the AI suggests making first, from the app's routes */
+/**
+ * Shows the Ideas page: videos the AI model suggests making first, based on
+ * the app's routes.
+ */
 class SuggestionController extends Controller
 {
+    /**
+     * Display the suggested videos.
+     */
     public function index(): View
     {
         $ideas = VideoIdea::with('video')->orderByRaw('video_id is not null')->latest('id')->get();
@@ -32,6 +38,9 @@ class SuggestionController extends Controller
         ]);
     }
 
+    /**
+     * Ask the AI model for new suggestions.
+     */
     public function store(Request $request, Suggester $suggester): RedirectResponse
     {
         $data = $request->validate([
@@ -50,6 +59,9 @@ class SuggestionController extends Controller
         return redirect()->route('video-demo.studio.suggestions.index');
     }
 
+    /**
+     * Remove the given idea.
+     */
     public function destroy(VideoIdea $idea): RedirectResponse
     {
         $idea->delete();

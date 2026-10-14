@@ -3,7 +3,7 @@
 // The job file gives the plan file, the app's address, an optional sign-in
 // link, the window size and where to write the recording. Writes result.json
 // next to the recording: ok, how long it ran, and on failure the step that
-// failed, the error and what was on the page (for Claude to fix the plan).
+// failed, the error and what was on the page (so the AI model can fix the plan).
 const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
@@ -12,7 +12,7 @@ const { CURSOR_JS, OVERLAY_JS, setPace, typingDelay, pause, glide, click, scroll
 const job = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const plan = JSON.parse(fs.readFileSync(job.planPath, 'utf8'));
 // The video is played back this many times faster after recording, so what
-// viewers must read (captions, cards, pauses) is held this much longer now
+// viewers must read (captions, cards, pauses) is held this much longer now.
 const SPEED = job.speed || 1;
 const style = Object.assign({ theme: 'light', accent: '#171717', captions: 'bottom', pace: 'normal', speed: SPEED }, job.style || {});
 setPace(style.pace);
@@ -21,9 +21,10 @@ const SNAPSHOT_LIMIT = 12000;
 
 const url = p => job.baseUrl.replace(/\/$/, '') + '/' + String(p).replace(/^\//, '');
 
+// Build a locator for a plan target, inside an iframe when target.frame is set.
 function locate(page, t) {
   if (!t) throw new Error('This step needs a target.');
-  // Inside an iframe, such as the card fields of an embedded payment form
+  // Inside an iframe, such as the card fields of an embedded payment form.
   const scope = t.frame ? page.frameLocator(t.frame).first() : page;
   let loc;
   if (t.role) loc = scope.getByRole(t.role, t.name ? { name: t.name } : {});
@@ -50,6 +51,7 @@ async function find(page, t) {
   return loc;
 }
 
+// Wait for the page to load and its network to go quiet, without failing if it never does.
 async function settle(page) {
   await page.waitForLoadState('load').catch(() => {});
   await page.waitForLoadState('networkidle', { timeout: 4000 }).catch(() => {});
@@ -131,7 +133,7 @@ async function run(page, step, isLast) {
     case 'caption':
       await page.evaluate(([t, s]) => window.__demoOverlay.caption(t, s), [step.title, step.text || '']);
       await pause(page, (step.ms || 3000) * SPEED);
-      // The last step stays on screen, so the video doesn't end mid-fade
+      // The last step stays on screen, so the video doesn't end mid-fade.
       if (isLast) return;
       await page.evaluate(() => window.__demoOverlay.hide());
       await pause(page, 350 * SPEED);
@@ -151,15 +153,15 @@ async function run(page, step, isLast) {
   }
 }
 
-// What was on the page when a step failed, for Claude to fix the plan
+// Describe what was on the page when a step failed, so the AI model can fix the plan.
 async function snapshot(page) {
   let tree = '';
   try {
     tree = await page.locator('body').ariaSnapshot({ timeout: 3000 });
   } catch {}
 
-  // The page's iframes and what's inside them, so Claude can target fields in
-  // embedded forms (payment card fields, sign-in widgets) with target.frame
+  // Add the page's iframes and what's inside them, so the AI model can target
+  // fields in embedded forms (payment card fields, sign-in widgets) with target.frame.
   try {
     const frames = await page.locator('iframe').evaluateAll(els => els.map(f => ({
       title: f.getAttribute('title'), name: f.getAttribute('name'), id: f.id,
@@ -184,16 +186,16 @@ async function snapshot(page) {
   const browser = await chromium.launch(job.channel ? { channel: job.channel } : {});
   let page;
   try {
-    // Playwright records at the page's own size, so each version is recorded at its screen size
+    // Playwright records at the page's own size, so each version is recorded at its screen size.
     const common = {
       viewport: job.viewport,
       hasTouch: !!job.touch,
-      // Phones get mobile layout handling (the page's meta viewport)
+      // Phones get mobile layout handling (the page's meta viewport).
       isMobile: !!job.touch && job.viewport.width < 600,
       ignoreHTTPSErrors: !!job.ignoreHttpsErrors,
     };
 
-    // Sign in first, outside the recording
+    // Sign in first, outside the recording.
     let storageState;
     if (job.loginPath) {
       const ctx = await browser.newContext(common);
@@ -207,7 +209,7 @@ async function snapshot(page) {
     const recordingStarted = Date.now();
     const context = await browser.newContext({ ...common, storageState, recordVideo: { dir: job.outDir, size: job.viewport } });
     await context.addInitScript(`window.__demoStyle = ${JSON.stringify(style)};`);
-    // Touch screens show where a finger taps instead of a cursor
+    // Touch screens show where a finger taps instead of a cursor.
     if (job.touch) await context.addInitScript('window.__demoTouch = true;');
     await context.addInitScript(CURSOR_JS);
     await context.addInitScript(OVERLAY_JS);
@@ -224,7 +226,7 @@ async function snapshot(page) {
     result.trimMs = started - recordingStarted;
 
     // Errors from the app itself: a step that fails after one of these is a
-    // bug in the app, not something a better plan can fix
+    // bug in the app, not something a better plan can fix.
     const appErrors = [];
     page.on('response', r => {
       if (r.status() >= 500 && r.request().isNavigationRequest()) appErrors.push({ kind: 'server', status: r.status(), url: r.url(), at: Date.now() });
@@ -243,7 +245,7 @@ async function snapshot(page) {
         result.url = page.url();
         result.title = await page.title().catch(() => '');
         result.snapshot = await snapshot(page);
-        // A server error or JavaScript error during this step means the app is broken here
+        // A server error or JavaScript error during this step means the app is broken here.
         const appError = appErrors.filter(a => a.at >= stepStarted - 2000).pop();
         if (appError) {
           const detail = await page.evaluate(() => (document.querySelector('.exception-message')?.textContent || document.querySelector('h1')?.textContent || document.title || '').trim()).catch(() => '');

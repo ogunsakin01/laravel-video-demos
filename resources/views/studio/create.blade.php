@@ -174,7 +174,7 @@
         let seq = 0;
         let last = null;
 
-        // Warn when even a cheap run would pass the spending limit
+        // Warn when even a cheap run would pass the spending limit.
         const limit = form.elements.max_cost;
         const warn = document.getElementById('vd-limit-warn');
         function checkLimit() {
@@ -186,7 +186,7 @@
 
         const mark = () => segments.forEach(s => s.setAttribute('aria-pressed', String(s.dataset.seconds === seconds.value)));
         function setSeconds(value) {
-          // Snap to the nearest length on offer
+          // Snap to the nearest length on offer.
           const options = [...segments].map(s => Number(s.dataset.seconds));
           seconds.value = String(options.reduce((a, b) => Math.abs(b - value) < Math.abs(a - value) ? b : a));
           mark();
@@ -222,7 +222,7 @@
         }
         for (const k of ['model', 'effort']) form.elements[k].addEventListener('change', estimate);
 
-        // Effort is a Claude setting; other providers ignore it
+        // Effort is a Claude setting; other providers ignore it.
         const effort = form.elements.effort;
         const modelNote = document.getElementById('vd-model-note');
         const syncEffort = () => {
@@ -234,7 +234,7 @@
         syncEffort();
         form.addEventListener('submit', e => {
           const submit = form.querySelector('button[type=submit]');
-          // One video per click
+          // Ignore repeat clicks, so one click starts one video.
           if (submit.getAttribute('aria-busy')) { e.preventDefault(); return; }
           effort.disabled = false;
           submit.setAttribute('aria-busy', 'true');
@@ -337,14 +337,14 @@
           who.addEventListener('change', () => { loading = null; pages = null; if (document.activeElement === input) load(); else setNote('The pages this user can open are listed when you click the field.'); });
         })();
 
-        // Show what the chosen style asks the AI to do
+        // Show what the chosen style asks the AI model to do.
         const styleSelect = form.elements.style_id;
         const styleHint = document.getElementById('vd-style-hint');
         const showStyle = () => { styleHint.textContent = styleSelect.selectedOptions[0]?.dataset.direction || ''; };
         styleSelect.addEventListener('change', showStyle);
         showStyle();
 
-        // Complete with AI: one short request turns a rough note into the fields
+        // Complete with AI: one short request turns a rough note into the form fields.
         const complete = document.getElementById('vd-complete');
         const label = complete.querySelector('span');
         const status = document.getElementById('vd-complete-note');

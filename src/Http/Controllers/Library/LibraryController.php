@@ -10,10 +10,19 @@ use Illuminate\View\View;
 use Ogunsakin01\VideoDemo\Library\Manifest;
 use Ogunsakin01\VideoDemo\Models\VideoRequest;
 
+/**
+ * Shows the public and private video libraries to the app's users.
+ */
 class LibraryController extends Controller
 {
+    /**
+     * Create a new controller instance.
+     */
     public function __construct(protected Manifest $manifest) {}
 
+    /**
+     * Display the library, or the videos matching a search.
+     */
     public function index(Request $request): View
     {
         $area = $this->area($request);
@@ -29,6 +38,9 @@ class LibraryController extends Controller
         ]);
     }
 
+    /**
+     * Display the given video.
+     */
     public function show(Request $request, string $slug): View
     {
         $area = $this->area($request);
@@ -43,6 +55,9 @@ class LibraryController extends Controller
         ]);
     }
 
+    /**
+     * Store a user's request for a video.
+     */
     public function request(Request $request): RedirectResponse
     {
         abort_unless(config('video-demo.library.accept_requests'), 404);
@@ -61,6 +76,9 @@ class LibraryController extends Controller
         return back()->with('video-demo.requested', true);
     }
 
+    /**
+     * Get the library area the current route belongs to.
+     */
     protected function area(Request $request): string
     {
         return str_starts_with((string) $request->route()?->getName(), 'video-demo.private.') ? 'private' : 'public';

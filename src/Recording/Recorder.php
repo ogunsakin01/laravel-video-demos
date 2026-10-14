@@ -12,15 +12,17 @@ use Ogunsakin01\VideoDemo\Ai\VideoStopped;
 use Ogunsakin01\VideoDemo\Models\VideoStyle;
 use RuntimeException;
 
-/** Runs the Node scripts in resources/recorder with Playwright */
+/**
+ * Runs the Node scripts in resources/recorder with Playwright.
+ */
 class Recorder
 {
     /**
-     * Records the plan's steps for one version into $dir (an absolute folder).
+     * Record the plan's steps for one version into $dir (an absolute folder).
      *
      * $recordAs is who to sign in as: a user id or email, "guest" for signed
      * out, or null for video-demo.recorder.login_as. $shouldStop is asked
-     * every second; when it says yes the browser is closed.
+     * twice a second; when it returns true the browser is closed.
      */
     public function record(Plan $plan, string $dir, array $style = [], string $device = 'desktop', ?string $recordAs = null, ?Closure $shouldStop = null): RecordingResult
     {
@@ -48,7 +50,7 @@ class Recorder
 
         $result = json_decode(File::get("$dir/result.json"), true) ?: [];
 
-        // Lengths and chapter times as they will be in the sped-up video
+        // Lengths and chapter times as they will be in the sped-up video.
         $speed = static::speed();
         $result['durationMs'] = ($result['durationMs'] ?? 0) / $speed;
         $result['chapters'] = array_map(fn ($c) => [...$c, 'at' => round($c['at'] / $speed, 2)], $result['chapters'] ?? []);
@@ -57,9 +59,11 @@ class Recorder
     }
 
     /**
-     * Opens each path as the given user and reports the ones that don't work:
-     * an error status, a redirect to sign-in, a JavaScript error, or a page
-     * that doesn't load. Costs no AI; run before planning and recording.
+     * Open each path as the given user and report the ones that don't work.
+     *
+     * A page fails on an error status, a redirect to sign-in, a JavaScript
+     * error, or not loading. It costs no AI, so it runs before planning and
+     * recording.
      *
      * @param  list<mixed>  $paths
      * @return list<array{path: string, problem: string, status: ?int, url: ?string, detail: ?string}>
@@ -94,8 +98,10 @@ class Recorder
     }
 
     /**
-     * Which of these paths are pages the given user can open: 200 with HTML,
-     * not a redirect. Each comes back with the page's heading or title.
+     * Find which of these paths are pages the given user can open.
+     *
+     * A page counts when it returns 200 with HTML and doesn't redirect. Each
+     * comes back with the page's heading or title.
      *
      * @param  list<string>  $paths
      * @return array{pages: list<array{path: string, title: string}>, skipped: list<array{path: string, reason: string}>}
@@ -124,20 +130,27 @@ class Recorder
         return ['pages' => $result['pages'] ?? [], 'skipped' => $result['skipped'] ?? []];
     }
 
-    /** How many times faster the finished video plays than it was recorded */
+    /**
+     * Get how many times faster the finished video plays than it was recorded.
+     */
     public static function speed(): float
     {
         return max(0.25, min(4.0, (float) config('video-demo.recorder.speed', 2)));
     }
 
+    /**
+     * Get the absolute path of a script in resources/recorder.
+     */
     public static function script(string $name = 'record.cjs'): string
     {
         return realpath(__DIR__.'/../../resources/recorder/'.$name);
     }
 
     /**
-     * Enough time for a plan: its length while recording (captions are held
-     * longer at higher speeds) twice over, and never less than the config's
+     * Get the time limit for recording a plan, in seconds.
+     *
+     * It allows twice the plan's length while recording (captions are held
+     * longer at higher speeds), and never less than the configured timeout.
      */
     public static function timeoutFor(Plan $plan): int
     {
@@ -146,6 +159,9 @@ class Recorder
         return (int) max(config('video-demo.recorder.timeout', 600), ceil($recording * 2 + 120));
     }
 
+    /**
+     * Get the browser settings every recorder script shares.
+     */
     protected function browserSettings(array $screen, ?string $recordAs): array
     {
         return [
@@ -158,7 +174,9 @@ class Recorder
         ];
     }
 
-    /** Runs a Node script, stopping it when $shouldStop says so or when it runs too long */
+    /**
+     * Run a Node script, stopping it when $shouldStop says so or when it runs too long.
+     */
     protected function run(string $script, string $job, int $timeout, ?Closure $shouldStop = null): void
     {
         $process = Process::timeout($timeout)
@@ -186,7 +204,10 @@ class Recorder
         }
     }
 
-    /** Folders Node searches for Playwright: the package's own install, then the app's */
+    /**
+     * Get the folders Node searches for Playwright: the package's own install,
+     * then the app's.
+     */
     protected function nodePaths(): array
     {
         return array_values(array_filter([
@@ -195,7 +216,10 @@ class Recorder
         ], 'is_dir'));
     }
 
-    /** A signed, short-lived link that signs the recorder in, or null to stay signed out */
+    /**
+     * Get a signed, short-lived link that signs the recorder in, or null to stay
+     * signed out.
+     */
     protected function loginPath(?string $recordAs): ?string
     {
         $user = RecordAs::resolve($recordAs);
@@ -212,7 +236,9 @@ class Recorder
         );
     }
 
-    /** The default user from video-demo.recorder.login_as, if set */
+    /**
+     * Get the default user from video-demo.recorder.login_as, if one is set.
+     */
     public static function loginUser(): ?Authenticatable
     {
         $loginAs = config('video-demo.recorder.login_as');
@@ -228,12 +254,14 @@ class Recorder
         }
     }
 
-    /** The absolute path of a folder on the work disk, which must be a local disk */
+    /**
+     * Get the absolute path of a folder on the work disk, which must be a local disk.
+     */
     public static function workDir(string $path): string
     {
         $name = config('video-demo.storage.work_disk');
 
-        // Every disk has path(), but only a local one gives a folder Node and ffmpeg can write to
+        // Every disk has path(), but only a local one gives a folder Node and ffmpeg can write to.
         if (config("filesystems.disks.$name.driver") !== 'local') {
             throw new RuntimeException("video-demo.storage.work_disk must be a local disk; [$name] is not.");
         }

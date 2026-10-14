@@ -6,15 +6,21 @@ use Ogunsakin01\VideoDemo\Ai\Drivers\Drivers;
 use Ogunsakin01\VideoDemo\Ai\Drivers\Turn;
 
 /**
- * Fills in the new-video form from a rough note, or suggests a video when the
- * note is empty. One short request with the app's routes, so it costs about
- * a cent; the planner reads the code properly later.
+ * Fills in the new-video form from a rough note, or suggests a video when the note is empty.
+ * It sends one short request with the app's routes; the planner reads the code later.
  */
 class FormAssistant
 {
+    /**
+     * Create a new form assistant instance.
+     */
     public function __construct(protected Drivers $drivers, protected CodeTools $code) {}
 
-    /** @return array{title: string, prompt: string, start_path: ?string, target_seconds: int, cost: float, cost_known: bool} */
+    /**
+     * Complete the new-video form from the developer's draft note.
+     *
+     * @return array{title: string, prompt: string, start_path: ?string, target_seconds: int, cost: float, cost_known: bool}
+     */
     public function complete(string $draft, string $model): array
     {
         $maxSeconds = (int) config('video-demo.limits.max_seconds', 300);

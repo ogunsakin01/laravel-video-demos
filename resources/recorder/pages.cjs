@@ -18,6 +18,7 @@ const decode = s => s
   .replace(/&quot;/g, '"').replace(/&#0?39;|&apos;/g, "'").replace(/&#(\d+);/g, (_, n) => String.fromCharCode(n))
   .replace(/\s+/g, ' ').trim();
 
+// Take the title from the page's first <h1>, or its <title>.
 function titleOf(html) {
   const h1 = html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i);
   const title = html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i);
@@ -49,7 +50,7 @@ function titleOf(html) {
       }
     };
 
-    // A few at a time: quick, without flooding a single-process dev server
+    // Four at a time: quick, without flooding a single-process dev server.
     const queue = [...job.paths];
     await Promise.all(Array.from({ length: 4 }, async () => {
       while (queue.length) await check(queue.shift());

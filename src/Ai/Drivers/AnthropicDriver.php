@@ -7,22 +7,29 @@ use Ogunsakin01\VideoDemo\Ai\Pricing;
 use Ogunsakin01\VideoDemo\Ai\Usage;
 
 /**
- * Claude, through the official Anthropic SDK. The default, and the one with
- * the most to offer: prompt caching (each request pays the cached price for
- * the conversation so far), effort control, strict tool schemas and
- * fallbacks when a request is declined.
+ * The default driver: Claude through the Anthropic SDK, with prompt caching,
+ * effort control, strict tool schemas and fallbacks when a request is declined.
  */
 class AnthropicDriver implements Driver
 {
     protected const MAX_TOKENS = 16_000;
 
+    /**
+     * Create a new Anthropic driver instance.
+     */
     public function __construct(protected Claude $claude) {}
 
+    /**
+     * Append a user message to the conversation.
+     */
     public function addUserText(array &$messages, string $text): void
     {
         $messages[] = ['role' => 'user', 'content' => $text];
     }
 
+    /**
+     * Send the conversation to Claude and append its reply.
+     */
     public function send(array &$messages, string $system, array $tools, string $model, string $effort, bool $longCache = false): Turn
     {
         $response = $this->claude->create([
@@ -37,18 +44,21 @@ class AnthropicDriver implements Driver
             ], $tools),
             'thinking' => ['type' => 'adaptive'],
             'outputConfig' => ['effort' => $effort],
-            // Caches everything up to the latest message, so each request
-            // pays the cheap cached price for the conversation so far
+            // Cache everything up to the latest message, so each request pays the
+            // cheaper cached price for the conversation so far.
             'cacheControl' => $longCache ? ['type' => 'ephemeral', 'ttl' => '1h'] : ['type' => 'ephemeral'],
             'messages' => $messages,
         ]);
 
-        // The whole reply, thinking blocks included, goes back unchanged
+        // The whole reply, thinking blocks included, must go back unchanged.
         $messages[] = ['role' => 'assistant', 'content' => $response->content];
 
         return $this->turn($response, $model);
     }
 
+    /**
+     * Append the results of the last turn's tool calls to the conversation.
+     */
     public function addToolOutputs(array &$messages, array $outputs): void
     {
         $messages[] = ['role' => 'user', 'content' => array_map(fn (ToolOutput $o) => array_filter([
@@ -59,6 +69,9 @@ class AnthropicDriver implements Driver
         ], fn ($v) => $v !== null), $outputs)];
     }
 
+    /**
+     * Get one answer matching a JSON schema.
+     */
     public function structured(string $system, string $prompt, array $schema, string $model): array
     {
         $response = $this->claude->create([
@@ -74,6 +87,9 @@ class AnthropicDriver implements Driver
         return ['data' => json_decode($turn->text, true) ?: [], 'turn' => $turn];
     }
 
+    /**
+     * Convert a Messages API response into a turn.
+     */
     protected function turn(object $response, string $requestedModel): Turn
     {
         $text = '';
@@ -86,10 +102,10 @@ class AnthropicDriver implements Driver
             }
         }
 
-        // Writes to the 1-hour cache cost more than to the 5-minute one
+        // Writes to the 1-hour cache cost more than writes to the 5-minute one.
         $write1h = (int) ($response->usage->cacheCreation->ephemeral1hInputTokens ?? 0);
 
-        // After a fallback the answering model may differ; price by it when known
+        // After a fallback the answering model may differ, so price by it when known.
         $model = Pricing::model($response->model) ? $response->model : $requestedModel;
 
         return new Turn(

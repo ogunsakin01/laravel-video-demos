@@ -20,6 +20,9 @@ class DemoSeeder extends Seeder
 {
     protected string $assets = __DIR__.'/../../demo-assets';
 
+    /**
+     * Seed the sample videos and video requests.
+     */
     public function run(Publisher $publisher): void
     {
         Storage::disk('demo-videos')->deleteDirectory('video-demo');
@@ -27,7 +30,7 @@ class DemoSeeder extends Seeder
         $styles = VideoStyle::options()->values();
         $plan = json_decode(file_get_contents(__DIR__.'/../../tours/sample.json'), true);
 
-        // title, description, library, desktop poster, Claude cost, versions, published
+        // Each sample: title, description, library, desktop poster, AI cost, versions, published.
         $samples = [
             ['Post a job', 'How a recruiter posts a new job, from the jobs page to a live listing.', 'public', 'form', 0.1137, ['desktop', 'tv', 'tablet', 'mobile'], true],
             ['Invite a teammate', 'How an admin invites a colleague and chooses what they can see.', 'public', 'caption', 0.0942, ['desktop', 'mobile'], true],
@@ -110,11 +113,17 @@ class DemoSeeder extends Seeder
         }
     }
 
+    /**
+     * Get the path of the sample clip or poster for a version.
+     */
     protected function asset(string $device, string $extension): string
     {
         return "$this->assets/sample".($device === 'desktop' ? '' : "-$device").".$extension";
     }
 
+    /**
+     * Build a sample generation log for the given recordings.
+     */
     protected function log(array $recordings, float $cost): array
     {
         $start = now()->subDays(1);

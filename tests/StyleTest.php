@@ -4,6 +4,9 @@ namespace Ogunsakin01\VideoDemo\Tests;
 
 use Ogunsakin01\VideoDemo\Models\VideoStyle;
 
+/**
+ * Tests video styles: the defaults from config and the ones developers add.
+ */
 class StyleTest extends TestCase
 {
     public function test_defaults_come_from_config_once(): void
@@ -18,7 +21,7 @@ class StyleTest extends TestCase
         $this->assertCount(1, $styles);
         $this->assertSame(1, VideoStyle::count());
         $this->assertSame('House style', $styles->first()->name);
-        // Settings a config entry leaves out fall back to the defaults
+        // Settings a config entry leaves out fall back to the defaults.
         $this->assertSame('normal', $styles->first()->pace);
     }
 
@@ -31,7 +34,7 @@ class StyleTest extends TestCase
 
         $this->post('/video-demo/studio/styles', $style)->assertRedirect('/video-demo/studio/styles');
         $added = VideoStyle::where('name', 'Onboarding series')->firstOrFail();
-        // The five defaults from config, plus this one
+        // The five defaults from config, plus this one.
         $this->assertSame(6, VideoStyle::count());
         $this->assertSame('#0f766e', $added->accent);
         $this->assertSame('abstract', $added->art);

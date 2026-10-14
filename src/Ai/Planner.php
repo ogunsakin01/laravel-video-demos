@@ -15,15 +15,19 @@ use Ogunsakin01\VideoDemo\Recording\RecordingResult;
 use RuntimeException;
 
 /**
- * Asks the model to read the app's code and write a step-by-step plan for
- * the video, then to fix the plan when a step fails in the browser. Works
- * with any driver: Claude through the Anthropic SDK, or other providers
- * through Prism.
+ * Asks the model to read the app's code and write a step-by-step plan for the video,
+ * then to fix the plan when a step fails in the browser. Works with any driver.
  */
 class Planner
 {
+    /**
+     * Create a new planner instance.
+     */
     public function __construct(protected Drivers $drivers, protected CodeTools $code) {}
 
+    /**
+     * Start a planning conversation for the video and run it until the model submits a plan.
+     */
     public function plan(Video $video): PlanningSession
     {
         $session = new PlanningSession;
@@ -34,7 +38,9 @@ class Planner
         return $session;
     }
 
-    /** Sends the failure back as the result of submit_plan and waits for a corrected plan */
+    /**
+     * Send a recording failure back as the result of submit_plan and wait for a corrected plan.
+     */
     public function repair(PlanningSession $session, Video $video, RecordingResult $failure): PlanningSession
     {
         if ($session->pendingSubmit === null) {
@@ -48,7 +54,7 @@ class Planner
                 $session->pendingSubmit['id'],
                 'submit_plan',
                 $session->pendingSubmit['input'],
-                // The page may show secrets too, such as an API settings screen
+                // The page may show secrets too, such as an API settings screen.
                 (new Redactor)->redact($failure->describeForRepair()),
                 isError: true,
             ),
@@ -61,6 +67,9 @@ class Planner
         return $session;
     }
 
+    /**
+     * Run the conversation until the model submits a valid plan or a limit is reached.
+     */
     protected function run(PlanningSession $session, Video $video): void
     {
         $maxTurns = (int) config('video-demo.limits.max_turns', 30);
@@ -73,8 +82,8 @@ class Planner
             if ($video->stopRequested()) {
                 throw new VideoStopped('Stopped by you.');
             }
-            // Each request costs a little more than the last as the conversation
-            // grows, so stop before one that would take the video over its limit
+            // Each request costs a little more than the last as the conversation grows,
+            // so stop before one that would take the video over its limit.
             $nextCost = $lastCost * 1.2;
             if ($lastCost > 0 && $video->cost + $nextCost > $maxCost) {
                 throw new PlanningFailed(sprintf('Stopped at $%.2f: the next request would take this video past its $%.2f limit. Raise the limit, or ask for a shorter video.', $video->cost, $maxCost));
@@ -136,9 +145,9 @@ class Planner
     }
 
     /**
-     * Tells the model how many more requests the video's budget allows, on
-     * the last result of the turn, so it wraps up in time. Appended, never
-     * edited in, so the cached conversation stays valid.
+     * Add a note to the turn's last result saying how many more requests the budget allows.
+     *
+     * The note is part of a new message, never edited into an earlier one, so the cached conversation stays valid.
      *
      * @param  list<ToolOutput>  $results
      * @return list<ToolOutput>
@@ -159,16 +168,20 @@ class Planner
     }
 
     /**
-     * Whether to keep the conversation in the 1-hour cache instead of the
-     * 5-minute one: recording several versions can outlast 5 minutes, and a
-     * repair afterwards would pay to cache the whole conversation again
+     * Determine if the conversation should use the 1-hour cache instead of the 5-minute one.
+     *
+     * Recording several versions can outlast 5 minutes, and a repair afterwards would pay to cache the whole conversation again.
      */
     protected function longCache(Video $video): bool
     {
         return count($video->deviceList()) * $video->target_seconds * Recorder::speed() > 240;
     }
 
-    /** @param array{id: string, name: string, input: array} $call */
+    /**
+     * Run one code tool call, turning a refused input into an error result.
+     *
+     * @param  array{id: string, name: string, input: array}  $call
+     */
     protected function runCodeTool(array $call): ToolOutput
     {
         if (! $this->code->handles($call['name'])) {
@@ -182,6 +195,9 @@ class Planner
         }
     }
 
+    /**
+     * Get a short log line describing a tool call.
+     */
     protected function describeToolCall(string $name, array $input): string
     {
         return match ($name) {
@@ -192,7 +208,11 @@ class Planner
         };
     }
 
-    /** @return list<string> */
+    /**
+     * Find the problems that keep a plan from being recorded.
+     *
+     * @return list<string>
+     */
     public function problems(Plan $plan, ?int $maxSteps = null): array
     {
         $problems = [];
@@ -207,7 +227,7 @@ class Planner
         foreach ($plan->steps as $i => $step) {
             $n = $i + 1;
             $action = $step['action'] ?? null;
-            // A frame alone isn't a target: something must identify the element in it
+            // A frame alone isn't a target: something must identify the element in it.
             $hasTarget = is_array($step['target'] ?? null)
                 && array_filter(array_diff_key($step['target'], ['frame' => true]), fn ($v) => $v !== null && $v !== '') !== [];
 
@@ -232,6 +252,9 @@ class Planner
         return $problems;
     }
 
+    /**
+     * Get the definition of the submit_plan tool.
+     */
     protected function submitTool(): array
     {
         return [
@@ -241,6 +264,9 @@ class Planner
         ];
     }
 
+    /**
+     * Build the first message: the request, its limits, the screens and the app's routes.
+     */
     protected function brief(Video $video): string
     {
         $notes = trim((string) config('video-demo.ai.notes'));
@@ -265,6 +291,9 @@ class Planner
         ]));
     }
 
+    /**
+     * Get the system prompt for planning.
+     */
     protected function systemPrompt(): string
     {
         return <<<'PROMPT'

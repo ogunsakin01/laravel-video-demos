@@ -11,6 +11,9 @@ use Ogunsakin01\VideoDemo\Jobs\GenerateVideo;
 use Ogunsakin01\VideoDemo\Models\Video;
 use Ogunsakin01\VideoDemo\Models\VideoStyle;
 
+/**
+ * Tests the studio's pages and making videos from them.
+ */
 class StudioTest extends TestCase
 {
     public function test_pages_render(): void
@@ -55,10 +58,10 @@ class StudioTest extends TestCase
         $this->assertSame('how-a-recruiter-posts-a-new-job', $video->slug);
         $this->assertSame(VideoStatus::Queued, $video->status);
         $this->assertNotNull($video->estimate_high);
-        // The video keeps a copy of its style, so editing the style later doesn't change it
+        // The video keeps a copy of its style, so editing the style later doesn't change it.
         $this->assertSame('Quick tip', $video->style['name']);
         $this->assertSame('brisk', $video->style['pace']);
-        // Kept in the configured order, whatever order the form sent
+        // Kept in the configured order, whatever order the form sent.
         $this->assertSame(['desktop', 'mobile'], $video->devices);
         Queue::assertPushed(GenerateVideo::class, fn ($job) => $job->video->is($video) && $job->replan);
     }
@@ -76,10 +79,10 @@ class StudioTest extends TestCase
         User::forceCreate(['email' => 'demo@example.com', 'password' => 'x']);
         $member = User::forceCreate(['email' => 'member@example.com', 'password' => 'x']);
 
-        // Without a valid signature nobody gets in
+        // Without a valid signature nobody gets in.
         $this->get('/video-demo/studio/_recorder/login/'.$member->id)->assertForbidden();
 
-        // Signed links work for any user, so videos can be recorded as anyone
+        // Signed links work for any user, so videos can be recorded as anyone.
         $link = URL::temporarySignedRoute('video-demo.studio.recorder-login', now()->addMinutes(5), ['user' => $member->id], absolute: false);
         $this->get($link)->assertRedirect('/');
         $this->assertAuthenticatedAs($member);
@@ -119,14 +122,14 @@ class StudioTest extends TestCase
             'status' => VideoStatus::Failed, 'error' => 'Anthropic Bad Request Exception',
         ]);
 
-        // No plan yet: one button, which asks for a plan again
+        // No plan yet: one button, which asks for a plan again.
         $this->get("/video-demo/studio/{$failed->id}")->assertSee('Try again')->assertDontSee('Record the same plan again</button>', false);
         $this->post("/video-demo/studio/{$failed->id}/retry", ['mode' => 'plan'])->assertRedirect();
         $this->assertSame(VideoStatus::Queued, $failed->fresh()->status);
         $this->assertNull($failed->fresh()->error);
         Queue::assertPushed(GenerateVideo::class, fn ($job) => $job->video->is($failed) && $job->replan);
 
-        // With a plan: it can be recorded again as it is, at no AI cost
+        // With a plan: it can be recorded again as it is, at no AI cost.
         $planned = Video::create([
             'prompt' => 'y', 'target_seconds' => 60, 'model' => 'claude-opus-5-5', 'effort' => 'high',
             'status' => VideoStatus::Failed, 'error' => 'Step 3 failed', 'plan' => ['title' => 'y', 'summary' => '', 'steps' => [['action' => 'pause']]],

@@ -6,6 +6,9 @@ use Illuminate\Support\Facades\File;
 use Ogunsakin01\VideoDemo\Ai\CodeTools;
 use Ogunsakin01\VideoDemo\Ai\Redactor;
 
+/**
+ * Tests that secrets are hidden before code is sent to the AI model.
+ */
 class RedactorTest extends TestCase
 {
     public function test_hides_known_secret_formats(): void

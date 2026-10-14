@@ -10,22 +10,25 @@ use Ogunsakin01\VideoDemo\Models\VideoIdea;
 use Ogunsakin01\VideoDemo\Models\VideoStyle;
 
 /**
- * Suggests which videos to make first, from the app's routes: the flows new
- * users most need, each ready to open in the new-video form. One short
- * request; the ideas are saved, and asking again adds new ones (or, with
- * $replace, starts over) so earlier ideas aren't paid for twice.
+ * Suggests which videos to make first, from the app's routes, each ready to open in the new-video form.
+ * The ideas are saved, so asking again adds new ones and earlier ideas aren't paid for twice.
  */
 class Suggester
 {
+    /**
+     * Create a new suggester instance.
+     */
     public function __construct(protected Drivers $drivers, protected CodeTools $code) {}
 
     /**
+     * Ask the model for new video ideas and store them, or replace the unused ones when $replace is true.
+     *
      * @return array{suggestions: list<array{id: int, title: string, prompt: string, why: string, start_path: ?string, target_seconds: int, style: string}>, cost: float, cost_known: bool, model: string, at: string}
      */
     public function suggest(?string $model = null, bool $replace = false): array
     {
         if ($replace) {
-            // Ideas already made into videos stay, as a record
+            // Ideas already made into videos stay, as a record.
             VideoIdea::whereNull('video_id')->delete();
         }
         $kept = VideoIdea::query()->pluck('title');
@@ -88,7 +91,6 @@ class Suggester
             'style' => $styles->contains('key', $s['style'] ?? null) ? $s['style'] : $styles->first()?->key,
         ], $answer['data']['suggestions'] ?? []), fn ($s) => $s['prompt'] !== ''));
 
-        // Ideas with the same title as one already kept are dropped
         $seen = $kept->map(fn ($t) => Str::lower(trim($t)))->all();
         $suggestions = array_values(array_filter(array_slice($suggestions, 0, 8), function ($s) use (&$seen) {
             $key = Str::lower(trim($s['title']));

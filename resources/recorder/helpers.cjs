@@ -1,5 +1,6 @@
-// A visible cursor that glides to each target before acting, eased scrolling,
-// and the caption and title card overlays.
+// Helpers for record.cjs: a visible cursor that glides to each target before
+// acting, eased scrolling, and the caption and title card overlays that run
+// inside the recorded page.
 const CURSOR_JS = `
 (() => {
   if (window.__demoCursor) return;
@@ -8,14 +9,14 @@ const CURSOR_JS = `
   c.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24"><path d="M4 2l16 9-7 2-3 7z" fill="#111" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/></svg>';
   const ring = document.createElement('div');
   ring.style.cssText = 'position:fixed;z-index:2147483646;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;background:rgba(17,17,17,.18);pointer-events:none;opacity:0;transform:scale(.4);transition:opacity .35s, transform .35s';
-  // Positions must be final the moment they are measured
+  // Turn off smooth scrolling, so positions are final the moment they are measured.
   const st = document.createElement('style');
   st.textContent = 'html,body{scroll-behavior:auto!important}';
-  // Phones and tablets have no pointer: show only the tap ring
+  // Phones and tablets have no pointer: show only the tap ring.
   if (window.__demoTouch) c.style.display = 'none';
   const add = () => { document.head.appendChild(st); document.body.appendChild(c); document.body.appendChild(ring); };
   document.body ? add() : document.addEventListener('DOMContentLoaded', add);
-  // Re-attach after the document is replaced in the same window (page.setContent)
+  // Re-attach after the document is replaced in the same window (page.setContent).
   const attach = () => { if (!c.isConnected && document.body) add(); };
   window.__demoCursor = {
     move(x, y) { attach(); c.style.transform = 'translate(' + x + 'px,' + y + 'px)'; },
@@ -28,10 +29,10 @@ const CURSOR_JS = `
   };
 })();`;
 
-// Title cards and captions, in the video's style (window.__demoStyle). Solid
-// colours only: no gradients. With style.art "abstract", cards get line art
-// that draws itself on and drifts, and the words rise into place, like an ad.
-// Written as a function so it reads as code; it runs inside the page.
+// Title cards and captions in the video's style (window.__demoStyle), in solid
+// colours only. With style.art "abstract", cards get line art that draws itself
+// on and drifts, and the words rise into place. Written as a function so it
+// reads as code; it is turned into a string and runs inside the page.
 function overlay() {
   if (window.__demoOverlay) return;
   const style = Object.assign({ theme: 'light', accent: '#171717', captions: 'bottom', art: 'none' }, window.__demoStyle || {});
@@ -42,14 +43,14 @@ function overlay() {
     : { bg: '#faf8f3', ink: '#171717', muted: '#5f636e', line: '#e5e2dc', bar: style.accent, art: '#c9c4b8', dot: plainAccent ? '#171717' : style.accent };
   const abstract = style.art === 'abstract';
   // Animations run this much slower while recording, to look right once the
-  // video is played back faster
+  // video is played back faster.
   const S = style.speed || 1;
   const ms = n => Math.round(n * S) + 'ms';
   const font = "'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
   const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]);
 
   const root = document.createElement('div');
-  // Same layer as the cursor but added later, so cards cover it
+  // Same layer as the cursor but added later, so cards cover it.
   root.style.cssText = 'position:fixed;inset:0;z-index:2147483647;pointer-events:none;font-family:' + font + ';-webkit-font-smoothing:antialiased';
   const css = document.createElement('style');
   css.textContent = [
@@ -71,7 +72,7 @@ function overlay() {
 
   const add = () => {
     document.body.appendChild(root);
-    // Geist for cards and captions; the system font shows if it can't load
+    // Geist for cards and captions; the system font shows if it can't load.
     if (!document.querySelector('link[data-demo-font]')) {
       const l = document.createElement('link');
       l.rel = 'stylesheet'; l.dataset.demoFont = '';
@@ -81,8 +82,8 @@ function overlay() {
   };
   document.body ? add() : document.addEventListener('DOMContentLoaded', add);
 
-  // Abstract line art, the same for the same title: contours, a network,
-  // waves or orbits, kept to the edges so the words in the middle stay clear
+  // Draw line art seeded by the title (contours, a network, waves or orbits),
+  // kept to the edges so the words in the middle stay clear.
   function art(seedText) {
     let seed = 0;
     for (const ch of String(seedText)) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0;
@@ -90,11 +91,11 @@ function overlay() {
     const kind = ['contours', 'network', 'waves', 'orbits'][seed % 4];
     const W = 1600, H = 1000;
     let out = '', n = 0;
-    // One line in the accent colour, for a touch of the brand
+    // One line is drawn in the accent colour.
     const line = (d, accent) => { out += '<path class="vd-l' + (accent ? ' vd-a' : '') + '" d="' + d + '" style="--d:' + ms(n++ * 70) + '"/>'; };
     const node = (x, y, r) => { out += '<circle class="vd-n" cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + r + '" style="--d:' + ms(300 + n++ * 60) + '"/>'; };
     if (kind === 'contours') {
-      // Topographic rings around a point near a corner
+      // Topographic rings around a point near a corner.
       const cx = rnd() < .5 ? W * (.08 + rnd() * .12) : W * (.8 + rnd() * .12), cy = H * (.15 + rnd() * .7);
       for (let ring = 1; ring <= 11; ring++) {
         const r = ring * 46, wob = 6 + ring * 2.2, ph = rnd() * 6.28; let d = '';
@@ -105,7 +106,7 @@ function overlay() {
         line(d + ' Z', ring === 3);
       }
     } else if (kind === 'network') {
-      // People-like nodes linked along the top and the bottom
+      // People-like nodes linked along the top and the bottom.
       const rows = [H * .14, H * .86];
       rows.forEach(y0 => {
         const pts = [];
@@ -115,7 +116,7 @@ function overlay() {
         pts.forEach((p, i) => node(p[0], p[1], i % 3 ? 3.5 : 6));
       });
     } else if (kind === 'waves') {
-      // Bands of waves across the top and bottom
+      // Bands of waves across the top and bottom.
       [H * .16, H * .84].forEach((y0, band) => {
         for (let i = 0; i < 5; i++) {
           const y = y0 + (i - 2) * 26, amp = 34 - Math.abs(i - 2) * 9, f = 140 + i * 22 + band * 30, ph = rnd() * 6; let d = '';
@@ -124,7 +125,7 @@ function overlay() {
         }
       });
     } else {
-      // Orbits with a planet each, off to one side
+      // Orbits with a planet each, off to one side.
       const cx = rnd() < .5 ? W * .1 : W * .9, cy = H * (.3 + rnd() * .4);
       for (let i = 1; i <= 7; i++) {
         const rx = i * 82, ry = i * 52, d = 'M ' + (cx - rx) + ' ' + cy + ' a ' + rx + ' ' + ry + ' 0 1 0 ' + rx * 2 + ' 0 a ' + rx + ' ' + ry + ' 0 1 0 ' + -rx * 2 + ' 0';
@@ -136,12 +137,12 @@ function overlay() {
     return '<svg class="vd-art" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><g class="vd-drift">' + out + '</g></svg>';
   }
 
-  // The words of a title, each rising into place a moment after the last
+  // The words of a title, each rising into place a moment after the last.
   const rising = (text, start) => esc(text).split(' ').map((w, i) => '<span class="vd-word" style="--d:' + ms(start + i * 70) + '">' + w + '</span>').join(' ');
 
   let current = null;
   const show = el => {
-    // Re-attach after the document is replaced in the same window
+    // Re-attach after the document is replaced in the same window.
     if (!root.isConnected) document.body.appendChild(root);
     if (current) current.remove();
     current = el;
@@ -187,7 +188,7 @@ function overlay() {
 }
 const OVERLAY_JS = '(' + overlay.toString() + ')();';
 
-// How fast the video moves: every pause and the typing speed scale by this
+// Every pause and the typing delay are scaled by the chosen pace.
 const PACES = { relaxed: 1.3, normal: 1, brisk: 0.7 };
 let pace = 1;
 const setPace = name => { pace = PACES[name] || 1; };
@@ -232,6 +233,7 @@ async function scrollTo(page, locator) {
   if (Math.abs(offset) > 40) await scrollBy(page, offset, locator);
 }
 
+// Scroll an element into view and move the cursor to its centre.
 async function glide(page, locator) {
   await scrollTo(page, locator);
   const box = await locator.boundingBox();

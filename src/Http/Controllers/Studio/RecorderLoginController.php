@@ -10,10 +10,13 @@ use Ogunsakin01\VideoDemo\Recording\RecordAs;
 /**
  * Signs the recorder's browser in as the user a video is recorded as. The
  * link is signed and expires after ten minutes, so only the package can make
- * one, and it only exists while the studio is enabled.
+ * one, and the route only exists while the studio is enabled.
  */
 class RecorderLoginController extends Controller
 {
+    /**
+     * Sign the recorder in as the given user.
+     */
     public function __invoke(string $user): RedirectResponse
     {
         try {

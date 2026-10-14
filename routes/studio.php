@@ -7,7 +7,8 @@ use Ogunsakin01\VideoDemo\Http\Controllers\Studio\SuggestionController;
 use Ogunsakin01\VideoDemo\Http\Controllers\Studio\VideoController;
 use Ogunsakin01\VideoDemo\Http\Middleware\AuthorizeStudio;
 
-// Everything except the recorder's sign-in link, which is signed instead
+// Every studio route except the recorder's sign-in link, which is
+// protected by its signature instead.
 Route::middleware(AuthorizeStudio::class)->group(function () {
     Route::get('/', [VideoController::class, 'index'])->name('index');
     Route::get('/create', [VideoController::class, 'create'])->name('create');
@@ -40,7 +41,7 @@ Route::middleware(AuthorizeStudio::class)->group(function () {
     Route::delete('/{video}', [VideoController::class, 'destroy'])->name('destroy');
 });
 
-// The recorder signs in through this signed link before recording starts
+// The recorder signs in through this signed link before recording starts.
 Route::get('/_recorder/login/{user}', RecorderLoginController::class)
     ->middleware('signed:relative')
     ->name('recorder-login');

@@ -7,11 +7,21 @@ use Ogunsakin01\VideoDemo\Models\Video;
 use Ogunsakin01\VideoDemo\Recording\Devices;
 use RuntimeException;
 
-/** Copies a finished video to the library disk and lists it in the manifest */
+/**
+ * Copies a finished video to the library disk and lists it in the manifest.
+ */
 class Publisher
 {
+    /**
+     * Create a new publisher instance.
+     */
     public function __construct(protected Manifest $manifest) {}
 
+    /**
+     * Publish a video's recordings to the library.
+     *
+     * Files from the previous version that the new one doesn't use are deleted.
+     */
     public function publish(Video $video): void
     {
         $work = Storage::disk(config('video-demo.storage.work_disk'));
@@ -24,7 +34,7 @@ class Publisher
         $disk = $this->manifest->disk();
         $old = collect($this->manifest->all())->firstWhere('slug', $video->slug);
 
-        // A new file name for each version, so browsers and CDNs never show an old cut
+        // A new file name for each version, so browsers and CDNs never show an old cut.
         $sources = [];
         foreach ($devices as $device) {
             $base = $this->manifest->path("{$video->slug}-v{$video->version}-$device");
@@ -64,6 +74,9 @@ class Publisher
         $video->update(['published_at' => now()]);
     }
 
+    /**
+     * Remove a video and its files from the library.
+     */
     public function unpublish(Video $video): void
     {
         if ($removed = $this->manifest->remove($video->slug)) {

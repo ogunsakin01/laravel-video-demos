@@ -5,6 +5,9 @@ namespace Ogunsakin01\VideoDemo\Tests;
 use Ogunsakin01\VideoDemo\Ai\CostEstimator;
 use Ogunsakin01\VideoDemo\Ai\Pricing;
 
+/**
+ * Tests the cost estimates shown before a video is made, and the actual cost after.
+ */
 class CostEstimatorTest extends TestCase
 {
     public function test_range_is_ordered_and_grows_with_length(): void
@@ -29,14 +32,14 @@ class CostEstimatorTest extends TestCase
         $this->assertGreaterThan($sonnet, $opus);
         $this->assertGreaterThan($haiku, $sonnet);
         $this->assertGreaterThan($opusLow, $opus);
-        // A one-minute video on Opus at high effort should be well under a dollar
+        // A one-minute video on Opus at high effort should be well under a dollar.
         $this->assertLessThan(1.0, $opus);
         $this->assertGreaterThan(0.05, $opus);
     }
 
     public function test_actual_cost_uses_cache_prices(): void
     {
-        // 1M of each kind of token on Opus 5.5: 4 + 5 (writes at 1.25×) + 0.20 + 20
+        // 1M of each kind of token on Opus 5.5: 4 + 5 (writes at 1.25×) + 0.20 + 20.
         $this->assertEqualsWithDelta(29.20, Pricing::cost('claude-opus-5-5', 1_000_000, 1_000_000, 1_000_000, 1_000_000), 0.0001);
     }
 }

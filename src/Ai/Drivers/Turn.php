@@ -4,7 +4,9 @@ namespace Ogunsakin01\VideoDemo\Ai\Drivers;
 
 use Ogunsakin01\VideoDemo\Ai\Usage;
 
-/** One reply from the model, in a form every driver can produce */
+/**
+ * One reply from the model, in a form every driver can produce.
+ */
 final readonly class Turn
 {
     public const TOOL_USE = 'tool_use';
@@ -16,6 +18,8 @@ final readonly class Turn
     public const REFUSAL = 'refusal';
 
     /**
+     * Create a new turn instance.
+     *
      * @param  list<array{id: string, name: string, input: array}>  $toolCalls
      */
     public function __construct(

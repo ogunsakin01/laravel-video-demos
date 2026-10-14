@@ -3,26 +3,36 @@
 namespace Ogunsakin01\VideoDemo\Studio;
 
 /**
- * Sample videos made with this package, shown on the studio's Examples page
- * so new users can see what they'll get. The files live in the package's
- * GitHub repository (not in installs) and are streamed from jsDelivr, pinned
- * to a release tag so they never change underneath the page.
+ * Sample videos made with this package, for the studio's Examples page. The
+ * files live in the package's GitHub repository, not in installs, and are
+ * streamed from jsDelivr pinned to a release tag, so they never change.
  */
 class Examples
 {
+    /**
+     * The jsDelivr address of the sample videos, pinned to a release.
+     */
     public const DEFAULT_URL = 'https://cdn.jsdelivr.net/gh/ogunsakin01/laravel-video-demos@v0.5.0';
 
+    /**
+     * Determine if the Examples page should be shown.
+     */
     public static function enabled(): bool
     {
         return (bool) config('video-demo.ui.examples', true) && static::baseUrl() !== '';
     }
 
+    /**
+     * Get the base URL the sample videos are streamed from.
+     */
     public static function baseUrl(): string
     {
         return rtrim((string) config('video-demo.ui.examples_url', self::DEFAULT_URL), '/');
     }
 
     /**
+     * Get the sample videos.
+     *
      * @return list<array{key: string, title: string, about: string, style: string, style_key: string, versions: array<string, array{video: string, poster: string, seconds: int}>}>
      */
     public static function all(): array

@@ -7,9 +7,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
 /**
- * A way of making videos: how Claude writes them and how cards and captions
- * look. The defaults come from config('video-demo.styles'); developers add
- * their own on the studio's Styles page.
+ * A way of making videos: how the AI model writes them and how cards and
+ * captions look. The defaults come from config('video-demo.styles');
+ * developers add their own on the studio's Styles page.
  *
  * @property int $id
  * @property string $key
@@ -30,7 +30,10 @@ class VideoStyle extends Model
 
     public const PACES = ['relaxed' => 'Relaxed', 'normal' => 'Normal', 'brisk' => 'Brisk'];
 
-    /** Behind title cards: nothing, or animated abstract line art with words that rise in, like an ad */
+    /**
+     * What shows behind title cards: nothing, or animated abstract line art with
+     * words that rise in.
+     */
     public const ARTS = ['none' => 'None', 'abstract' => 'Abstract line art'];
 
     protected $table = 'video_demo_styles';
@@ -38,7 +41,7 @@ class VideoStyle extends Model
     protected $guarded = ['id'];
 
     /**
-     * All styles, copying the defaults from config the first time
+     * Get all styles, copying the defaults from config the first time.
      *
      * @return Collection<int, VideoStyle>
      */
@@ -51,6 +54,9 @@ class VideoStyle extends Model
         return self::query()->orderBy('position')->orderBy('id')->get();
     }
 
+    /**
+     * Create the styles from config('video-demo.styles') that don't exist yet.
+     */
     public static function seedFromConfig(): void
     {
         $position = 0;
@@ -59,11 +65,17 @@ class VideoStyle extends Model
         }
     }
 
+    /**
+     * Get the default look of cards and captions.
+     */
     public static function defaults(): array
     {
         return ['theme' => 'light', 'accent' => '#171717', 'captions' => 'bottom', 'pace' => 'normal', 'art' => 'none'];
     }
 
+    /**
+     * Perform any actions required after the model boots.
+     */
     protected static function booted(): void
     {
         static::creating(function (VideoStyle $style) {
@@ -72,7 +84,10 @@ class VideoStyle extends Model
         });
     }
 
-    /** What a video keeps, so recording it again later looks the same */
+    /**
+     * Get what a video keeps of this style, so recording it again later looks the
+     * same.
+     */
     public function snapshot(): array
     {
         return $this->only(['key', 'name', 'direction', 'theme', 'accent', 'captions', 'pace', 'art']);

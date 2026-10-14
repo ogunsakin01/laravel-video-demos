@@ -4,18 +4,28 @@ namespace Ogunsakin01\VideoDemo\Ai;
 
 use Anthropic\Client;
 
-/** The one place the package calls the Messages API, so tests can stand in for it */
+/**
+ * The one place the package calls the Anthropic Messages API, so tests can replace it.
+ */
 class Claude
 {
-    /** Models that can fall back to another model when a request is declined */
+    /**
+     * The models that can fall back to another model when a request is declined.
+     */
     protected const FALLBACK_MODELS = ['claude-opus-5-5', 'claude-sonnet-5-5'];
 
+    /**
+     * Create a new Claude client instance.
+     */
     public function __construct(protected Client $client) {}
 
-    /** @return object A Message: content, stopReason, stopDetails, model, usage */
+    /**
+     * Send a request to the Messages API.
+     *
+     * @return object A Message: content, stopReason, stopDetails, model, usage.
+     */
     public function create(array $params): object
     {
-        // The required arguments by name; the rest (tools, thinking, caching…) as given
         ['model' => $model, 'maxTokens' => $maxTokens, 'messages' => $messages] = $params;
         $options = array_diff_key($params, array_flip(['model', 'maxTokens', 'messages']));
 

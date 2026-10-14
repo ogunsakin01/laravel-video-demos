@@ -15,17 +15,16 @@ use Prism\Prism\ValueObjects\ToolCall;
 use Prism\Prism\ValueObjects\ToolResult;
 
 /**
- * Any provider Prism supports: OpenAI, Gemini, Mistral, DeepSeek, Groq, xAI,
- * OpenRouter, Ollama (local models) and more. Needs prism-php/prism, with
- * the provider's key set up in config/prism.php.
- *
- * The planner runs its own loop, so tools here never run inside Prism: each
- * request is one step, and the planner handles the calls it returns.
+ * Talks to any provider Prism supports, such as OpenAI, Gemini, Mistral or Ollama. Needs prism-php/prism,
+ * with the provider's key set in config/prism.php. Tools never run inside Prism; the planner runs them.
  */
 class PrismDriver implements Driver
 {
     protected const MAX_TOKENS = 16_000;
 
+    /**
+     * Create a new Prism driver instance.
+     */
     public function __construct(protected string $provider)
     {
         if (! class_exists(Prism::class)) {
@@ -33,11 +32,19 @@ class PrismDriver implements Driver
         }
     }
 
+    /**
+     * Append a user message to the conversation.
+     */
     public function addUserText(array &$messages, string $text): void
     {
         $messages[] = new UserMessage($text);
     }
 
+    /**
+     * Send the conversation to the model and append its reply.
+     *
+     * Each request is a single step, so the planner handles the tool calls it returns.
+     */
     public function send(array &$messages, string $system, array $tools, string $model, string $effort, bool $longCache = false): Turn
     {
         $response = Prism::text()
@@ -62,6 +69,9 @@ class PrismDriver implements Driver
         );
     }
 
+    /**
+     * Append the results of the last turn's tool calls to the conversation.
+     */
     public function addToolOutputs(array &$messages, array $outputs): void
     {
         $messages[] = new ToolResultMessage(array_map(
@@ -70,6 +80,9 @@ class PrismDriver implements Driver
         ));
     }
 
+    /**
+     * Get one answer matching a JSON schema.
+     */
     public function structured(string $system, string $prompt, array $schema, string $model): array
     {
         $response = Prism::structured()
@@ -93,7 +106,9 @@ class PrismDriver implements Driver
         return ['data' => $response->structured ?? [], 'turn' => $turn];
     }
 
-    /** A tool Prism can describe to the model; the planner runs it, not Prism */
+    /**
+     * Build a tool Prism can describe to the model. The planner runs it, not Prism.
+     */
     protected function tool(array $definition): \Prism\Prism\Tool
     {
         $tool = Tool::as($definition['name'])->for($definition['description'])->using(fn () => '');
@@ -106,6 +121,9 @@ class PrismDriver implements Driver
         return $tool;
     }
 
+    /**
+     * Get the turn's stop reason from Prism's finish reason.
+     */
     protected function stop(FinishReason $reason, array $toolCalls): string
     {
         return match (true) {
@@ -116,12 +134,15 @@ class PrismDriver implements Driver
         };
     }
 
+    /**
+     * Convert Prism's token counts into priced usage.
+     */
     protected function usage(\Prism\Prism\ValueObjects\Usage $usage, string $model): Usage
     {
         $cacheRead = (int) ($usage->cacheReadInputTokens ?? 0);
         $cacheWrite = (int) ($usage->cacheWriteInputTokens ?? 0);
 
-        // Providers count cached tokens inside the prompt total; price them once
+        // Providers count cached tokens inside the prompt total, so price them only once.
         return Usage::fromCounts(
             $model,
             max(0, $usage->promptTokens - $cacheRead - $cacheWrite),

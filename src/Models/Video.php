@@ -11,6 +11,8 @@ use Ogunsakin01\VideoDemo\Enums\VideoStatus;
 use Ogunsakin01\VideoDemo\Recording\Devices;
 
 /**
+ * A video made in the studio, with its plan, recordings, AI usage and log.
+ *
  * @property int $id
  * @property string $slug
  * @property ?string $title
@@ -52,6 +54,9 @@ class Video extends Model
 
     protected $attributes = ['log' => '[]'];
 
+    /**
+     * Get the attributes that should be cast.
+     */
     protected function casts(): array
     {
         return [
@@ -72,6 +77,9 @@ class Video extends Model
         ];
     }
 
+    /**
+     * Perform any actions required after the model boots.
+     */
     protected static function booted(): void
     {
         static::creating(function (Video $video) {
@@ -79,6 +87,9 @@ class Video extends Model
         });
     }
 
+    /**
+     * Get a slug for the title that no other video uses.
+     */
     public static function uniqueSlug(string $title): string
     {
         $base = Str::slug($title) ?: 'video';
@@ -91,20 +102,31 @@ class Video extends Model
         return $slug;
     }
 
+    /**
+     * Add a message to the video's log.
+     *
+     * The job and the studio both write to the log, so this starts from the
+     * saved log rather than the copy in memory.
+     */
     public function addLog(string $message): void
     {
-        // The job and the studio both write to the log: start from what is saved
         $saved = $this->exists ? static::whereKey($this->id)->first(['id', 'log'])?->log : null;
         $this->log = [...($saved ?? $this->log ?? []), ['at' => now()->toIso8601String(), 'message' => $message]];
         $this->save();
     }
 
+    /**
+     * Move the video to a status, logging the message if one is given.
+     */
     public function moveTo(VideoStatus $status, ?string $message = null): void
     {
         $this->status = $status;
         $message ? $this->addLog($message) : $this->save();
     }
 
+    /**
+     * Add the tokens and cost of an AI request to the video's totals.
+     */
     public function addUsage(Usage $usage): void
     {
         $this->input_tokens += $usage->input;
@@ -115,35 +137,51 @@ class Video extends Model
         $this->save();
     }
 
-    /** Folder for this video's working files on the work disk */
+    /**
+     * Get the folder for this video's working files on the work disk, or a file
+     * in it.
+     */
     public function workPath(string $file = ''): string
     {
         return rtrim(config('video-demo.storage.work_path'), '/')."/{$this->id}".($file !== '' ? "/$file" : '');
     }
 
-    /** The versions this video is recorded in */
+    /**
+     * Get the versions this video is recorded in.
+     */
     public function deviceList(): array
     {
         return $this->devices ?: Devices::defaults();
     }
 
+    /**
+     * Get the version shown first and used for the poster.
+     */
     public function primaryDevice(): string
     {
         return Devices::primary($this->recordedDevices() ?: $this->deviceList());
     }
 
-    /** Versions with a finished recording */
+    /**
+     * Get the versions that have a finished recording.
+     */
     public function recordedDevices(): array
     {
         return array_keys($this->recordings ?? []);
     }
 
-    /** A version's MP4 or poster on the work disk */
+    /**
+     * Get the path of a version's MP4 or poster on the work disk.
+     */
     public function workFile(string $device, string $kind = 'video'): string
     {
         return $this->workPath($kind === 'video' ? "video-$device.mp4" : "poster-$device.jpg");
     }
 
+    /**
+     * Determine if a version, the primary one by default, has a recording on the
+     * work disk.
+     */
     public function hasRecording(?string $device = null): bool
     {
         $device ??= $this->primaryDevice();
@@ -152,18 +190,27 @@ class Video extends Model
             && Storage::disk(config('video-demo.storage.work_disk'))->exists($this->workFile($device));
     }
 
-    /** The most this video may spend on AI: its own limit, else the config's */
+    /**
+     * Get the most this video may spend on AI: its own limit, else the configured one.
+     */
     public function spendLimit(): float
     {
         return (float) ($this->max_cost ?: config('video-demo.limits.max_cost_per_video', 2.0));
     }
 
-    /** Whether someone pressed Stop; reads the database, as the job runs elsewhere */
+    /**
+     * Determine if someone pressed Stop.
+     *
+     * This reads the database, since the job runs in another process.
+     */
     public function stopRequested(): bool
     {
         return (bool) static::whereKey($this->id)->value('stop_requested');
     }
 
+    /**
+     * Determine if the video is published to the library.
+     */
     public function isPublished(): bool
     {
         return $this->published_at !== null;

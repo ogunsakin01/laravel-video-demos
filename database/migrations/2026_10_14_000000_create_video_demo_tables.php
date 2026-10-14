@@ -6,6 +6,9 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Run the migrations.
+     */
     public function up(): void
     {
         // Videos being made in the studio. Only used on developers' machines;
@@ -20,10 +23,10 @@ return new class extends Migration
             $table->string('model');
             $table->string('effort');
             $table->string('visibility')->default('public');
-            // A copy of the style used, so recording again looks the same
+            // A copy of the style used, so recording again looks the same.
             $table->json('style')->nullable();
             // Versions to record (desktop, tv, tablet, mobile) and, per version,
-            // what the last recording produced
+            // what the last recording produced.
             $table->json('devices')->nullable();
             $table->json('recordings')->nullable();
             $table->string('status');
@@ -43,7 +46,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        // The styles offered when making a video, first copied from config
+        // The styles offered when making a video, first copied from config.
         Schema::create('video_demo_styles', function (Blueprint $table) {
             $table->id();
             $table->string('key')->unique();
@@ -58,7 +61,8 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        // Videos your app's users asked for, stored where they asked (production)
+        // Videos the app's users asked for, stored where they asked (usually
+        // production).
         Schema::create('video_demo_requests', function (Blueprint $table) {
             $table->id();
             $table->text('question');
@@ -69,6 +73,9 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Reverse the migrations.
+     */
     public function down(): void
     {
         Schema::dropIfExists('video_demo_requests');

@@ -22,35 +22,48 @@ use RuntimeException;
 use Throwable;
 
 /**
- * Makes a video: the AI writes the plan, the recorder plays it, and a step
- * that fails because the plan was wrong goes back to the AI to fix. Pages
- * are checked first, and an error in the app itself stops the job with the
- * problem listed, since no plan can fix it and repairs would only cost.
- * With $replan false the stored plan is recorded again, at no AI cost.
+ * Makes a video: the AI model writes the plan, the recorder plays it, and a
+ * step that fails because the plan was wrong goes back to the model to fix.
+ *
+ * Pages are checked first, and an error in the app itself stops the job with
+ * the problem listed, since no plan can fix it and repairs would only cost
+ * money. With $replan false the stored plan is recorded again, at no AI cost.
  */
 class GenerateVideo implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    /**
+     * The number of times the job may be attempted.
+     */
     public int $tries = 1;
 
+    /**
+     * The number of seconds the job can run before timing out.
+     */
     public int $timeout = 1800;
 
+    /**
+     * Create a new job instance.
+     */
     public function __construct(public Video $video, public bool $replan = true)
     {
         $this->onConnection(config('video-demo.queue.connection') ?: VideoDemoServiceProvider::QUEUE_CONNECTION);
         $this->onQueue(config('video-demo.queue.name'));
 
-        // Planning, then each version recorded and encoded
+        // Allow time for planning, then for recording and encoding each version.
         $this->timeout = (int) max(1800, 900 + count($video->deviceList()) * max(600, $video->target_seconds * 12));
     }
 
+    /**
+     * Execute the job.
+     */
     public function handle(Planner $planner, Recorder $recorder, Encoder $encoder): void
     {
         $video = $this->video;
         $video->refresh();
 
-        // Stopped while it was waiting in the queue
+        // Stopped while it was waiting in the queue.
         if ($video->status === VideoStatus::Stopped || $video->stop_requested) {
             $this->stopped($video);
 
@@ -64,7 +77,7 @@ class GenerateVideo implements ShouldQueue
 
         try {
             if ($this->replan) {
-                // A broken start page would fail every plan: find out for free first
+                // A broken start page would fail every plan, so check it first at no AI cost.
                 $this->checkPages($recorder, $video, [$video->start_path ?: '/'], 'Checking the start page');
 
                 $video->moveTo(VideoStatus::Planning, 'The AI is reading the code');
@@ -83,7 +96,6 @@ class GenerateVideo implements ShouldQueue
                 $plan = $plan->fitTo(min($video->target_seconds, (int) config('video-demo.limits.max_seconds', 300)), Recorder::speed());
                 $video->update(['plan' => $plan->toArray()]);
 
-                // Every page the plan opens, checked before recording
                 $this->checkPages($recorder, $video, $plan->paths(), 'Checking the pages in the plan');
 
                 $results = [];
@@ -137,7 +149,7 @@ class GenerateVideo implements ShouldQueue
             $recordings[$device] = ['seconds' => $result->seconds, 'chapters' => $result->chapters];
         }
 
-        // Versions no longer chosen are removed
+        // Remove the files of versions that are no longer chosen.
         foreach (array_diff($video->recordedDevices(), $devices) as $old) {
             $work->delete([$video->workFile($old), $video->workFile($old, 'poster')]);
         }
@@ -154,7 +166,10 @@ class GenerateVideo implements ShouldQueue
         $video->moveTo(VideoStatus::Ready, sprintf('Ready. The AI cost $%.4f in total.', $video->cost));
     }
 
-    /** Opens the pages before any AI is spent on them; broken ones stop the job */
+    /**
+     * Check the pages before any AI is spent on them, failing the job when one
+     * is broken.
+     */
     protected function checkPages(Recorder $recorder, Video $video, array $paths, string $message): void
     {
         if (! config('video-demo.recorder.check_pages', true) || $paths === []) {
@@ -177,6 +192,9 @@ class GenerateVideo implements ShouldQueue
         $this->stopIfAsked($video);
     }
 
+    /**
+     * Stop the job if someone pressed Stop.
+     */
     protected function stopIfAsked(Video $video): void
     {
         if ($video->stopRequested()) {
@@ -184,6 +202,9 @@ class GenerateVideo implements ShouldQueue
         }
     }
 
+    /**
+     * Mark the video as stopped and log what the AI cost so far.
+     */
     protected function stopped(Video $video): void
     {
         $video->refresh();
@@ -191,6 +212,9 @@ class GenerateVideo implements ShouldQueue
         $video->moveTo(VideoStatus::Stopped, sprintf('Stopped by you. The AI cost $%.4f so far.', $video->cost));
     }
 
+    /**
+     * Handle a job failure.
+     */
     public function failed(Throwable $e): void
     {
         $this->video->refresh();

@@ -6,22 +6,25 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Run the migrations.
+     */
     public function up(): void
     {
         Schema::table('video_demo_videos', function (Blueprint $table) {
-            // The most this video may spend on AI, and the most steps its plan may have
+            // The most this video may spend on AI, and the most steps its plan may have.
             $table->decimal('max_cost', 10, 4)->nullable();
             $table->unsignedInteger('max_steps')->nullable();
-            // Who the recorder signs in as: a user id or email, or null for a guest
+            // Who the recorder signs in as: a user id or email, or null for a guest.
             $table->string('record_as')->nullable();
             $table->string('record_as_label')->nullable();
-            // Pages found broken before or during recording
+            // Pages found broken before or during recording.
             $table->json('issues')->nullable();
-            // Set by the Stop button; the job stops at its next safe point
+            // Set by the Stop button; the job stops at its next safe point.
             $table->boolean('stop_requested')->default(false);
         });
 
-        // Ideas the AI suggested, kept until replaced or deleted
+        // Ideas the AI model suggested, kept until replaced or deleted.
         Schema::create('video_demo_ideas', function (Blueprint $table) {
             $table->id();
             $table->string('title');
@@ -37,6 +40,9 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Reverse the migrations.
+     */
     public function down(): void
     {
         Schema::dropIfExists('video_demo_ideas');

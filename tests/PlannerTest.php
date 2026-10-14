@@ -69,16 +69,16 @@ class PlannerTest extends TestCase
             $this->step('click', ['target' => ['role' => 'button', 'name' => 'Publish job']]),
         ];
 
-        // 1: reads a view, with a thinking block that must be sent back unchanged
+        // Reply 1 reads a view, with a thinking block that must be sent back unchanged.
         $this->respond(1, [
             ['type' => 'thinking', 'thinking' => '', 'signature' => 'sig-1'],
             ['type' => 'tool_use', 'id' => 'tu_read', 'name' => 'read_file', 'input' => ['path' => 'resources/views/jobs/create.blade.php', 'from_line' => null]],
         ]);
-        // 2: a plan with a goto missing its url, which is refused
+        // Reply 2 is a plan with a goto missing its url, which is refused.
         $this->respond(2, [$this->submit('tu_bad', [$this->step('goto')])]);
-        // 3: a valid plan
+        // Reply 3 is a valid plan.
         $this->respond(3, [$this->submit('tu_plan', $goodSteps)]);
-        // 4: after the recording fails, a corrected plan
+        // Reply 4, after the recording fails, is a corrected plan.
         $this->respond(4, [$this->submit('tu_fixed', $goodSteps)]);
 
         $video = $this->video();
@@ -88,7 +88,7 @@ class PlannerTest extends TestCase
         $this->assertCount(3, $session->plan->steps);
         $this->assertSame('tu_plan', $session->pendingSubmit['id']);
 
-        // The request the SDK sent
+        // The request the SDK sent.
         $first = $this->request(1);
         $this->assertStringStartsWith('/v1/messages', $first['path']);
         $this->assertStringContainsString('server-side-fallback-2026-07-01', $first['headers']['anthropic-beta']);
@@ -103,21 +103,21 @@ class PlannerTest extends TestCase
         $this->assertStringContainsString('How a recruiter posts a job', $first['body']['messages'][0]['content']);
         $this->assertStringContainsString("<style name=\"Quick tip\">\nAs short as it can be. No title cards.\n</style>", $first['body']['messages'][0]['content']);
 
-        // The file it asked for came back, and the thinking block was returned unchanged
+        // The file it asked for came back, and the thinking block was returned unchanged.
         $second = $this->request(2)['body']['messages'];
         $this->assertSame('sig-1', $second[1]['content'][0]['signature']);
         $this->assertSame('tu_read', $second[2]['content'][0]['tool_use_id']);
         $this->assertStringContainsString('1  <label for="t">Job title</label>', $second[2]['content'][0]['content']);
 
-        // The rejected plan was answered with the problem
+        // The rejected plan was answered with the problem.
         $third = $this->request(3)['body']['messages'];
         $this->assertTrue($third[4]['content'][0]['is_error']);
         $this->assertStringContainsString('Step 1 (goto) needs url.', $third[4]['content'][0]['content']);
 
-        // The conversation is only ever appended to, so the prompt cache holds
+        // The conversation is only ever appended to, so the prompt cache holds.
         $this->assertSame($second, array_slice($third, 0, count($second)));
 
-        // A failed recording goes back as the result of the plan's submit_plan call
+        // A failed recording goes back as the result of the plan's submit_plan call.
         $failure = RecordingResult::fromArray([
             'ok' => false, 'failedStep' => 3, 'error' => 'Could not find a visible element with role "button", name "Publish job".',
             'url' => 'http://app.test/jobs/create', 'title' => 'New job', 'snapshot' => '- button "Post job"',
@@ -132,7 +132,7 @@ class PlannerTest extends TestCase
         $this->assertSame('tu_fixed', $session->pendingSubmit['id']);
         $this->assertSame(1, $session->repairs);
 
-        // Each response: 10 input, 5,000 cache writes, 20,000 cache reads, 1,000 output on Opus 5.5
+        // Each response: 10 input, 5,000 cache writes, 20,000 cache reads, 1,000 output on Opus 5.5.
         $perTurn = (10 * 4 + 5_000 * 4 * 1.25 + 20_000 * 0.20 + 1_000 * 20) / 1_000_000;
         $this->assertEqualsWithDelta($perTurn * 4, $video->fresh()->cost, 0.0001);
         $this->assertSame(4 * 20_000, $video->fresh()->cache_read_tokens);
@@ -180,12 +180,12 @@ class PlannerTest extends TestCase
         $video->update(['max_steps' => 3, 'max_cost' => 1.5]);
         $session = app(Planner::class)->plan($video);
 
-        // The brief named both limits
+        // The brief named both limits.
         $brief = $this->request(1)['body']['messages'][0]['content'];
         $this->assertStringContainsString('at most 3 steps', $brief);
         $this->assertStringContainsString('at most $1.50 on AI requests', $brief);
 
-        // The 5-step plan was refused, with the budget left
+        // The 5-step plan was refused, with the budget left.
         $answer = end($this->request(2)['body']['messages'])['content'][0];
         $this->assertTrue($answer['is_error']);
         $this->assertStringContainsString('The plan has 5 steps; the limit is 3.', $answer['content']);
@@ -200,7 +200,7 @@ class PlannerTest extends TestCase
         $this->respond(1, $read('tu_1'));
         $this->respond(2, $read('tu_2'));
 
-        // Each fake response costs about $0.049; the limit allows the first only
+        // Each fake response costs about $0.049; the limit allows the first only.
         $video = $this->video();
         $video->update(['max_cost' => 0.06]);
 

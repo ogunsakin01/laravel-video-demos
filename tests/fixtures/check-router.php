@@ -1,8 +1,8 @@
 <?php
 
-// A tiny app for the page check (php -S with this router): one good page,
+// A small app for the page check (php -S with this router): one good page,
 // one that fails on the server, one that needs signing in and one whose
-// JavaScript throws
+// JavaScript throws.
 $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
 switch ($path) {

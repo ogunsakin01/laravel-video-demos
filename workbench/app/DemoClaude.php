@@ -7,13 +7,16 @@ use RuntimeException;
 
 /**
  * Stands in for Claude in the demo app when no ANTHROPIC_API_KEY is set, so
- * the tours can be recorded for free. "Complete with AI" gets a canned reply;
- * generating a video needs a real key.
+ * the tours can be recorded at no cost. "Complete with AI" and "Suggest videos"
+ * get canned replies; generating a video needs a real key.
  */
 class DemoClaude extends Claude
 {
     public function __construct() {}
 
+    /**
+     * Answer form completion and suggestion requests with canned replies.
+     */
     public function create(array $params): object
     {
         if (! isset($params['outputConfig']['format'])) {
@@ -22,9 +25,9 @@ class DemoClaude extends Claude
 
         usleep(900_000);
 
-        // "Suggest videos" asks for a list
+        // "Suggest videos" asks for a list.
         if (isset($params['outputConfig']['format']['schema']['properties']['suggestions'])) {
-            // "Suggest more" lists the ideas already kept; answer with new ones
+            // "Suggest more" lists the ideas already kept; answer with new ones.
             if (str_contains(json_encode($params['messages']), 'ideas_already_suggested')) {
                 return $this->reply($params['model'], ['suggestions' => [
                     ['title' => 'Invite your hiring team', 'prompt' => 'How an admin invites colleagues to review applicants together.', 'why' => 'Hiring is a team effort.', 'start_path' => '/', 'target_seconds' => 45, 'style' => 'quick'],
@@ -53,6 +56,9 @@ class DemoClaude extends Claude
         ];
     }
 
+    /**
+     * Build a text reply holding the given data as JSON.
+     */
     protected function reply(string $model, array $data): object
     {
         return (object) [

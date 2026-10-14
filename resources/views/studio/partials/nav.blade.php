@@ -1,4 +1,4 @@
-{{-- The studio's menu, the same on every studio page. $active: index, ideas, examples, styles, create --}}
+{{-- The studio's menu, the same on every studio page. $active: index, ideas, examples, styles or create. --}}
 @php($active = $active ?? null)
 <a class="vd-btn vd-btn-ghost" href="{{ route('video-demo.studio.index') }}" @if ($active === 'index') aria-current="page" @endif>All videos</a>
 <a class="vd-btn vd-btn-ghost" href="{{ route('video-demo.studio.suggestions.index') }}" @if ($active === 'ideas') aria-current="page" @endif>Ideas</a>

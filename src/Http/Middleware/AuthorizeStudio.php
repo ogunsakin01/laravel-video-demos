@@ -8,16 +8,20 @@ use Illuminate\Support\Facades\Gate;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Who may use the studio, like Horizon and Telescope: anyone on a local
- * machine (or in tests), and elsewhere only users the app's gate allows.
- * Without a gate, a studio enabled outside local (on a staging server, say)
- * is closed, so nobody can spend the app's API credit or have Claude read
- * its code.
+ * Decides who may use the studio, as Horizon and Telescope do. Anyone may on
+ * a local machine or in tests; elsewhere, only users the app's gate allows.
  *
- *   Gate::define('viewVideoDemoStudio', fn ($user) => $user->isAdmin());
+ * Without the gate, a studio enabled outside local (on a staging server, say)
+ * is closed, so nobody can spend the app's API credit or have the AI model
+ * read its code:
+ *
+ *     Gate::define('viewVideoDemoStudio', fn ($user) => $user->isAdmin());
  */
 class AuthorizeStudio
 {
+    /**
+     * Handle an incoming request.
+     */
     public function handle(Request $request, Closure $next): Response
     {
         $gate = config('video-demo.studio.gate', 'viewVideoDemoStudio');

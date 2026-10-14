@@ -9,17 +9,20 @@ return [
     | Studio
     |--------------------------------------------------------------------------
     |
-    | The screens where developers create, preview and publish videos. Claude
-    | reads the app's code and the recorder drives the app in a browser, so
-    | the studio is meant to run on a developer's machine only. Its routes
+    | The screens where developers create, preview and publish videos. The AI
+    | model reads the app's code and the recorder drives the app in a browser,
+    | so the studio is meant to run on a developer's machine only. Its routes
     | are not registered at all when it is disabled, and never in production
     | unless "allow_in_production" is set.
     |
     */
 
     'studio' => [
+        // On in the local environment by default. Set VIDEO_DEMO_STUDIO to
+        // turn it on or off anywhere else.
         'enabled' => env('VIDEO_DEMO_STUDIO', env('APP_ENV') === 'local'),
         'allow_in_production' => false,
+
         // Outside local, only users this gate allows may use the studio. With
         // no such gate defined, the studio is closed outside local.
         'gate' => 'viewVideoDemoStudio',
@@ -28,7 +31,8 @@ return [
         'domain' => null,
 
         // Your production address, so the studio can show what users asked
-        // for there. Needs video-demo.library.requests_token on both sides.
+        // for there. It needs video-demo.library.requests_token set on both
+        // sides.
         'production_url' => env('VIDEO_DEMO_PRODUCTION_URL'),
     ],
 
@@ -58,14 +62,14 @@ return [
             'domain' => null,
         ],
 
-        // Let visitors ask for a video when a search finds nothing
+        // Let visitors ask for a video when a search finds nothing.
         'accept_requests' => true,
 
         // Lets the studio on your machine fetch those requests from production.
-        // Send it as a bearer token; leave empty to turn the endpoint off.
+        // It is sent as a bearer token. Leave it empty to turn the endpoint off.
         'requests_token' => env('VIDEO_DEMO_REQUESTS_TOKEN'),
 
-        // How long production caches the manifest, in seconds
+        // How long production caches the manifest, in seconds.
         'cache_seconds' => 300,
     ],
 
@@ -89,28 +93,35 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Claude
+    | AI Model
     |--------------------------------------------------------------------------
     |
-    | Each app owner uses their own API key. Prices are US dollars per million
-    | tokens and are used for the cost preview and for each video's cost.
-    | Check https://claude.com/pricing and update them when prices change.
+    | The models that plan videos. Each app owner uses their own API key.
+    | Prices are US dollars per million tokens and are used for the cost
+    | preview and for each video's cost. Check your provider's pricing page
+    | (https://platform.claude.com/docs/en/about-claude/pricing for Claude)
+    | and update them when prices change.
     |
     */
 
     'ai' => [
+        // The Anthropic API key. Keys for other providers go in config/prism.php.
         'api_key' => env('ANTHROPIC_API_KEY'),
-        // The model new videos start with. Left empty, the form picks the
-        // cheapest model marked "reliable" below (Claude Sonnet 5.5).
+
+        // The model new videos start with. Left empty, the cheapest model
+        // marked "reliable" below whose provider has an API key is used
+        // (Claude Sonnet 5.5 out of the box).
         'model' => env('VIDEO_DEMO_MODEL'),
-        // How hard Claude thinks (low to max). Other providers ignore it.
+
+        // How much Claude thinks before it answers: low, medium, high, xhigh
+        // or max. Other providers ignore it.
         'effort' => env('VIDEO_DEMO_EFFORT', 'high'),
 
-        // Seconds to wait for one reply from the model
+        // How long to wait for one reply from the model, in seconds.
         'timeout' => 600,
 
         // When Claude Opus or Sonnet declines a request, let the API retry it
-        // on another model instead of failing (Anthropic only)
+        // on another model instead of failing. Anthropic models only.
         'fallbacks' => true,
 
         // Each model's provider and prices (US dollars per million tokens).
@@ -121,31 +132,39 @@ return [
             'claude-opus-5-5' => ['label' => 'Claude Opus 5.5', 'provider' => 'anthropic', 'reliable' => true, 'input' => 4.00, 'output' => 20.00, 'cache_read' => 0.20],
             'claude-sonnet-5-5' => ['label' => 'Claude Sonnet 5.5', 'provider' => 'anthropic', 'reliable' => true, 'input' => 2.00, 'output' => 10.00, 'cache_read' => 0.10],
             // Haiku costs 5 times as much for a request whose prompt (cached
-            // tokens included) is over 100K tokens. Cheap, but plans less
+            // tokens included) is over 100K tokens. It is cheap, but plans less
             // reliably, so it isn't picked by default.
             'claude-haiku-5-5' => ['label' => 'Claude Haiku 5.5', 'provider' => 'anthropic', 'reliable' => false, 'input' => 0.10, 'output' => 0.50, 'cache_read' => 0.01,
                 'long_context' => ['above' => 100_000, 'multiplier' => 5]],
 
-            // Other providers, through Prism, with their keys in config/prism.php
-            // (OPENAI_API_KEY, GEMINI_API_KEY…). Prices as listed in October
-            // 2026; check your provider's pricing page. Mark a model reliable
-            // only once it has planned a few videos well.
+            // Other providers go through Prism, with their keys in
+            // config/prism.php (OPENAI_API_KEY, GEMINI_API_KEY and so on).
+            // Prices as listed in October 2026; check your provider's pricing
+            // page. Mark a model reliable only once it has planned a few videos
+            // well.
             // 'gpt-6.1-sol' => ['label' => 'GPT-6.1 Sol', 'provider' => 'openai', 'reliable' => true, 'input' => 2.00, 'output' => 10.00, 'cache_read' => 0.10],
             // 'gemini-3.8-flash' => ['label' => 'Gemini 3.8 Flash', 'provider' => 'gemini', 'reliable' => false, 'input' => 0.75, 'output' => 3.75, 'cache_read' => 0.075],
             // 'qwen3-coder' => ['label' => 'Qwen3 Coder (local)', 'provider' => 'ollama', 'reliable' => false, 'input' => 0, 'output' => 0],
         ],
 
-        // Writing to the 5-minute prompt cache costs this many times the input price
+        // Writing to the 5-minute prompt cache costs this many times the
+        // input price.
         'cache_write_multiplier' => 1.25,
-        // ...and to the 1-hour cache this many times, used while long recordings run
+
+        // Writing to the 1-hour prompt cache, used while long recordings run,
+        // costs this many times the input price.
         'cache_write_1h_multiplier' => 2.0,
 
-        // Folders Claude may read, relative to the app's root. Files matching
-        // "deny" are never read, wherever they are.
+        // Folders the AI model may read, relative to the app's root. Files
+        // matching "deny" are never read, wherever they are.
         'code' => [
             'paths' => ['app', 'routes', 'resources/views', 'resources/js', 'resources/ts', 'lang'],
             'deny' => ['.env', '.env.*', '*.key', '*.pem', 'auth.json', '*secret*', '*credential*'],
+
+            // The most of a file sent in one read, in bytes. Longer files are
+            // read in parts.
             'max_file_bytes' => 60_000,
+
             // Hide things that look like secrets (API keys, tokens, private
             // keys, long quoted passwords) in code and pages before they are
             // sent. Add your own as label => regular expression.
@@ -153,9 +172,9 @@ return [
             'redact_patterns' => [],
         ],
 
-        // Anything Claude should know that the code doesn't say: the sample
-        // data in your seeders, which account the recorder signs in as, words
-        // your users use for things.
+        // Anything the AI model should know that the code doesn't say, such
+        // as the sample data in your seeders, which account the recorder signs
+        // in as, or the words your users use for things.
         'notes' => '',
     ],
 
@@ -163,15 +182,26 @@ return [
     |--------------------------------------------------------------------------
     | Limits
     |--------------------------------------------------------------------------
+    |
+    | These limits keep a video from spending too much or running too long.
+    | The cost limit is the default for each new video; the form and the
+    | generate command can set a different one per video.
+    |
     */
 
     'limits' => [
-        // Stop a video's generation once its cost passes this, in US dollars
+        // Stop a video's generation once its cost passes this, in US dollars.
         'max_cost_per_video' => 2.00,
-        // Requests to Claude while it reads code and writes the plan
+
+        // The most requests to the AI model while it reads code and writes
+        // the plan.
         'max_turns' => 30,
-        // Times Claude may fix the plan after a step fails in the browser
+
+        // The most times the AI model may fix the plan after a step fails in
+        // the browser.
         'max_repairs' => 2,
+
+        // The longest video that can be asked for, in seconds.
         'max_seconds' => 300,
     ],
 
@@ -193,6 +223,9 @@ return [
         // Leave null to record signed out. Sign-in happens through a signed
         // link that only exists while the studio is enabled.
         'login_as' => env('VIDEO_DEMO_LOGIN_AS'),
+
+        // The auth guard the recorder signs in with. Null uses the app's
+        // default guard.
         'guard' => null,
 
         // The types of user a video can be recorded as. Found from the app's
@@ -205,19 +238,25 @@ return [
         // Playwright's own Chromium can't play MP4 (H.264) video. If your app
         // shows videos, set this to "chrome" to record with installed Chrome.
         'channel' => env('VIDEO_DEMO_BROWSER_CHANNEL'),
+
+        // Accept invalid or self-signed HTTPS certificates, as local sites
+        // often have.
         'ignore_https_errors' => true,
 
+        // The node and npm commands, or their full paths.
         'node' => env('VIDEO_DEMO_NODE', 'node'),
         'npm' => env('VIDEO_DEMO_NPM', 'npm'),
+
         // A full path when ffmpeg isn't on the PATH, or a wrapper script for a
-        // bundled copy that needs its own library folder (see the README)
+        // bundled copy that needs its own library folder (see the README).
         'ffmpeg' => env('VIDEO_DEMO_FFMPEG', 'ffmpeg'),
 
         // Where video-demo:install puts Playwright. The app's own node_modules
         // is searched too, so an app that already has Playwright needs nothing.
         'node_modules' => env('VIDEO_DEMO_NODE_MODULES', storage_path('video-demo/recorder/node_modules')),
 
-        // The least time each recording may take; long videos get more
+        // The least time each recording may take, in seconds. Long videos get
+        // more.
         'timeout' => 600,
 
         // Open the start page before planning, and every page in the plan
@@ -236,10 +275,10 @@ return [
     | Devices
     |--------------------------------------------------------------------------
     |
-    | The versions a video can be recorded in. Claude writes one plan for all
-    | of them; each extra version only adds recording time on your machine.
-    | Each is recorded at exactly this size. "touch" devices show taps
-    | instead of a cursor. "default_devices" are switched on in the
+    | The versions a video can be recorded in. The AI model writes one plan
+    | for all of them; each extra version only adds recording time on your
+    | machine. Each is recorded at exactly this size. "touch" devices show
+    | taps instead of a cursor. "default_devices" are switched on in the
     | new-video form.
     |
     */
@@ -267,11 +306,15 @@ return [
         // Leave empty to use the package's own "video-demo" connection: your
         // default connection, with retry_after long enough for long videos
         // (otherwise a job running past retry_after is started a second
-        // time, and paid for twice), on its own queue. Run a worker for it:
-        //   php artisan queue:work video-demo
-        // Name a connection to use it instead.
+        // time, and paid for twice), on its own queue. Name a connection to
+        // use it instead.
         'connection' => env('VIDEO_DEMO_QUEUE_CONNECTION'),
+
+        // The queue the package's jobs are pushed to.
         'name' => env('VIDEO_DEMO_QUEUE', 'video-demo'),
+
+        // Seconds a job may run before the queue starts it again, for the
+        // package's own connection. Keep it longer than your longest video.
         'retry_after' => 7200,
     ],
 
@@ -279,16 +322,27 @@ return [
     |--------------------------------------------------------------------------
     | Appearance
     |--------------------------------------------------------------------------
+    |
+    | The name, logo, colours and font used by the studio and library pages,
+    | and whether the studio shows its Examples page.
+    |
     */
 
     'ui' => [
-        // Shown in the studio and library headers
+        // Shown in the studio and library headers.
         'name' => env('VIDEO_DEMO_NAME', env('APP_NAME', 'Laravel').' videos'),
+
+        // The URL of an image shown next to the name, or null for none.
         'logo' => null,
-        // Buttons and highlights. The default near-black turns light in dark mode.
+
+        // The colour of buttons and highlights. The default near-black turns
+        // light in dark mode.
         'accent' => '#171717',
-        // Geist, from Bunny Fonts (no tracking). Set to null to use system fonts only.
+
+        // Geist, from Bunny Fonts (no tracking). Set to null to use system
+        // fonts only.
         'font_url' => 'https://fonts.bunny.net/css?family=geist:400,500,600|geist-mono:400,500&display=swap',
+
         // The studio's Examples page: sample videos made with this package,
         // streamed from its GitHub repository through jsDelivr. Set to false
         // to hide the page, or point examples_url at your own copy.
@@ -298,14 +352,14 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Video styles
+    | Video Styles
     |--------------------------------------------------------------------------
     |
     | The styles offered when making a video. These are copied into the
     | database the first time they are needed; after that, add and edit
-    | styles on the studio's Styles page. "direction" tells Claude how to
-    | write the video. "theme" (light or dark) and "accent" set the look of
-    | title cards and captions, "captions" puts them at the top or bottom,
+    | styles on the studio's Styles page. "direction" tells the AI model how
+    | to write the video. "theme" (light or dark) and "accent" set the look
+    | of title cards and captions, "captions" puts them at the top or bottom,
     | "pace" (relaxed, normal or brisk) sets how fast the video moves, and
     | "art" (none or abstract) puts animated line art behind title cards,
     | with the words rising into place, like an ad.

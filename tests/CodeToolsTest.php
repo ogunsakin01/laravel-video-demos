@@ -6,6 +6,9 @@ use Illuminate\Support\Facades\File;
 use Ogunsakin01\VideoDemo\Ai\CodeTools;
 use RuntimeException;
 
+/**
+ * Tests the code tools the AI model uses to read the app.
+ */
 class CodeToolsTest extends TestCase
 {
     protected string $root;

@@ -21,7 +21,10 @@ use Ogunsakin01\VideoDemo\Recording\RecordAs;
 use Ogunsakin01\VideoDemo\Studio\Pages;
 use Ogunsakin01\VideoDemo\VideoDemoServiceProvider;
 
-/** Spending limits, step limits, Stop, who a video is recorded as, embed code and the queue */
+/**
+ * Tests spending limits, step limits, Stop, who a video is recorded as, embed
+ * code and the queue.
+ */
 class ControlsTest extends TestCase
 {
     protected function video(array $overrides = []): Video
@@ -32,7 +35,9 @@ class ControlsTest extends TestCase
         ]);
     }
 
-    /** Users with a role column: one admin and two members */
+    /**
+     * Create a users table with a role column: one admin and two members.
+     */
     protected function users(?Closure $columns = null): void
     {
         Schema::create('users', function ($table) use ($columns) {
@@ -53,11 +58,11 @@ class ControlsTest extends TestCase
 
     public function test_prices_match_the_published_rates(): void
     {
-        // Per million tokens: Sonnet 5.5 is $2 in, $2.50 to write the cache, $0.10 to read it, $10 out
+        // Per million tokens: Sonnet 5.5 is $2 in, $2.50 to write the cache, $0.10 to read it, $10 out.
         $this->assertEqualsWithDelta(14.60, Pricing::cost('claude-sonnet-5-5', 1_000_000, 1_000_000, 1_000_000, 1_000_000), 0.0001);
-        // An hour-long cache write costs twice the input price
+        // An hour-long cache write costs twice the input price.
         $this->assertEqualsWithDelta(4.0, Pricing::cost('claude-sonnet-5-5', 0, 0, 0, 0, 1_000_000), 0.0001);
-        // Haiku 5.5 is $0.10 in and $0.50 out, five times that once the prompt passes 100K tokens
+        // Haiku 5.5 is $0.10 in and $0.50 out, five times that once the prompt passes 100K tokens.
         $this->assertEqualsWithDelta(0.10 * 0.05 + 0.50 * 0.001, Pricing::cost('claude-haiku-5-5', 50_000, 0, 0, 1_000), 0.000001);
         $this->assertEqualsWithDelta(5 * (0.10 * 0.06 + 0.01 * 0.05 + 0.50 * 0.001), Pricing::cost('claude-haiku-5-5', 60_000, 0, 50_000, 1_000), 0.000001);
     }
@@ -68,7 +73,7 @@ class ControlsTest extends TestCase
         $this->assertSame('claude-sonnet-5-5', Pricing::defaultModel());
         $this->assertMatchesRegularExpression('/<option value="claude-sonnet-5-5"[^>]*selected/', $this->get('/video-demo/studio/create')->getContent());
 
-        // With only an OpenAI key, the cheapest reliable OpenAI model
+        // With only an OpenAI key, the cheapest reliable OpenAI model is picked.
         config([
             'video-demo.ai.api_key' => null,
             'prism.providers.openai.api_key' => 'sk-test',
@@ -77,7 +82,7 @@ class ControlsTest extends TestCase
         $this->assertSame('gpt-6.1-sol', Pricing::defaultModel());
         $this->get('/video-demo/studio/create')->assertDontSee('to generate videos.')->assertSee('GPT-6.1 Sol')->assertDontSee('Claude Opus 5.5');
 
-        // A model set in the config wins
+        // A model set in the config wins.
         config(['video-demo.ai.model' => 'claude-opus-5-5']);
         $this->assertSame('claude-opus-5-5', Pricing::defaultModel());
     }
@@ -88,7 +93,7 @@ class ControlsTest extends TestCase
         $this->users();
         $idea = VideoIdea::create(['title' => 'Post a job', 'prompt' => 'How to post a job', 'target_seconds' => 60, 'style' => 'quick']);
 
-        // User types, not users
+        // The list shows user types, not users.
         $this->get('/video-demo/studio/create')->assertSee('Guest (signed out)')->assertSee('value="type:member"', false)->assertDontSee('member@example.com')->assertSee('Spending limit');
 
         $this->post('/video-demo/studio', [
@@ -115,7 +120,7 @@ class ControlsTest extends TestCase
 
         $this->get("/video-demo/studio/{$video->id}")->assertSee('$0.75')->assertSee('Member');
 
-        // An unknown type is refused
+        // An unknown type is refused.
         $this->post('/video-demo/studio', ['record_as' => 'type:owner'])->assertSessionHasErrors('record_as');
     }
 
@@ -133,12 +138,12 @@ class ControlsTest extends TestCase
 
         $this->assertNull(RecordAs::resolve(RecordAs::GUEST));
         $this->assertSame('admin@example.com', RecordAs::resolve('type:admin')->email);
-        // The default user is used when they are of that type
+        // The default user is used when they are of that type.
         $this->assertSame('second-member@example.com', RecordAs::resolve('type:member')->email);
-        // Videos from 0.4.0 stored a user
+        // Videos from 0.4.0 stored a user.
         $this->assertSame('member@example.com', RecordAs::resolve('member@example.com')->email);
 
-        // The command takes a type's key or label
+        // The command takes a type's key or label.
         $this->assertSame('type:admin', RecordAs::parse('Admin'));
         $this->assertSame('guest', RecordAs::parse('guest'));
 
@@ -182,7 +187,7 @@ class ControlsTest extends TestCase
         $this->assertSame('b@example.com', RecordAs::resolve('type:owner')->email);
 
         // Someone with both roles isn't picked for either while a user with
-        // just that role exists, even when they are the default user
+        // just that role exists, even when they are the default user.
         User::forceCreate(['email' => 'both@example.com', 'password' => 'x']);
         DB::table('role_user')->insert([['role_id' => 1, 'user_id' => 3], ['role_id' => 2, 'user_id' => 3]]);
         config(['video-demo.recorder.login_as' => 'both@example.com']);
@@ -199,7 +204,7 @@ class ControlsTest extends TestCase
         $this->assertSame(['type:admin' => 'Admin', 'type:user' => 'Other users'], array_slice(RecordAs::options(), 1));
         $this->assertSame('jo@example.com', RecordAs::resolve('type:user')->email);
 
-        // Listing them in the config wins
+        // Listing them in the config wins.
         config(['video-demo.recorder.user_types' => ['Account owner' => 'boss@example.com']]);
         $this->assertSame(['type:account-owner' => 'Account owner'], array_slice(RecordAs::options(), 1));
         $this->assertSame('boss@example.com', RecordAs::resolve('type:account-owner')->email);
@@ -228,7 +233,7 @@ class ControlsTest extends TestCase
         $this->assertTrue($running->fresh()->stop_requested);
         $this->getJson("/video-demo/studio/{$running->id}/status")->assertJson(['stopping' => true, 'working' => true]);
 
-        // A stopped video can be tried again, and the old Stop is forgotten
+        // A stopped video can be tried again, and the old Stop is forgotten.
         $running->update(['status' => VideoStatus::Stopped]);
         $this->get("/video-demo/studio/{$running->id}")->assertSee('Try again');
         $this->post("/video-demo/studio/{$running->id}/retry", ['mode' => 'plan'])->assertRedirect();
@@ -275,7 +280,7 @@ class ControlsTest extends TestCase
             ->assertSee('/storage/video-demo/post-a-job-v1.mp4&quot; poster=', false)
             ->assertSee('data-copy=', false);
 
-        // And on the staff library page, not the public one
+        // And on the staff library page, not the public one.
         $this->get('/admin/videos/post-a-job')->assertSee('Embed');
         $this->get('/help/videos/post-a-job')->assertDontSee('data-copy=', false);
     }
@@ -288,7 +293,7 @@ class ControlsTest extends TestCase
         ]);
 
         $this->assertSame('/storage/video-demo/a.mp4', app(Manifest::class)->url(['video' => 'video-demo/a.mp4']));
-        // A disk on another host, such as a CDN or S3, keeps its full address
+        // A disk on another host, such as a CDN or S3, keeps its full address.
         $this->assertSame('https://cdn.example.com/a.mp4', Manifest::relative('https://cdn.example.com/a.mp4', 'public'));
         config(['filesystems.disks.s3' => ['driver' => 's3']]);
         $this->assertSame('http://old-name.test/a.mp4', Manifest::relative('http://old-name.test/a.mp4', 's3'));
@@ -300,7 +305,7 @@ class ControlsTest extends TestCase
         $this->assertSame(7200, $connection['retry_after']);
         $this->assertSame('video-demo', $connection['queue']);
 
-        // A sync queue holds the page open while a video is made
+        // A sync queue holds the page open while a video is made.
         config(['video-demo.queue.connection' => 'sync']);
         $this->assertStringContainsString('QUEUE_CONNECTION=sync', VideoDemoServiceProvider::queueWarning());
 
@@ -339,7 +344,7 @@ class ControlsTest extends TestCase
         $this->assertTrue($a->fresh()->isPublished() && $b->fresh()->isPublished());
         $this->assertNotNull(app(Manifest::class)->find('invite-a-teammate', 'public'));
 
-        // Already live at this version: nothing to do
+        // Already live at this version: nothing to do.
         $this->post('/video-demo/studio/bulk', ['action' => 'publish', 'videos' => [$a->id]])->assertSessionHas('status', 'Published 0 videos. Skipped 1: not ready, or already published at their latest version.');
 
         $this->post('/video-demo/studio/bulk', ['action' => 'unpublish', 'videos' => [$a->id, $c->id]])->assertSessionHas('status', 'Unpublished 1 video. Skipped 1: not published.');

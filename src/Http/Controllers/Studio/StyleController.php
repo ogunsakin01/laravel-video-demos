@@ -9,8 +9,14 @@ use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Ogunsakin01\VideoDemo\Models\VideoStyle;
 
+/**
+ * Manages the video styles on the studio's Styles page.
+ */
 class StyleController extends Controller
 {
+    /**
+     * Display the styles, and the one being edited.
+     */
     public function index(Request $request): View
     {
         $styles = VideoStyle::options();
@@ -21,16 +27,22 @@ class StyleController extends Controller
         ]);
     }
 
+    /**
+     * Store a new style.
+     */
     public function store(Request $request): RedirectResponse
     {
         $data = $this->validated($request);
-        // Copy the defaults first, so adding a style never hides them
+        // Copy the defaults first, so adding a style never hides them.
         VideoStyle::options();
         VideoStyle::create($data);
 
         return redirect()->route('video-demo.studio.styles.index')->with('status', 'Style added.');
     }
 
+    /**
+     * Update the given style.
+     */
     public function update(Request $request, VideoStyle $style): RedirectResponse
     {
         $style->update($this->validated($request));
@@ -38,6 +50,9 @@ class StyleController extends Controller
         return redirect()->route('video-demo.studio.styles.index')->with('status', 'Style saved. Videos already made keep the style they were made with.');
     }
 
+    /**
+     * Remove the given style.
+     */
     public function destroy(VideoStyle $style): RedirectResponse
     {
         if (VideoStyle::count() <= 1) {
@@ -49,6 +64,9 @@ class StyleController extends Controller
         return redirect()->route('video-demo.studio.styles.index')->with('status', 'Style deleted.');
     }
 
+    /**
+     * Validate the style form.
+     */
     protected function validated(Request $request): array
     {
         return $request->validate([

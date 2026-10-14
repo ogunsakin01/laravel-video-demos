@@ -79,7 +79,7 @@
 
   <x-slot:scripts>
     <script>
-      // Bulk publish: tick videos, then Publish or Unpublish
+      // Bulk publish: tick videos, then press Publish or Unpublish.
       (() => {
         const form = document.getElementById('vd-bulk-form');
         if (!form) return;

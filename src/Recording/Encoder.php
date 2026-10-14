@@ -7,10 +7,14 @@ use RuntimeException;
 use Symfony\Component\Process\Exception\ProcessSignaledException;
 use Symfony\Component\Process\Exception\ProcessStartFailedException;
 
-/** Converts the browser's WebM recording to an MP4 that plays everywhere, and grabs a poster frame */
+/**
+ * Converts the browser's WebM recording to an MP4 that plays everywhere, and grabs a poster frame.
+ */
 class Encoder
 {
     /**
+     * Encode a WebM recording to MP4 and save a poster frame.
+     *
      * $trimSeconds (in recording time) cuts the browser's start-up from the
      * beginning; $speed plays the recording back that many times faster.
      */
@@ -20,7 +24,7 @@ class Encoder
         $speed = max($speed, 0.1);
 
         $this->run([$ffmpeg, '-y', '-v', 'error',
-            // Squeezes the timestamps, so frames play $speed times faster
+            // Squeezes the timestamps, so frames play $speed times faster.
             '-itsscale', number_format(1 / $speed, 6, '.', ''),
             '-i', $webm, '-ss', number_format($trimSeconds / $speed, 2, '.', ''), '-r', '30',
             '-c:v', 'libx264', '-crf', '26', '-preset', 'slow', '-pix_fmt', 'yuv420p',
@@ -29,6 +33,9 @@ class Encoder
         $this->run([$ffmpeg, '-y', '-v', 'error', '-ss', '2', '-i', $mp4, '-frames:v', '1', '-q:v', '4', $poster]);
     }
 
+    /**
+     * Run an ffmpeg command, turning a missing binary or a crash into a readable error.
+     */
     protected function run(array $command): void
     {
         try {

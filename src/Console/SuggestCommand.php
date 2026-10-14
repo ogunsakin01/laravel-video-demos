@@ -6,16 +6,31 @@ use Illuminate\Console\Command;
 use Ogunsakin01\VideoDemo\Ai\Suggester;
 use Throwable;
 
-/** Videos worth making first, suggested from the app's routes */
+/**
+ * Suggests the videos worth making first, from the app's routes.
+ */
 class SuggestCommand extends Command
 {
+    /**
+     * The name and signature of the console command.
+     *
+     * @var string
+     */
     protected $signature = 'video-demo:suggest
         {--model= : The AI model (the cheapest reliable one when left out)}
         {--replace : Delete the ideas not yet made into videos and start over}
         {--json : Print the suggestions as JSON, for scripts and AI agents}';
 
+    /**
+     * The console command description.
+     *
+     * @var string
+     */
     protected $description = 'Suggest the videos worth making first for this app';
 
+    /**
+     * Execute the console command.
+     */
     public function handle(Suggester $suggester): int
     {
         try {

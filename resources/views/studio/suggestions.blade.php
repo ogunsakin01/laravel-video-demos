@@ -77,7 +77,7 @@
     <script>
       document.getElementById('vd-suggest-form').addEventListener('submit', e => {
         const button = e.submitter || e.target.querySelector('.vd-btn-primary');
-        // Keep the clicked button's value, which disabling would drop
+        // Keep the clicked button's value, which disabling would drop.
         const keep = document.createElement('input');
         keep.type = 'hidden'; keep.name = button.name; keep.value = button.value;
         e.target.append(keep);

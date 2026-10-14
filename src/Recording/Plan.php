@@ -3,24 +3,32 @@
 namespace Ogunsakin01\VideoDemo\Recording;
 
 /**
- * The step list Claude writes and the recorder plays. Stored with each video,
- * so a video can be recorded again after the UI changes without asking
- * Claude again.
+ * The step list the AI model writes and the recorder plays. It is stored with
+ * each video, so a video can be recorded again after the UI changes without
+ * asking the AI model again.
  */
 final class Plan
 {
     public const ACTIONS = ['goto', 'click', 'type', 'select', 'check', 'press', 'hover', 'scroll', 'wait', 'caption', 'card', 'pause'];
 
-    /** Rough time each action takes on screen, in milliseconds, before pauses */
+    /**
+     * Rough time each action takes on screen, in milliseconds, before pauses.
+     */
     protected const ACTION_MS = [
         'goto' => 1500, 'click' => 1300, 'type' => 1000, 'select' => 1400, 'check' => 1200,
         'press' => 400, 'hover' => 1000, 'scroll' => 900, 'wait' => 500,
     ];
 
-    /** Characters typed per second by the recorder */
+    /**
+     * Characters typed per second by the recorder.
+     */
     protected const TYPING_PER_SECOND = 18;
 
-    /** @param list<array<string, mixed>> $steps */
+    /**
+     * Create a new plan instance.
+     *
+     * @param  list<array<string, mixed>>  $steps
+     */
     public function __construct(
         public string $title,
         public string $summary,
@@ -29,6 +37,9 @@ final class Plan
 
     public const TARGET_FIELDS = ['role', 'name', 'label', 'placeholder', 'text', 'selector', 'frame'];
 
+    /**
+     * Create a plan from the AI model's submission or a video's stored plan.
+     */
     public static function fromArray(array $data): self
     {
         return new self(
@@ -39,8 +50,10 @@ final class Plan
     }
 
     /**
-     * Empty values from the model ("", 0, []) mean "not set": the schema has
-     * no nullable fields, to stay within Anthropic's limit on union types
+     * Turn the empty values the model sends ("", 0, []) into null.
+     *
+     * The schema has no nullable fields, to stay within Anthropic's limit on
+     * union types, so an empty value means "not set".
      */
     protected static function normalise(array $step): array
     {
@@ -63,12 +76,18 @@ final class Plan
         return $step;
     }
 
+    /**
+     * Get the plan as an array.
+     */
     public function toArray(): array
     {
         return ['title' => $this->title, 'summary' => $this->summary, 'steps' => $this->steps];
     }
 
-    /** The steps a version plays: those without only_on, and those naming it */
+    /**
+     * Get the plan as one version plays it: the steps without only_on, and
+     * those naming the version.
+     */
     public function forDevice(string $device): self
     {
         $steps = array_values(array_filter(
@@ -80,8 +99,8 @@ final class Plan
     }
 
     /**
-     * The pages the plan opens with goto, so they can be checked before
-     * recording
+     * Get the pages the plan opens with goto, so they can be checked before
+     * recording.
      *
      * @return list<string>
      */
@@ -94,10 +113,11 @@ final class Plan
     }
 
     /**
-     * Estimated length of the finished video, in seconds. At $speed above 1
-     * the recording is played back faster: actions take less time, while
-     * captions, cards and pauses are held longer while recording, so they
-     * keep their length.
+     * Get the estimated length of the finished video, in seconds.
+     *
+     * At $speed above 1 the recording is played back faster: actions take
+     * less time, while captions, cards and pauses are held longer while
+     * recording, so they keep their length.
      */
     public function estimatedSeconds(float $speed = 1): float
     {
@@ -105,9 +125,11 @@ final class Plan
     }
 
     /**
-     * Stretches or shrinks captions, cards and pauses so the video lands near
-     * the target length. Actions keep their natural speed, and nothing is cut
-     * to less than half or more than three times its planned time.
+     * Stretch or shrink captions, cards and pauses so the video lands near the
+     * target length.
+     *
+     * Actions keep their natural speed, and nothing is cut to less than half
+     * or stretched to more than three times its planned time.
      */
     public function fitTo(int $targetSeconds, float $speed = 1): self
     {
@@ -134,7 +156,9 @@ final class Plan
         return new self($this->title, $this->summary, $steps);
     }
 
-    /** Chapters for the player, from the steps that start one */
+    /**
+     * Get the chapters for the player, from the steps that start one.
+     */
     public function chapters(): array
     {
         $chapters = [];
@@ -149,12 +173,17 @@ final class Plan
         return $chapters;
     }
 
+    /**
+     * Determine if a step's length can change to fit the target length.
+     */
     protected function isFlexible(array $step): bool
     {
         return in_array($step['action'] ?? null, ['caption', 'card', 'pause'], true);
     }
 
-    /** How long a step lasts in the finished video */
+    /**
+     * Get how long a step lasts in the finished video, in milliseconds.
+     */
     protected function stepMs(array $step, float $speed = 1): int
     {
         $action = $step['action'] ?? 'pause';
@@ -168,12 +197,12 @@ final class Plan
             $ms += (int) (strlen((string) ($step['value'] ?? '')) / self::TYPING_PER_SECOND * 1000);
         }
 
-        // Actions play back faster; a pause the plan adds after one keeps its length
+        // Actions play back faster; a pause the plan adds after one keeps its length.
         return (int) ($ms / max($speed, 0.1)) + (int) ($step['ms'] ?? 0);
     }
 
     /**
-     * JSON schema for the submit_plan tool, strict-mode compatible.
+     * Get the JSON schema for the submit_plan tool, compatible with strict mode.
      *
      * No field is "something or null": Anthropic limits strict tool schemas
      * to 16 fields with union types, so an unused field is empty instead

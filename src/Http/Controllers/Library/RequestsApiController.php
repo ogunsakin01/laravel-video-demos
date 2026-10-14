@@ -7,9 +7,14 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Ogunsakin01\VideoDemo\Models\VideoRequest;
 
-/** Open video requests, for the studio on a developer's machine */
+/**
+ * Lists open video requests for the studio on a developer's machine.
+ */
 class RequestsApiController extends Controller
 {
+    /**
+     * Display the open video requests as JSON.
+     */
     public function __invoke(Request $request): JsonResponse
     {
         $token = (string) config('video-demo.library.requests_token');

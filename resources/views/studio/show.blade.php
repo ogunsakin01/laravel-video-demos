@@ -266,7 +266,7 @@
   </div>
 
   <script>
-    // Log times in the viewer's own time zone, as the live updates show them
+    // Log times in the viewer's own time zone, as the live updates show them.
     document.querySelectorAll('#vd-log time[datetime]').forEach(t => { t.textContent = new Date(t.dateTime).toTimeString().slice(0, 8); });
     document.querySelectorAll('[data-src]').forEach(b => b.addEventListener('click', () => {
       const v = document.getElementById('vd-preview');

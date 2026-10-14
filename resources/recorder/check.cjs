@@ -1,8 +1,8 @@
-// Opens each page a video will use and reports the ones that don't work, so
-// a broken page is found before any AI is spent planning or repairing.
+// Opens each page a video will use and reports the ones that fail, so a broken
+// page is found before the AI model is asked to plan or repair anything.
 //   node check.cjs <job.json>
-// The job gives the paths, the app's address, the sign-in link and the
-// screen. Writes result.json: { problems: [{ path, problem, status, url, detail }] }.
+// The job gives the paths, the app's address, the sign-in link and the screen.
+// Writes result.json: { problems: [{ path, problem, status, url, detail }] }.
 const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
@@ -11,7 +11,7 @@ const job = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const url = p => job.baseUrl.replace(/\/$/, '') + '/' + String(p).replace(/^\//, '');
 const isSignIn = u => /\/(login|signin|sign-in)\b/.test(new URL(u).pathname);
 
-// The error a page shows: Laravel's exception message when there is one
+// Read the error a page shows, preferring Laravel's exception message.
 async function describeError(page) {
   return page.evaluate(() => {
     const pick = sel => document.querySelector(sel)?.textContent?.trim();
@@ -47,7 +47,7 @@ async function describeError(page) {
         const finalUrl = page.url();
 
         if (status && status >= 400) {
-          // Laravel's error pages only repeat the status ("404 | Not Found"); keep real messages
+          // Laravel's error pages only repeat the status ("404 | Not Found"), so keep only a detail that says more.
           const detail = (await describeError(page)).slice(0, 400);
           const generic = /^(\d{3}\b)?[\s|·-]*(not found|server error|forbidden|unauthorized|page expired|too many requests|service unavailable)?$/i.test(detail.trim());
           problems.push({ path: p, problem: `The page returned HTTP ${status}`, status, url: finalUrl, detail: generic ? null : detail });

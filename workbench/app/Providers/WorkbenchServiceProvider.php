@@ -14,12 +14,15 @@ use Workbench\App\DemoClaude;
  */
 class WorkbenchServiceProvider extends ServiceProvider
 {
+    /**
+     * Configure the demo app, and use DemoClaude when no API key is set.
+     */
     public function register(): void
     {
         config([
             'app.name' => 'Acme HR',
             'video-demo.studio.enabled' => true,
-            // No sign-in in the demo, so the private library is open
+            // No sign-in in the demo, so the private library is open.
             'video-demo.library.private.middleware' => ['web'],
             'video-demo.ai.api_key' => env('ANTHROPIC_API_KEY', 'demo-key'),
             'video-demo.ui.name' => 'Acme HR videos',
@@ -38,6 +41,9 @@ class WorkbenchServiceProvider extends ServiceProvider
         }
     }
 
+    /**
+     * Load the demo app's views, migrations, routes and commands.
+     */
     public function boot(): void
     {
         $this->loadViewsFrom(__DIR__.'/../../resources/views', 'workbench');

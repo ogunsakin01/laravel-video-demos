@@ -2,6 +2,10 @@
 
 namespace Ogunsakin01\VideoDemo\Recording;
 
+/**
+ * The outcome of recording one version of a video, read from the recorder's
+ * result.json.
+ */
 final readonly class RecordingResult
 {
     public function __construct(
@@ -19,6 +23,9 @@ final readonly class RecordingResult
         public ?array $appError = null,
     ) {}
 
+    /**
+     * Create a result from the recorder's result.json, with times in seconds.
+     */
     public static function fromArray(array $r, ?string $device = null): self
     {
         return new self(
@@ -38,15 +45,19 @@ final readonly class RecordingResult
     }
 
     /**
-     * True when a step failed in a way a corrected plan may fix. Not when the
-     * app itself broke (a server or JavaScript error): no plan fixes that
+     * Determine if a step failed in a way a corrected plan may fix.
+     *
+     * Not when the app itself broke (a server or JavaScript error), since no
+     * plan fixes that.
      */
     public function canRepair(): bool
     {
         return ! $this->ok && $this->failedStep !== null && $this->appError === null;
     }
 
-    /** The app's own error, as an issue to show the developer */
+    /**
+     * Get the app's own error as an issue to show the developer.
+     */
     public function issue(): ?array
     {
         if (! $this->appError) {
@@ -64,6 +75,9 @@ final readonly class RecordingResult
         ];
     }
 
+    /**
+     * Get a one-line summary for the video's log.
+     */
     public function summary(): string
     {
         $on = $this->device ? ' ('.Devices::get($this->device)['label'].')' : '';
@@ -73,7 +87,9 @@ final readonly class RecordingResult
             : ($this->failedStep ? "Step {$this->failedStep} failed$on: {$this->error}" : "Recording failed$on: {$this->error}");
     }
 
-    /** The failure as Claude sees it when asked to fix the plan */
+    /**
+     * Describe the failure for the AI model when it is asked to fix the plan.
+     */
     public function describeForRepair(): string
     {
         return implode("\n\n", array_filter([

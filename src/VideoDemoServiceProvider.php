@@ -16,9 +16,14 @@ use Ogunsakin01\VideoDemo\Library\Manifest;
 
 class VideoDemoServiceProvider extends ServiceProvider
 {
-    /** The package's own queue connection, with a long retry_after */
+    /**
+     * The name of the package's queue connection, which has a long retry_after.
+     */
     public const QUEUE_CONNECTION = 'video-demo';
 
+    /**
+     * Register any package services.
+     */
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../config/video-demo.php', 'video-demo');
@@ -27,12 +32,15 @@ class VideoDemoServiceProvider extends ServiceProvider
         $this->app->singleton(Manifest::class);
 
         // The package gets its own client, so it never changes how the app
-        // itself talks to Anthropic
+        // itself talks to Anthropic.
         $this->app->when(Claude::class)
             ->needs(Client::class)
             ->give(fn () => new Client(apiKey: config('video-demo.ai.api_key')));
     }
 
+    /**
+     * Bootstrap any package services.
+     */
     public function boot(): void
     {
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'video-demo');
@@ -57,9 +65,10 @@ class VideoDemoServiceProvider extends ServiceProvider
     }
 
     /**
-     * A copy of the app's default queue connection with retry_after long
-     * enough for a video. Generation runs for minutes; with Laravel's usual
-     * 90 seconds the queue would start the same job again while it runs.
+     * Register a copy of the app's default queue connection for long videos.
+     *
+     * Generation runs for minutes. With Laravel's usual retry_after of 90
+     * seconds, the queue would start the same job again while it runs.
      */
     protected function registerQueueConnection(): void
     {
@@ -74,12 +83,14 @@ class VideoDemoServiceProvider extends ServiceProvider
             ...$base,
             'retry_after' => (int) config('video-demo.queue.retry_after', 7200),
             // Its own queue, so the app's workers (with their shorter
-            // retry_after) never pick up a long video and start it again
+            // retry_after) never pick up a long video and start it again.
             'queue' => config('video-demo.queue.name') ?: 'video-demo',
         ]]);
     }
 
-    /** Problems with the queue setup that would break long videos, for the studio to show */
+    /**
+     * Get a warning about queue settings that would break long videos, if any.
+     */
     public static function queueWarning(): ?string
     {
         $connection = config('video-demo.queue.connection') ?: self::QUEUE_CONNECTION;
@@ -95,6 +106,9 @@ class VideoDemoServiceProvider extends ServiceProvider
         return null;
     }
 
+    /**
+     * Determine if the studio is enabled in this environment.
+     */
     public static function studioEnabled(): bool
     {
         if (! config('video-demo.studio.enabled')) {
@@ -104,6 +118,9 @@ class VideoDemoServiceProvider extends ServiceProvider
         return ! app()->environment('production') || config('video-demo.studio.allow_in_production');
     }
 
+    /**
+     * Register the package routes.
+     */
     protected function registerRoutes(): void
     {
         if ($this->app->routesAreCached()) {
@@ -130,6 +147,9 @@ class VideoDemoServiceProvider extends ServiceProvider
         }
     }
 
+    /**
+     * Get the route group options for the given config key.
+     */
     protected function groupOptions(string $key, string $name): array
     {
         return array_filter([

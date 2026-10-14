@@ -5,6 +5,9 @@ namespace Ogunsakin01\VideoDemo\Tests;
 use Illuminate\Support\Facades\Route;
 use Orchestra\Testbench\Attributes\DefineEnvironment;
 
+/**
+ * Tests which routes are registered in each environment.
+ */
 class RoutesTest extends TestCase
 {
     public function test_studio_and_library_routes_are_registered_locally(): void

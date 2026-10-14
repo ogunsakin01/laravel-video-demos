@@ -9,6 +9,9 @@ use Ogunsakin01\VideoDemo\Library\Publisher;
 use Ogunsakin01\VideoDemo\Models\Video;
 use Ogunsakin01\VideoDemo\Models\VideoRequest;
 
+/**
+ * Tests publishing, the video library and the player component.
+ */
 class LibraryTest extends TestCase
 {
     protected function setUp(): void
@@ -45,12 +48,12 @@ class LibraryTest extends TestCase
         $this->assertNotNull($video->fresh()->published_at);
         $entry = app(Manifest::class)->find('post-a-job', 'public');
         $this->assertSame('Posting a job.', $entry['summary']);
-        // Desktop is the main version; each version keeps its own size and length
+        // Desktop is the main version; each version keeps its own size and length.
         $this->assertSame('video-demo/post-a-job-v1-desktop.mp4', $entry['video']);
         $this->assertSame(390, $entry['sources']['mobile']['width']);
         $this->assertSame(66.0, (float) $entry['sources']['mobile']['duration']);
 
-        // A new cut replaces the old files
+        // A new cut replaces the old files.
         $video->update(['version' => 2]);
         app(Publisher::class)->publish($video);
         Storage::disk('public')->assertMissing(['video-demo/post-a-job-v1-desktop.mp4', 'video-demo/post-a-job-v1-mobile.jpg']);
@@ -90,7 +93,7 @@ class LibraryTest extends TestCase
 
         $this->assertStringContainsString('post-a-job-v1.mp4', $this->blade('<x-video-demo::player slug="post-a-job" />')->__toString());
 
-        // With versions, the player carries them all and can be told which to play
+        // With versions, the player carries them all and can be told which to play.
         app(Manifest::class)->put($this->manifestVideo(['sources' => [
             'desktop' => ['video' => 'video-demo/d.mp4', 'poster' => 'video-demo/d.jpg', 'width' => 1280, 'height' => 800, 'duration' => 10, 'chapters' => []],
             'mobile' => ['video' => 'video-demo/m.mp4', 'poster' => 'video-demo/m.jpg', 'width' => 390, 'height' => 844, 'duration' => 12, 'chapters' => []],

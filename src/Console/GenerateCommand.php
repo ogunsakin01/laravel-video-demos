@@ -18,12 +18,16 @@ use Ogunsakin01\VideoDemo\VideoDemoServiceProvider;
 use Throwable;
 
 /**
- * Makes a video from the command line, the same way the studio does, so AI
- * agents and scripts can make videos without the studio's web page. Waits
- * for the video by default, so the result is known when the command ends.
+ * Makes a video from the command line the same way the studio does, for scripts and AI agents.
+ * It waits for the video by default, so the result is known when the command ends.
  */
 class GenerateCommand extends Command
 {
+    /**
+     * The name and signature of the console command.
+     *
+     * @var string
+     */
     protected $signature = 'video-demo:generate
         {description : What the video should show, the way users would ask about it}
         {--title= : The video title (the AI suggests one when left out)}
@@ -41,8 +45,16 @@ class GenerateCommand extends Command
         {--queue : Queue it and return straight away, instead of waiting}
         {--json : Print the result as JSON, for scripts and AI agents}';
 
+    /**
+     * The console command description.
+     *
+     * @var string
+     */
     protected $description = 'Plan and record a how-to video of this app, like the studio does';
 
+    /**
+     * Execute the console command.
+     */
     public function handle(CostEstimator $estimator, CodeTools $code, Publisher $publisher): int
     {
         if (! VideoDemoServiceProvider::studioEnabled()) {
@@ -68,7 +80,7 @@ class GenerateCommand extends Command
         try {
             GenerateVideo::dispatchSync($video);
         } catch (Throwable) {
-            // The job records the error on the video
+            // The job records the error on the video.
         }
         $video->refresh();
 
@@ -80,6 +92,11 @@ class GenerateCommand extends Command
         return $this->report($video);
     }
 
+    /**
+     * Validate the options and create the queued video.
+     *
+     * @throws \InvalidArgumentException
+     */
     protected function createVideo(CostEstimator $estimator, CodeTools $code): Video
     {
         $model = $this->option('model') ?: Pricing::defaultModel();
@@ -164,6 +181,9 @@ class GenerateCommand extends Command
         return $video;
     }
 
+    /**
+     * Find the style named by the --style option, or the first style.
+     */
     protected function style(): VideoStyle
     {
         $styles = VideoStyle::options();
@@ -177,6 +197,9 @@ class GenerateCommand extends Command
             ?? throw new \InvalidArgumentException("Unknown style [$wanted]. Choose one of: ".$styles->pluck('key')->implode(', ').'.');
     }
 
+    /**
+     * Print the video's outcome, as text or JSON, and return the exit code.
+     */
     protected function report(Video $video, ?string $message = null): int
     {
         $ok = in_array($video->status, [VideoStatus::Ready, VideoStatus::Queued], true);
@@ -224,7 +247,9 @@ class GenerateCommand extends Command
         return $ok ? self::SUCCESS : self::FAILURE;
     }
 
-    /** Prints why a video couldn't be started, in the chosen format */
+    /**
+     * Print why the video couldn't be started, in the chosen format.
+     */
     protected function refuse(string $message): int
     {
         $this->option('json')

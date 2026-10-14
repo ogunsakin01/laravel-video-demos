@@ -10,15 +10,28 @@ use Ogunsakin01\VideoDemo\Models\Video;
 use Throwable;
 
 /**
- * Records published videos again from their stored plans and republishes them,
- * after the app's look changes. Claude is not asked, so it costs nothing.
+ * Records published videos again from their stored plans and republishes them, after the app's look changes.
+ * The model is not asked, so it costs nothing.
  */
 class RefreshCommand extends Command
 {
+    /**
+     * The name and signature of the console command.
+     *
+     * @var string
+     */
     protected $signature = 'video-demo:refresh {slug?* : Only these videos}';
 
+    /**
+     * The console command description.
+     *
+     * @var string
+     */
     protected $description = 'Record published videos again from their saved plans and republish them';
 
+    /**
+     * Execute the console command.
+     */
     public function handle(Publisher $publisher): int
     {
         $videos = Video::whereNotNull('published_at')

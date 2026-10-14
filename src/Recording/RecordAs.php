@@ -16,15 +16,15 @@ use RuntimeException;
 use Throwable;
 
 /**
- * Who a video is recorded as: a guest (signed out), the default user from
- * video-demo.recorder.login_as, or a type of user, such as "Admin" or
- * "Member". Types come from the way the app models roles, found in this
- * order: video-demo.recorder.user_types, spatie/laravel-permission,
- * Laratrust, Bouncer, a role_id column, a role column on the users table,
- * then an admin flag. At recording time a user of that type is signed in.
+ * Resolves who a video is recorded as: a guest (signed out), the default user
+ * from video-demo.recorder.login_as, or a type of user, such as "Admin" or
+ * "Member". At recording time a user of that type is signed in.
  *
- * Stored on the video as "guest", "type:<key>", null for the default, or
- * (videos from 0.4.0) a user id or email.
+ * Types come from the way the app models roles, tried in this order:
+ * video-demo.recorder.user_types, spatie/laravel-permission, Laratrust,
+ * Bouncer, a role_id column, a role column on the users table, then an
+ * admin flag. The choice is stored on the video as "guest", "type:<key>",
+ * null for the default, or (videos from 0.4.0) a user id or email.
  */
 class RecordAs
 {
@@ -32,14 +32,18 @@ class RecordAs
 
     public const TYPE = 'type:';
 
-    /** Columns on the users table that usually hold a role or user type */
+    /**
+     * Columns on the users table that usually hold a role or user type.
+     */
     protected const ROLE_COLUMNS = ['role', 'type', 'user_type', 'account_type', 'role_name', 'user_role'];
 
-    /** Yes/no columns that usually mark an admin */
+    /**
+     * Yes/no columns that usually mark an admin.
+     */
     protected const ADMIN_FLAGS = ['is_admin', 'admin', 'is_super_admin', 'is_staff', 'is_superuser'];
 
     /**
-     * Choices for the form, value => label
+     * Get the choices for the form, value => label.
      *
      * @return array<string, string>
      */
@@ -59,7 +63,8 @@ class RecordAs
     }
 
     /**
-     * The user types the app has, key => label and a way to find one such user
+     * Get the user types the app has, each with a label and a way to find one
+     * such user.
      *
      * @return array<string, array{label: string, users: Closure(): ?Authenticatable}>
      */
@@ -75,22 +80,26 @@ class RecordAs
                     return $types;
                 }
             } catch (Throwable) {
-                // Not this style of roles; try the next
+                // The app doesn't model roles this way; try the next.
             }
         }
 
         return [];
     }
 
-    /** The signed-in user a video is recorded as, or null for a guest */
+    /**
+     * Get the user a video is recorded as, or null for a guest.
+     */
     public static function user(Video $video): ?Authenticatable
     {
         return static::resolve($video->record_as);
     }
 
     /**
+     * Resolve a stored value to the user to record as, or null for a guest.
+     *
      * "guest" is signed out; null or "" the default user; "type:admin" a user
-     * of that type; anything else a user id or email
+     * of that type; anything else a user id or email.
      */
     public static function resolve(?string $recordAs): ?Authenticatable
     {
@@ -110,7 +119,10 @@ class RecordAs
         return static::find($recordAs);
     }
 
-    /** "a user of type Admin (admin@example.com)", for the planner; null for a guest */
+    /**
+     * Describe who a video is recorded as for the planner, such as
+     * "a Member user, member@example.com", or null for a guest.
+     */
     public static function describe(Video $video): ?string
     {
         $user = static::user($video);
@@ -124,7 +136,9 @@ class RecordAs
         return ($type ? "a $type user, " : '').static::name($user).($roles !== '' ? " (role: $roles)" : '');
     }
 
-    /** The label stored with a video */
+    /**
+     * Get the label for a stored value.
+     */
     public static function label(?string $value): string
     {
         $options = static::options();
@@ -135,13 +149,14 @@ class RecordAs
             return Str::headline(substr($value, strlen(self::TYPE)));
         }
 
-        // With no default user, the default is signed out
+        // With no default user, the default is signed out.
         return in_array($value, [null, '', self::GUEST], true) ? 'Guest (signed out)' : (string) $value;
     }
 
     /**
-     * Turns what someone typed (a type's key or label, "guest", a user id or
-     * email) into the value stored on a video
+     * Parse what someone typed into the value stored on a video.
+     *
+     * The input may be a type's key or label, "guest", or a user id or email.
      */
     public static function parse(string $input): string
     {
@@ -159,6 +174,11 @@ class RecordAs
         return (string) static::find($input)->getAuthIdentifier();
     }
 
+    /**
+     * Find a user by id or email.
+     *
+     * @throws RuntimeException
+     */
     public static function find(string $idOrEmail): Authenticatable
     {
         $provider = static::provider();
@@ -167,6 +187,9 @@ class RecordAs
         return $user ?? throw new RuntimeException("The user [$idOrEmail] to record as was not found.");
     }
 
+    /**
+     * Get the user provider of the guard the recorder signs in with.
+     */
     public static function provider(): UserProvider
     {
         $guard = static::guard();
@@ -175,12 +198,17 @@ class RecordAs
             ?? throw new RuntimeException("The [$guard] guard has no user provider. Check video-demo.recorder.guard.");
     }
 
+    /**
+     * Get the guard the recorder signs in with.
+     */
     protected static function guard(): string
     {
         return config('video-demo.recorder.guard') ?: config('auth.defaults.guard');
     }
 
-    /** The Eloquent user model, or null when users aren't Eloquent models */
+    /**
+     * Get the Eloquent user model, or null when users aren't Eloquent models.
+     */
     protected static function model(): ?string
     {
         $model = config('auth.providers.'.config('auth.guards.'.static::guard().'.provider').'.model')
@@ -190,11 +218,12 @@ class RecordAs
     }
 
     /**
-     * Finds a user the query matches. With $roleCount (a subquery counting a
-     * user's roles), users with the fewest roles come first: a "Member"
-     * video shouldn't be recorded by someone who is also an admin. The
-     * default user is preferred among the best matches, so videos show
-     * familiar data.
+     * Build a closure that finds a user the query matches.
+     *
+     * With $roleCount (a subquery counting a user's roles), users with the
+     * fewest roles come first: a "Member" video shouldn't be recorded by
+     * someone who is also an admin. The default user is preferred among the
+     * best matches, so videos show familiar data.
      *
      * @param  ?Closure(string $table, string $key): \Illuminate\Database\Query\Builder  $roleCount
      */
@@ -223,7 +252,9 @@ class RecordAs
         };
     }
 
-    /** video-demo.recorder.user_types: label => user id or email */
+    /**
+     * Get the types set in video-demo.recorder.user_types (label => user id or email).
+     */
     protected static function configured(): array
     {
         $types = [];
@@ -234,12 +265,14 @@ class RecordAs
         return $types;
     }
 
-    /** spatie/laravel-permission */
+    /**
+     * Get the types from spatie/laravel-permission roles.
+     */
     protected static function spatie(): array
     {
         $roleModel = config('permission.models.role', 'Spatie\\Permission\\Models\\Role');
         $model = static::model();
-        // HasRoles adds a role() query scope
+        // Only models using HasRoles have the role() query scope.
         if (! class_exists($roleModel) || ! $model || ! method_exists($model, 'scopeRole')) {
             return [];
         }
@@ -258,7 +291,9 @@ class RecordAs
         return $types;
     }
 
-    /** Laratrust: roles, and a role_user pivot with user_id or user_type */
+    /**
+     * Get the types from Laratrust's roles table and role_user pivot.
+     */
     protected static function laratrust(): array
     {
         if (! Schema::hasTable('roles') || ! Schema::hasTable('role_user') || ! Schema::hasColumn('role_user', 'user_id')) {
@@ -271,7 +306,9 @@ class RecordAs
         ), fn ($table, $key) => DB::table('role_user')->selectRaw('count(*)')->whereColumn('role_user.user_id', "$table.$key"));
     }
 
-    /** Bouncer: roles, and assigned_roles with entity_id */
+    /**
+     * Get the types from Bouncer's roles and assigned_roles tables.
+     */
     protected static function bouncer(): array
     {
         if (! Schema::hasTable('roles') || ! Schema::hasTable('assigned_roles')) {
@@ -284,7 +321,9 @@ class RecordAs
         ), fn ($table, $key) => DB::table('assigned_roles')->selectRaw('count(*)')->whereColumn('assigned_roles.entity_id', "$table.$key"));
     }
 
-    /** A role_id column on users pointing at a roles table */
+    /**
+     * Get the types from a role_id column on users pointing at a roles table.
+     */
     protected static function roleTable(): array
     {
         $model = static::model();
@@ -295,7 +334,11 @@ class RecordAs
         return static::fromRolesTable(fn ($q, $id) => $q->where('role_id', $id));
     }
 
-    /** @param  Closure(Builder<Model>, mixed): Builder<Model>  $scope */
+    /**
+     * Get a type for each row of the roles table, finding its users with the scope.
+     *
+     * @param  Closure(Builder<Model>, mixed): Builder<Model>  $scope
+     */
     protected static function fromRolesTable(Closure $scope, ?Closure $roleCount = null): array
     {
         if (! static::model()) {
@@ -311,7 +354,9 @@ class RecordAs
         return $types;
     }
 
-    /** A role or type column on the users table: each value is a type */
+    /**
+     * Get the types from a role or type column on the users table, one per value.
+     */
     protected static function roleColumn(): array
     {
         $model = static::model();
@@ -340,7 +385,9 @@ class RecordAs
         return [];
     }
 
-    /** An is_admin style flag: admins and everyone else */
+    /**
+     * Get two types from an is_admin style flag: admins and everyone else.
+     */
     protected static function adminFlag(): array
     {
         $model = static::model();
@@ -361,6 +408,9 @@ class RecordAs
         return [];
     }
 
+    /**
+     * Get a short name for a user: their email, name or id.
+     */
     protected static function name(Authenticatable $user): string
     {
         return (string) ($user->email ?? $user->name ?? $user->getAuthIdentifier());

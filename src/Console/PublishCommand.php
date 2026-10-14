@@ -8,15 +8,30 @@ use Ogunsakin01\VideoDemo\Library\Publisher;
 use Ogunsakin01\VideoDemo\Models\Video;
 use Throwable;
 
-/** Publishes a finished video to the library, or takes it down */
+/**
+ * Publishes a finished video to the library, or takes it down.
+ */
 class PublishCommand extends Command
 {
+    /**
+     * The name and signature of the console command.
+     *
+     * @var string
+     */
     protected $signature = 'video-demo:publish
         {video : The video\'s id or slug}
         {--unpublish : Take it out of the library instead}';
 
+    /**
+     * The console command description.
+     *
+     * @var string
+     */
     protected $description = 'Publish a finished video to the library, or unpublish it';
 
+    /**
+     * Execute the console command.
+     */
     public function handle(Publisher $publisher): int
     {
         $key = (string) $this->argument('video');

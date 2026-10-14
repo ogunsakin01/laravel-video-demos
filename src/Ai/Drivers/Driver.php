@@ -3,35 +3,33 @@
 namespace Ogunsakin01\VideoDemo\Ai\Drivers;
 
 /**
- * How the package talks to a model provider. The planner holds a
- * conversation in the driver's own message format and only ever appends to
- * it; the driver turns each reply into a Turn the planner understands.
- *
- * Tools are given provider-neutral: name, description and a JSON schema.
+ * How the package talks to a model provider. The planner keeps the conversation in the driver's
+ * own message format and only ever appends to it; the driver turns each reply into a Turn.
  */
 interface Driver
 {
-    /** Appends the user's first message to $messages */
+    /**
+     * Append a user message to the conversation.
+     */
     public function addUserText(array &$messages, string $text): void;
 
     /**
-     * Sends the conversation and appends the model's reply to $messages.
+     * Send the conversation and append the model's reply to it.
      *
      * @param  list<array{name: string, description: string, schema: array}>  $tools
-     * @param  bool  $longCache  keep the conversation cached for an hour, where the provider allows
+     * @param  bool  $longCache  Keep the conversation cached for an hour, where the provider allows.
      */
     public function send(array &$messages, string $system, array $tools, string $model, string $effort, bool $longCache = false): Turn;
 
     /**
-     * Appends results for the tool calls of the last turn.
+     * Append the results of the last turn's tool calls to the conversation.
      *
      * @param  list<ToolOutput>  $outputs
      */
     public function addToolOutputs(array &$messages, array $outputs): void;
 
     /**
-     * One answer matching a JSON schema, for short tasks such as "Complete
-     * with AI".
+     * Get one answer matching a JSON schema, for short tasks such as "Complete with AI".
      *
      * @return array{data: array, turn: Turn}
      */
