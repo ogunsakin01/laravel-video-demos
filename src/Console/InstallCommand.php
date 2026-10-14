@@ -5,9 +5,13 @@ namespace Ogunsakin01\VideoDemo\Console;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
+use Ogunsakin01\VideoDemo\SampleData\Sandbox;
+use Throwable;
 
 /**
- * Publishes the config and installs Playwright and Chromium for the recorder.
+ * Sets the package up in one go, and is safe to run again after each
+ * upgrade: the config, the package's migrations, Playwright and Chromium for
+ * the recorder, the sample database, and a restart of the queue workers.
  */
 class InstallCommand extends Command
 {
@@ -17,14 +21,15 @@ class InstallCommand extends Command
      * @var string
      */
     protected $signature = 'video-demo:install
-        {--no-browser : Only publish the config, without installing Playwright}';
+        {--no-browser : Skip installing Playwright and Chromium}
+        {--no-sample-data : Skip building the sample database}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Publish the config and install Playwright and its browser for recording';
+    protected $description = 'Set up or upgrade the package: config, migrations, the recorder\'s browser and the sample database';
 
     /**
      * The Playwright version the recorder is tested with.
@@ -36,12 +41,38 @@ class InstallCommand extends Command
      */
     public function handle(): int
     {
+        // An existing config is left as it is.
         $this->call('vendor:publish', ['--tag' => 'video-demo-config']);
 
-        if ($this->option('no-browser')) {
-            return self::SUCCESS;
+        // Only the package's own migrations: the app's are its own business.
+        $this->components->task('Running the package\'s migrations', fn () => $this->callSilently('migrate', [
+            '--path' => realpath(__DIR__.'/../../database/migrations'),
+            '--realpath' => true,
+            '--force' => true,
+        ]) === 0);
+
+        if (! $this->option('no-browser')) {
+            $this->installBrowser();
         }
 
+        if (! $this->option('no-sample-data')) {
+            $this->buildSampleDatabase();
+        }
+
+        // Running workers keep the code they started with until they restart.
+        $this->callSilently('queue:restart');
+
+        $this->newLine();
+        $this->components->info('Next: set ANTHROPIC_API_KEY (or another provider\'s key) and VIDEO_DEMO_LOGIN_AS in .env, start a worker with php artisan queue:work video-demo, and open /'.trim(config('video-demo.studio.prefix'), '/').'. Run this command again after each upgrade.');
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * Install Playwright and Chromium for the recorder, and check for ffmpeg.
+     */
+    protected function installBrowser(): void
+    {
         $modules = config('video-demo.recorder.node_modules');
         $dir = dirname($modules);
         File::ensureDirectoryExists($dir);
@@ -61,18 +92,44 @@ class InstallCommand extends Command
 
         try {
             $hasFfmpeg = Process::run([config('video-demo.recorder.ffmpeg'), '-version'])->successful();
-        } catch (\Throwable) {
+        } catch (Throwable) {
             $hasFfmpeg = false;
         }
         if (! $hasFfmpeg) {
             $this->components->warn('ffmpeg could not be run. Install it (brew install ffmpeg, apt install ffmpeg), or set VIDEO_DEMO_FFMPEG to the full path of a copy, or of a wrapper script for a bundled copy (see the README).');
         }
+    }
 
-        $this->newLine();
-        $this->components->info('Next: run php artisan migrate, set ANTHROPIC_API_KEY and VIDEO_DEMO_LOGIN_AS in .env, start a queue worker, and open /'.trim(config('video-demo.studio.prefix'), '/'));
-        $this->line('  To record videos on sample data instead of your own, build the sample database once: php artisan video-demo:sample-database');
+    /**
+     * Build the sample database videos can be recorded on. A failure is only
+     * a warning: everything else works without it.
+     */
+    protected function buildSampleDatabase(): void
+    {
+        $base = null;
+        $error = null;
+        $this->components->task('Building the sample database (your migrations and seeders, on a separate SQLite file)', function () use (&$base, &$error) {
+            try {
+                $base = Sandbox::base();
+            } catch (Throwable $e) {
+                $error = $e->getMessage();
+            }
 
-        return self::SUCCESS;
+            return $base !== null;
+        });
+
+        if ($error !== null) {
+            $this->components->warn("Recording on sample data won't work until this is fixed: $error Then run php artisan video-demo:sample-database.");
+
+            return;
+        }
+
+        foreach ($base['info']['warnings'] ?? [] as $warning) {
+            $this->components->warn($warning);
+        }
+        foreach ($base['info']['users'] ?? [] as $type => $user) {
+            $this->components->twoColumnDetail("Sample $type user", $user);
+        }
     }
 
     /**

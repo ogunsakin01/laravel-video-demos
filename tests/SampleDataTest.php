@@ -160,10 +160,12 @@ class SampleDataTest extends TestCase
     public function test_a_base_database_is_built_once_and_copied_for_each_video(): void
     {
         $package = realpath(__DIR__.'/..');
+        // Symfony Process passes on only variables also in $_SERVER or $_ENV.
         putenv("TESTBENCH_WORKING_PATH=$package");
+        $_SERVER['TESTBENCH_WORKING_PATH'] = $_ENV['TESTBENCH_WORKING_PATH'] = $package;
         config([
             'video-demo.sample_data.artisan' => "$package/vendor/bin/testbench",
-            'video-demo.sample_data.seeders' => [],
+            'video-demo.sample_data.seeders' => [Seeders\SampleUsersSeeder::class, 'Missing\\Seeder'],
             'video-demo.recorder.login_as' => 'demo@example.com',
         ]);
 
@@ -172,6 +174,8 @@ class SampleDataTest extends TestCase
             $this->assertTrue($base['built']);
             $this->assertFileExists($base['path']);
             $this->assertSame(Sandbox::dir().'/base-'.Sandbox::fingerprint().'.sqlite', $base['path']);
+            // Seeders that don't exist are skipped.
+            $this->assertSame(['SampleUsersSeeder'], $base['info']['seeded']);
             // The second time it is reused.
             $this->assertFalse(Sandbox::base()['built']);
 
@@ -186,7 +190,7 @@ class SampleDataTest extends TestCase
 
             $saved = $sandbox->seed([['table' => 'users', 'ref' => 'teammate', 'data' => ['email' => 'sam@example.com', 'name' => 'Sam']]]);
             $this->assertTrue($saved[0]['ok'], json_encode($saved));
-            $this->assertSame(2, $sandbox->query('users')['total']);
+            $this->assertSame(3, $sandbox->query('users')['total']);
 
             // Only the video's copy changed; the app's own database has neither user.
             $this->assertFalse(Schema::hasTable('users') && DB::table('users')->where('email', 'sam@example.com')->exists());
@@ -195,6 +199,7 @@ class SampleDataTest extends TestCase
             $this->assertFileExists($base['path']);
         } finally {
             putenv('TESTBENCH_WORKING_PATH');
+            unset($_SERVER['TESTBENCH_WORKING_PATH'], $_ENV['TESTBENCH_WORKING_PATH']);
         }
     }
 
@@ -315,6 +320,23 @@ class SampleDataTest extends TestCase
         $this->get('/video-demo/studio/create')->assertSee('Record on sample data');
         $this->assertTrue(app(VideoDemo::class)->make('x', ['sample_data' => true])->sample_data);
         $this->assertFalse(app(VideoDemo::class)->make('y')->sample_data);
+    }
+
+    public function test_install_sets_everything_up_in_one_command(): void
+    {
+        // The sample database can't be built here, which is only a warning.
+        config(['video-demo.sample_data.artisan' => $this->root.'/missing-artisan']);
+
+        try {
+            $this->artisan('video-demo:install', ['--no-browser' => true])
+                ->expectsOutputToContain('Running the package\'s migrations')
+                ->expectsOutputToContain("Recording on sample data won't work until this is fixed")
+                ->expectsOutputToContain('Run this command again after each upgrade')
+                ->assertSuccessful();
+            $this->assertFileExists(config_path('video-demo.php'));
+        } finally {
+            File::delete(config_path('video-demo.php'));
+        }
     }
 
     public function test_clean_keeps_the_current_base_and_databases_in_use(): void

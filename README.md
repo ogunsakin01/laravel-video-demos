@@ -14,7 +14,6 @@ Videos are made on your machine and published to any Laravel disk. Your producti
 ```bash
 composer require ogunsakin01/laravel-video-demos
 php artisan video-demo:install
-php artisan migrate
 ```
 
 See [Installation](#installation) for the `.env` settings and the queue worker.
@@ -60,9 +59,16 @@ The plan is stored with the video. After your app's look changes, `php artisan v
 
 ```bash
 composer require ogunsakin01/laravel-video-demos
-php artisan video-demo:install   # publishes the config, installs Playwright and Chromium
-php artisan migrate
+php artisan video-demo:install
 ```
+
+That one command sets everything up, and is safe to run again:
+
+- publishes the config (an existing one is left alone)
+- runs the package's own migrations (not your app's pending ones)
+- installs Playwright and Chromium for the recorder (`--no-browser` skips it) and checks ffmpeg
+- builds the [sample database](#sample-data) from your migrations and seeders, with a user of each type (`--no-sample-data` skips it; if it can't be built, you get a warning and everything else still works)
+- restarts queue workers, so they run the new code
 
 Add to `.env` on your machine:
 
@@ -132,7 +138,7 @@ VIDEO_DEMO_FFMPEG=/Users/you/.local/bin/ffmpeg-remotion
    From 0.4, videos run on the package's own `video-demo` queue, so start a worker for it as above; a plain `queue:work` no longer picks them up.
 
    With Horizon, run `php artisan horizon:terminate`; with Supervisor, it starts the workers again for you. Do the same in production after a deploy.
-3. **Run new migrations, if any:** `php artisan migrate`.
+3. **Run `php artisan video-demo:install` again.** It runs the package's new migrations, updates the recorder's browser and rebuilds the sample database, and keeps your config.
 4. **Check the [changelog](CHANGELOG.md)** for what changed. If you published the config or views, compare them with the new versions: new settings work without being in your published config, but changes to the published views won't reach you.
 5. **If your app caches its config or views,** clear them: `php artisan optimize:clear`.
 

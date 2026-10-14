@@ -2,6 +2,16 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/). While the version is 0.x, minor releases may include breaking changes; they will be listed here.
 
+## v0.8.1 - 2026-10-14
+
+### Changed
+
+- **One setup command.** `php artisan video-demo:install` now does it all, and is safe to run again after each upgrade: it publishes the config (keeping yours), runs the package's own migrations, installs Playwright and Chromium, builds the sample database with a user of each type, and restarts the queue workers. `--no-browser` and `--no-sample-data` skip those steps. A sample database that can't be built is a warning, not a failure.
+
+### Fixed
+
+- The sample-data test no longer depends on Testbench's cached packages, which made it fail on a fresh CI machine.
+
 ## v0.8.0 - 2026-10-14
 
 Run `php artisan migrate` after updating.
