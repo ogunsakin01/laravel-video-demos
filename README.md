@@ -26,7 +26,7 @@ GitHub doesn't play videos stored in a repository, so the previews below are GIF
 
 [![Laravel Video Demos in dark mode: describe a flow, and the AI plans and records it](docs/promo.gif)](https://raw.githubusercontent.com/ogunsakin01/laravel-video-demos/main/docs/social/laravel-video-demos-promo.mp4)
 
-[Full video (MP4, about a minute and a half)](https://raw.githubusercontent.com/ogunsakin01/laravel-video-demos/main/docs/social/laravel-video-demos-promo.mp4)
+[Full video (MP4, about two minutes)](https://raw.githubusercontent.com/ogunsakin01/laravel-video-demos/main/docs/social/laravel-video-demos-promo.mp4)
 
 ### The library, where your users watch them
 
