@@ -1,4 +1,11 @@
-# Laravel Video Demo
+# Laravel Video Demos
+
+[![Latest version on Packagist](https://img.shields.io/packagist/v/ogunsakin01/laravel-video-demos.svg?style=flat-square)](https://packagist.org/packages/ogunsakin01/laravel-video-demos)
+[![Tests](https://img.shields.io/github/actions/workflow/status/ogunsakin01/laravel-video-demos/tests.yml?branch=master&label=tests&style=flat-square)](https://github.com/ogunsakin01/laravel-video-demos/actions/workflows/tests.yml)
+[![Total downloads](https://img.shields.io/packagist/dt/ogunsakin01/laravel-video-demos.svg?style=flat-square)](https://packagist.org/packages/ogunsakin01/laravel-video-demos)
+[![PHP 8.3+](https://img.shields.io/badge/php-8.3%2B-777bb4.svg?style=flat-square)](composer.json)
+[![Laravel 12 and 13](https://img.shields.io/badge/laravel-12%20%7C%2013-ff2d20.svg?style=flat-square)](composer.json)
+[![MIT license](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](LICENSE.md)
 
 Describe a flow in your Laravel app and get a recorded how-to video of it. Claude reads your app's code and plans the walkthrough. Playwright then records it in a real browser against your local copy of the app, with a cursor, captions and title cards. You choose the length, the style and the screens (desktop, TV, tablet, mobile), and you see the cost before anything is spent.
 
@@ -176,6 +183,19 @@ The tour videos above are plain plans in `workbench/tours`, recorded with the pa
 ```bash
 vendor/bin/testbench demo:record-tours --url=http://127.0.0.1:8123
 ```
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for what changed in each release.
+
+## Contributing
+
+Bug reports, ideas and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for how to set up the package and its demo app, and please follow the [code of conduct](CODE_OF_CONDUCT.md).
+
+## Credits
+
+- [Damilola Ogunsakin](https://github.com/ogunsakin01)
+- [All contributors](https://github.com/ogunsakin01/laravel-video-demos/graphs/contributors)
 
 ## License
 

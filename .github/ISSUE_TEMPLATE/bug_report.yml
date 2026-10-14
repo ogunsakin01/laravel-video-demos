@@ -1,0 +1,48 @@
+name: Bug report
+description: Something doesn't work as described
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead. Include error messages and the studio's progress log if there is one.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Run …
+        2. Open …
+        3. See …
+    validations:
+      required: true
+  - type: input
+    id: package
+    attributes:
+      label: Package version
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: php
+    attributes:
+      label: PHP version
+      placeholder: '8.4'
+    validations:
+      required: true
+  - type: input
+    id: laravel
+    attributes:
+      label: Laravel version
+      placeholder: '13.0'
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Recording setup
+      description: Only for recording problems. Operating system, Node.js and Playwright versions, and the browser channel if you set one.
+      placeholder: macOS 15, Node 22, Playwright 1.64, chrome

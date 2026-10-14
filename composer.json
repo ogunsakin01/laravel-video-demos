@@ -2,22 +2,35 @@
     "name": "ogunsakin01/laravel-video-demos",
     "description": "Generate how-to videos of your Laravel app with Claude. Describe a flow, set a length, see the cost, and get a recorded walkthrough.",
     "keywords": [
-        "laravel",
-        "video",
-        "demo",
-        "tutorial",
-        "playwright",
+        "ai",
+        "anthropic",
         "claude",
-        "anthropic"
+        "demo",
+        "documentation",
+        "how-to",
+        "laravel",
+        "onboarding",
+        "playwright",
+        "screen-recording",
+        "tutorial",
+        "video"
     ],
+    "homepage": "https://github.com/ogunsakin01/laravel-video-demos",
     "license": "MIT",
     "type": "library",
     "authors": [
         {
             "name": "Damilola Ogunsakin",
-            "email": "ogunsakin191@gmail.com"
+            "email": "ogunsakin191@gmail.com",
+            "homepage": "https://github.com/ogunsakin01",
+            "role": "Developer"
         }
     ],
+    "support": {
+        "issues": "https://github.com/ogunsakin01/laravel-video-demos/issues",
+        "source": "https://github.com/ogunsakin01/laravel-video-demos",
+        "security": "https://github.com/ogunsakin01/laravel-video-demos/security/advisories/new"
+    },
     "require": {
         "php": "^8.3",
         "anthropic-ai/sdk": "^0.57",
