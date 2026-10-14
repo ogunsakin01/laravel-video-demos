@@ -36,7 +36,8 @@ class GenerateCommand extends Command
         {--max-steps= : The most steps the plan may have}
         {--speed= : How much faster the video plays than it was recorded, from 0.25 to 4 (VIDEO_DEMO_SPEED when left out)}
         {--as= : Record as a type of user, such as "admin", "guest" for signed out, or a user id or email}
-        {--sample-data : Record against a temporary database with sample data, not your own}
+        {--sample-data : Record on sample data (the default, unless VIDEO_DEMO_SAMPLE_DATA=false)}
+        {--own-data : Record on your own local data instead of sample data}
         {--private : List it in the private library only}
         {--publish : Publish it to the library when it is ready}
         {--queue : Queue it and return straight away, instead of waiting}
@@ -111,7 +112,7 @@ class GenerateCommand extends Command
             'max_steps' => $this->option('max-steps'),
             'speed' => $this->option('speed'),
             'as' => $this->option('as') ?: null,
-            'sample_data' => $this->option('sample-data') ?: null,
+            'sample_data' => $this->option('own-data') ? false : ($this->option('sample-data') ?: null),
         ], fn ($v) => $v !== null), 'Queued from the command line');
 
         if (! $this->option('json')) {

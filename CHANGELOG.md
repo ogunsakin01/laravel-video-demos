@@ -2,6 +2,17 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/). While the version is 0.x, minor releases may include breaking changes; they will be listed here.
 
+## v0.9.0 - 2026-10-14
+
+### Changed
+
+- **Videos are recorded on sample data by default**, on the form, from the facade and from the command line. To record on your own local data, untick **Record on sample data**, pass `--own-data` to `video-demo:generate`, `'sample_data' => false` to `VideoDemo::make`, or set `VIDEO_DEMO_SAMPLE_DATA=false` for the whole app. Videos made before keep their setting. If the sample database can't be built, the error says how to record on your own data instead.
+- On the video page, **Make it again** is in the main column, under Details, instead of the narrow side column.
+
+### Fixed
+
+- Checkbox rows (Record on sample data, and Zoom and Highlight on the Styles page) line up with their labels again.
+
 ## v0.8.3 - 2026-10-14
 
 ### Added

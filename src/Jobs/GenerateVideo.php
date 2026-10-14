@@ -217,7 +217,11 @@ class GenerateVideo implements ShouldQueue
         $video->moveTo(VideoStatus::Checking, is_file(Sandbox::dir().'/base-'.Sandbox::fingerprint().'.sqlite')
             ? 'Copying the sample database'
             : 'Building the sample database: running your migrations and seeders once (php artisan video-demo:sample-database does this ahead of time)');
-        $sandbox = Sandbox::create($video);
+        try {
+            $sandbox = Sandbox::create($video);
+        } catch (RuntimeException $e) {
+            throw new RuntimeException($e->getMessage().' To record on your own local data instead, untick "Record on sample data" under "Make it again" (or set VIDEO_DEMO_SAMPLE_DATA=false).', 0, $e);
+        }
         $recorder->sandbox = $sandbox;
 
         try {

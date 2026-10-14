@@ -177,6 +177,73 @@
         </div>
         <div><button class="vd-btn">Save details</button></div>
       </form>
+
+      @unless ($video->status->isWorking())
+      <div class="vd-card vd-stack">
+        <h2 style="margin:0">Make it again</h2>
+        @if (! empty($video->plan['steps']))
+          <form method="post" action="{{ route('video-demo.studio.rerecord', $video) }}" class="vd-stack-sm">@csrf
+            <span class="vd-label" id="vd-rerecord-devices">Versions</span>
+            @include('video-demo::studio.partials.devices', ['devices' => $devices, 'selected' => $video->deviceList(), 'labelledBy' => 'vd-rerecord-devices'])
+            <div>
+              <label for="rr-speed">Playback speed</label>
+              <select name="speed" id="rr-speed">
+                @foreach (['1' => '1× real time', '1.25' => '1.25×', '1.5' => '1.5×', '2' => '2×', '3' => '3×'] as $value => $label)
+                  <option value="{{ $value }}" @selected(abs($video->playbackSpeed() - $value) < 0.01)>{{ $label }}</option>
+                @endforeach
+              </select>
+            </div>
+            <button class="vd-btn vd-btn-block">Record the same plan again</button>
+            <span class="vd-hint">Free. Use it after the app's look changes, to add a version, or to change the speed.</span>
+          </form>
+          <hr class="vd-divider" style="margin:0">
+        @endif
+        <form method="post" action="{{ route('video-demo.studio.regenerate', $video) }}" class="vd-stack">@csrf
+          <div>
+            <label for="r-prompt">Description</label>
+            <textarea id="r-prompt" name="prompt" required maxlength="4000">{{ $video->prompt }}</textarea>
+          </div>
+          <div class="vd-row">
+            <div>
+              <label for="r-seconds">Seconds</label>
+              <input type="number" id="r-seconds" name="target_seconds" min="10" max="{{ config('video-demo.limits.max_seconds', 300) }}" value="{{ $video->target_seconds }}">
+            </div>
+            <div>
+              <label for="r-effort">Effort</label>
+              <select id="r-effort" name="effort">
+                @foreach ($efforts as $effort)
+                  <option value="{{ $effort }}" @selected($video->effort === $effort)>{{ ucfirst($effort) }}</option>
+                @endforeach
+              </select>
+            </div>
+          </div>
+          <div class="vd-row">
+            <div>
+              <label for="r-max-cost">Spending limit ($)</label>
+              <input type="number" id="r-max-cost" name="max_cost" step="0.01" min="0.01" max="100" value="{{ $video->spendLimit() }}">
+            </div>
+            <div>
+              <label for="r-max-steps">Max steps</label>
+              <input type="number" id="r-max-steps" name="max_steps" min="3" max="250" value="{{ $video->max_steps }}" placeholder="No limit">
+            </div>
+          </div>
+          <div>
+            <label for="r-speed">Playback speed</label>
+            <select name="speed" id="r-speed">
+                @foreach (['1' => '1× real time', '1.25' => '1.25×', '1.5' => '1.5×', '2' => '2×', '3' => '3×'] as $value => $label)
+                  <option value="{{ $value }}" @selected(abs($video->playbackSpeed() - $value) < 0.01)>{{ $label }}</option>
+                @endforeach
+              </select>
+          </div>
+          <div class="vd-stack-sm">
+            <input type="hidden" name="sample_data" value="0">
+            <label class="vd-check-row"><input type="checkbox" name="sample_data" value="1" @checked($video->sample_data)> Record on sample data</label>
+            <span class="vd-hint">A copy of your database where the AI adds what the pages need, instead of your own data.</span>
+          </div>
+          <button class="vd-btn vd-btn-block">Ask the AI for a new plan</button>
+        </form>
+      </div>
+      @endunless
     </div>
 
     <aside class="vd-stack">
@@ -227,71 +294,6 @@
       </div>
 
       @unless ($video->status->isWorking())
-        <div class="vd-card vd-stack">
-          <h2 style="margin:0">Make it again</h2>
-          @if (! empty($video->plan['steps']))
-            <form method="post" action="{{ route('video-demo.studio.rerecord', $video) }}" class="vd-stack-sm">@csrf
-              <span class="vd-label" id="vd-rerecord-devices">Versions</span>
-              @include('video-demo::studio.partials.devices', ['devices' => $devices, 'selected' => $video->deviceList(), 'labelledBy' => 'vd-rerecord-devices'])
-              <div>
-                <label for="rr-speed">Playback speed</label>
-                <select name="speed" id="rr-speed">
-                  @foreach (['1' => '1× real time', '1.25' => '1.25×', '1.5' => '1.5×', '2' => '2×', '3' => '3×'] as $value => $label)
-                    <option value="{{ $value }}" @selected(abs($video->playbackSpeed() - $value) < 0.01)>{{ $label }}</option>
-                  @endforeach
-                </select>
-              </div>
-              <button class="vd-btn vd-btn-block">Record the same plan again</button>
-              <span class="vd-hint">Free. Use it after the app's look changes, to add a version, or to change the speed.</span>
-            </form>
-            <hr class="vd-divider" style="margin:0">
-          @endif
-          <form method="post" action="{{ route('video-demo.studio.regenerate', $video) }}" class="vd-stack">@csrf
-            <div>
-              <label for="r-prompt">Description</label>
-              <textarea id="r-prompt" name="prompt" required maxlength="4000">{{ $video->prompt }}</textarea>
-            </div>
-            <div class="vd-row">
-              <div>
-                <label for="r-seconds">Seconds</label>
-                <input type="number" id="r-seconds" name="target_seconds" min="10" max="{{ config('video-demo.limits.max_seconds', 300) }}" value="{{ $video->target_seconds }}">
-              </div>
-              <div>
-                <label for="r-effort">Effort</label>
-                <select id="r-effort" name="effort">
-                  @foreach ($efforts as $effort)
-                    <option value="{{ $effort }}" @selected($video->effort === $effort)>{{ ucfirst($effort) }}</option>
-                  @endforeach
-                </select>
-              </div>
-            </div>
-            <div class="vd-row">
-              <div>
-                <label for="r-max-cost">Spending limit ($)</label>
-                <input type="number" id="r-max-cost" name="max_cost" step="0.01" min="0.01" max="100" value="{{ $video->spendLimit() }}">
-              </div>
-              <div>
-                <label for="r-max-steps">Max steps</label>
-                <input type="number" id="r-max-steps" name="max_steps" min="3" max="250" value="{{ $video->max_steps }}" placeholder="No limit">
-              </div>
-            </div>
-            <div>
-              <label for="r-speed">Playback speed</label>
-              <select name="speed" id="r-speed">
-                  @foreach (['1' => '1× real time', '1.25' => '1.25×', '1.5' => '1.5×', '2' => '2×', '3' => '3×'] as $value => $label)
-                    <option value="{{ $value }}" @selected(abs($video->playbackSpeed() - $value) < 0.01)>{{ $label }}</option>
-                  @endforeach
-                </select>
-            </div>
-            <div class="vd-stack-sm">
-              <input type="hidden" name="sample_data" value="0">
-              <label class="vd-check-row"><input type="checkbox" name="sample_data" value="1" @checked($video->sample_data)> Record on sample data</label>
-              <span class="vd-hint">A copy of your database where the AI adds what the pages need, instead of your own data.</span>
-            </div>
-            <button class="vd-btn vd-btn-block">Ask the AI for a new plan</button>
-          </form>
-        </div>
-
         <form method="post" action="{{ route('video-demo.studio.destroy', $video) }}" onsubmit="return confirm('Delete this video and its recording?')">@csrf @method('delete')
           <button class="vd-btn vd-btn-ghost vd-btn-danger vd-btn-block">Delete video</button>
         </form>

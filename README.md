@@ -124,10 +124,10 @@ VIDEO_DEMO_FFMPEG=/Users/you/.local/bin/ffmpeg-remotion
 1. **Move to the new version.** While the package is below 1.0, each minor version (0.2, 0.3…) may include breaking changes, so Composer's `^` keeps you on the one you installed: `composer update` won't move `^0.2` to 0.3. Ask for the new one by name:
 
    ```bash
-   composer require ogunsakin01/laravel-video-demos:^0.8
+   composer require ogunsakin01/laravel-video-demos:^0.9
    ```
 
-   Patch releases (0.8.0 to 0.8.1) arrive with a normal `composer update`.
+   Patch releases (0.9.0 to 0.9.1) arrive with a normal `composer update`.
 2. **Restart your queue workers.** A running `php artisan queue:work` keeps the code it loaded when it started, so without a restart videos are still made by the old version, even though the studio pages show the new one:
 
    ```bash
@@ -149,7 +149,7 @@ The studio is where videos are made. It is only registered when `APP_ENV` is `lo
 - **Videos**: every video with its status, length and cost. Tick several to **Publish** or **Unpublish** them together; videos that aren't ready, or are already published at their latest version, are skipped.
 - **New video**: describe the flow, or use **Complete with AI**. Choose the length (a target: captions and pauses stretch or shrink to fit), the versions to record, a style, the model and the effort. The estimated cost updates as you change them.
   - **Record as**: the type of user the video shows the app as, such as Admin or Member, or a guest (signed out). Types come from the way your app models roles: [spatie/laravel-permission](https://github.com/spatie/laravel-permission), Laratrust, Bouncer, a `role_id` or `role`/`type` column on users, or an `is_admin` flag. For the recording, a user of that type is signed in, preferring one with no other roles (so a Member video isn't recorded by someone who is also an admin) and the default user when they qualify. If your app does roles another way, list the types in `recorder.user_types`: `'Admin' => 'admin@example.com'`.
-  - **Record on sample data**: record against a temporary copy of your database, filled with sample data, instead of your own. See [Sample data](#sample-data).
+  - **Record on sample data** (on by default): record against a temporary copy of your database, filled with sample data, instead of your own. Untick it to record on your own local data. See [Sample data](#sample-data).
   - **Start page**: search the pages the chosen type of user can open, by title or address, or type any path (`/jobs/5`). The list comes from your GET routes that need no parameters, each opened as that user to keep the ones that return a page; the title is the page's heading. Logout, delete, export and API routes are never opened.
   - **Spending limit**: the most this video may cost ($2 unless you change it, or `limits.max_cost_per_video`). The AI is told its budget, sees how many requests it has left, and stops before a request that would go over. The form warns you if even the lowest estimate is above the limit.
   - **Max steps**: the most steps the plan may have. Fewer steps make a shorter, cheaper plan.
@@ -176,7 +176,7 @@ Gate::define('viewVideoDemoStudio', fn ($user) => $user->isAdmin());
 
 ## Sample data
 
-Your own local data may be empty, or real. Tick **Record on sample data** (or pass `--sample-data`, or `'sample_data' => true` to the facade) and the video is recorded against a database made for it:
+Your own local data may be empty, or real, so by default videos are recorded against a database made for them. To record on your own local data instead, untick **Record on sample data**, pass `--own-data`, or `'sample_data' => false` to the facade; `VIDEO_DEMO_SAMPLE_DATA=false` makes that the default for the whole app. Videos made before 0.8 keep recording on your own data until you choose **Try again on sample data**.
 
 1. **A base database, built once.** Your migrations run on a separate SQLite file, then your seeders (`sample_data.seeders`, `DatabaseSeeder` by default), then a user of each type is found or made, the same types **Record as** offers. Users are made with your `UserFactory` when you have one and given the role the way your app records it (spatie, Laratrust, Bouncer, a role column or an admin flag). This happens the first time it is needed, or ahead of time:
 
@@ -405,7 +405,7 @@ Everything is in [`config/video-demo.php`](config/video-demo.php), with comments
 | `recorder.login_as` | The user the recorder signs in as by default |
 | `recorder.user_types` | The types of user to record as, when they can't be found from your roles |
 | `recorder.check_pages` | Check pages for errors before planning and recording (on by default) |
-| `sample_data.seeders`, `sample_data.default` | The seeders that fill the [sample database](#sample-data), and whether new videos use it |
+| `sample_data.seeders`, `sample_data.default` (`VIDEO_DEMO_SAMPLE_DATA`) | The seeders that fill the [sample database](#sample-data), and whether new videos use it (yes by default) |
 | `queue.connection`, `queue.retry_after` | The queue videos run on; leave the connection empty to use the package's own |
 | `ui.name` (`VIDEO_DEMO_NAME`) | The name on the studio and library pages |
 | `styles` | The styles offered at first |

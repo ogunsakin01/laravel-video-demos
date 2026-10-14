@@ -43,8 +43,8 @@ class VideoDemo
      * Options, all optional: title, start (a path), length (seconds), style
      * (a key or name), devices (list), model, effort, private (bool),
      * max_cost (dollars), max_steps, speed (0.25 to 4), as (a user type such
-     * as "admin", "guest", or a user id or email), sample_data (true records
-     * against a temporary database with sample data, not the app's own) and
+     * as "admin", "guest", or a user id or email), sample_data (false records
+     * on the app's own local data instead of a temporary sample database) and
      * queue (false makes it now, in this process). Throws
      * InvalidArgumentException for a bad option.
      *
@@ -148,7 +148,7 @@ class VideoDemo
             'speed' => $speed !== null ? (float) $speed : null,
             'record_as' => $recordAs,
             'record_as_label' => RecordAs::label($recordAs),
-            'sample_data' => (bool) ($options['sample_data'] ?? config('video-demo.sample_data.default', false)),
+            'sample_data' => (bool) ($options['sample_data'] ?? config('video-demo.sample_data.default', true)),
             'status' => VideoStatus::Queued,
             'estimate_low' => $estimate['low'],
             'estimate_high' => $estimate['high'],

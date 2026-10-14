@@ -184,8 +184,8 @@
   .vd-check input { width: 16px; height: 16px; margin: 0; accent-color: var(--vd-accent); cursor: pointer; vertical-align: middle; }
   .vd-bulk { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: var(--vd-muted); border-bottom: 1px solid var(--vd-border); }
   .vd-bulk[hidden] { display: none; }
-  .vd-check-row { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 500; cursor: pointer; }
-  .vd-check-row input { width: 16px; height: 16px; margin: 0; accent-color: var(--vd-accent); }
+  .vd .vd-check-row { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 500; cursor: pointer; }
+  .vd .vd-check-row input { width: 16px; height: 16px; margin: 0; accent-color: var(--vd-accent); }
   .vd-combo { position: relative; }
   .vd-combo-list { position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 4px); max-height: 300px; overflow-y: auto; margin: 0; padding: 4px; list-style: none;
     background: var(--vd-card); border: 1px solid var(--vd-border-strong); border-radius: var(--vd-radius); box-shadow: var(--vd-shadow-lg); }

@@ -320,7 +320,17 @@ class SampleDataTest extends TestCase
 
         $this->get('/video-demo/studio/create')->assertSee('Record on sample data');
         $this->assertTrue(app(VideoDemo::class)->make('x', ['sample_data' => true])->sample_data);
-        $this->assertFalse(app(VideoDemo::class)->make('y')->sample_data);
+
+        // Sample data is the default, in the shipped config and so for the form, the facade and the CLI.
+        $this->assertTrue((require __DIR__.'/../config/video-demo.php')['sample_data']['default']);
+        config(['video-demo.sample_data.default' => true]);
+        $this->get('/video-demo/studio/create')->assertSee('name="sample_data" value="1" checked', false);
+        $this->assertTrue(app(VideoDemo::class)->make('y')->sample_data);
+        $this->assertFalse(app(VideoDemo::class)->make('z', ['sample_data' => false])->sample_data);
+        $this->artisan('video-demo:generate', ['description' => 'How a member reads a ticket', '--queue' => true, '--json' => true])->assertSuccessful();
+        $this->assertTrue(Video::latest('id')->first()->sample_data);
+        $this->artisan('video-demo:generate', ['description' => 'How a member reads a ticket', '--own-data' => true, '--queue' => true, '--json' => true])->assertSuccessful();
+        $this->assertFalse(Video::latest('id')->first()->sample_data);
     }
 
     public function test_a_video_whose_page_failed_can_try_again_on_sample_data(): void

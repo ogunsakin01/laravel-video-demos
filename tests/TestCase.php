@@ -38,6 +38,8 @@ abstract class TestCase extends Orchestra
         $app['config']->set('video-demo.ai.api_key', 'test-key');
         // Tests don't open real browsers unless they ask to (see RecorderTest).
         $app['config']->set('video-demo.recorder.check_pages', false);
+        // Sample data is on by default; tests of other features record on the test database.
+        $app['config']->set('video-demo.sample_data.default', false);
     }
 
     /**

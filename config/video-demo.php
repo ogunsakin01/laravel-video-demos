@@ -276,7 +276,7 @@ return [
     | Sample Data
     |--------------------------------------------------------------------------
     |
-    | With "Record on sample data" ticked, a video is recorded against a
+    | By default, a video is recorded against a
     | temporary SQLite database instead of the app's own. A base database is
     | built once (your migrations, then these seeders, then a user of each
     | type) and copied for each video; it is built again when a migration,
@@ -289,8 +289,10 @@ return [
     */
 
     'sample_data' => [
-        // Ticks "Record on sample data" on the new-video form.
-        'default' => (bool) env('VIDEO_DEMO_SAMPLE_DATA', false),
+        // New videos are recorded on sample data unless this is false. Each
+        // video can still choose; set VIDEO_DEMO_SAMPLE_DATA=false to record
+        // on your own local data by default.
+        'default' => (bool) env('VIDEO_DEMO_SAMPLE_DATA', true),
 
         // The seeders to run first. Empty leaves it all to the AI. Seeders
         // that are missing are skipped, and one that fails is reported.

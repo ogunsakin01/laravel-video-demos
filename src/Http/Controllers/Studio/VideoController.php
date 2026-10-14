@@ -79,7 +79,7 @@ class VideoController extends Controller
                 'speed' => (float) $request->query('speed', Recorder::speed()),
                 'max_steps' => $request->query('max_steps'),
                 'record_as' => $request->query('record_as', config('video-demo.recorder.login_as') ? '' : RecordAs::GUEST),
-                'sample_data' => (bool) $request->query('sample_data', config('video-demo.sample_data.default', false)),
+                'sample_data' => (bool) $request->query('sample_data', config('video-demo.sample_data.default', true)),
                 'idea' => $request->query('idea'),
             ],
             'recordAs' => RecordAs::options(),
