@@ -267,6 +267,7 @@ return [
         // Videos play this many times faster than they were recorded, which
         // makes clicks and typing snappy. Captions, title cards and pauses
         // are held longer while recording, so they keep a readable length.
+        // This is the default for new videos; each video can set its own.
         'speed' => (float) env('VIDEO_DEMO_SPEED', 2),
     ],
 

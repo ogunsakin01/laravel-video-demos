@@ -185,6 +185,7 @@
             <div class="vd-stat"><dt>Style</dt><dd>{{ $video->style['name'] }}</dd></div>
           @endif
           <div class="vd-stat"><dt>Versions</dt><dd>{{ collect($video->deviceList())->map(fn ($d) => $devices[$d]['label'] ?? $d)->implode(', ') }}</dd></div>
+          <div class="vd-stat"><dt>Speed</dt><dd class="vd-num">{{ rtrim(rtrim(number_format($video->playbackSpeed(), 2), '0'), '.') }}×</dd></div>
           <div class="vd-stat"><dt>Spending limit</dt><dd class="vd-num">${{ number_format($video->spendLimit(), 2) }}</dd></div>
           @if ($video->max_steps)
             <div class="vd-stat"><dt>Max steps</dt><dd class="vd-num">{{ $video->max_steps }}</dd></div>
@@ -220,8 +221,16 @@
             <form method="post" action="{{ route('video-demo.studio.rerecord', $video) }}" class="vd-stack-sm">@csrf
               <span class="vd-label" id="vd-rerecord-devices">Versions</span>
               @include('video-demo::studio.partials.devices', ['devices' => $devices, 'selected' => $video->deviceList(), 'labelledBy' => 'vd-rerecord-devices'])
+              <div>
+                <label for="rr-speed">Playback speed</label>
+                <select name="speed" id="rr-speed">
+                  @foreach (['1' => '1× real time', '1.25' => '1.25×', '1.5' => '1.5×', '2' => '2×', '3' => '3×'] as $value => $label)
+                    <option value="{{ $value }}" @selected(abs($video->playbackSpeed() - $value) < 0.01)>{{ $label }}</option>
+                  @endforeach
+                </select>
+              </div>
               <button class="vd-btn vd-btn-block">Record the same plan again</button>
-              <span class="vd-hint">Free. Use it after the app's look changes, or to add a version.</span>
+              <span class="vd-hint">Free. Use it after the app's look changes, to add a version, or to change the speed.</span>
             </form>
             <hr class="vd-divider" style="margin:0">
           @endif
@@ -253,6 +262,14 @@
                 <label for="r-max-steps">Max steps</label>
                 <input type="number" id="r-max-steps" name="max_steps" min="3" max="250" value="{{ $video->max_steps }}" placeholder="No limit">
               </div>
+            </div>
+            <div>
+              <label for="r-speed">Playback speed</label>
+              <select name="speed" id="r-speed">
+                  @foreach (['1' => '1× real time', '1.25' => '1.25×', '1.5' => '1.5×', '2' => '2×', '3' => '3×'] as $value => $label)
+                    <option value="{{ $value }}" @selected(abs($video->playbackSpeed() - $value) < 0.01)>{{ $label }}</option>
+                  @endforeach
+                </select>
             </div>
             <button class="vd-btn vd-btn-block">Ask the AI for a new plan</button>
           </form>

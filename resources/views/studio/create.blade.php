@@ -50,6 +50,18 @@
       </div>
 
       <div>
+        <span class="vd-label" id="vd-speed-label">Playback speed</span>
+        <input type="hidden" id="speed" name="speed" value="{{ old('speed', $defaults['speed']) }}">
+        <div class="vd-segments" role="group" aria-labelledby="vd-speed-label">
+          @foreach (['1' => '1× real time', '1.25' => '1.25×', '1.5' => '1.5×', '2' => '2×', '3' => '3×'] as $value => $label)
+            <button type="button" class="vd-segment" data-speed="{{ $value }}">{{ $label }}</button>
+          @endforeach
+        </div>
+        <span class="vd-hint">How much faster the video plays than it was recorded. Clicks and typing speed up; captions and title cards are held longer, so they stay readable.</span>
+        @error('speed')<span class="vd-error">{{ $message }}</span>@enderror
+      </div>
+
+      <div>
         <span class="vd-label" id="vd-devices-label">Versions</span>
         @include('video-demo::studio.partials.devices', ['devices' => $devices, 'selected' => old('devices', $defaults['devices'])])
         <span class="vd-hint">The AI writes one plan for all of them. Each extra version only adds recording time on this machine.</span>
@@ -192,6 +204,17 @@
           mark();
         }
         segments.forEach(s => s.addEventListener('click', () => { seconds.value = s.dataset.seconds; mark(); estimate(); }));
+
+        // Playback speed: the nearest option is marked
+        const speed = document.getElementById('speed');
+        const speeds = form.querySelectorAll('[data-speed]');
+        const markSpeed = () => {
+          const options = [...speeds].map(b => Number(b.dataset.speed));
+          const nearest = options.reduce((a, b) => Math.abs(b - speed.value) < Math.abs(a - speed.value) ? b : a);
+          speeds.forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.speed) === nearest)));
+        };
+        speeds.forEach(b => b.addEventListener('click', () => { speed.value = b.dataset.speed; markSpeed(); }));
+        markSpeed();
         setSeconds(Number(seconds.value));
 
         const post = (url, data) => {

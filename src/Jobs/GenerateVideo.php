@@ -83,7 +83,7 @@ class GenerateVideo implements ShouldQueue
                 $video->moveTo(VideoStatus::Planning, 'The AI is reading the code');
                 $session = $planner->plan($video);
                 $plan = $session->plan;
-                $video->addLog(sprintf('Plan ready: %d steps, about %d seconds', count($plan->steps), $plan->estimatedSeconds(Recorder::speed())));
+                $video->addLog(sprintf('Plan ready: %d steps, about %d seconds', count($plan->steps), $plan->estimatedSeconds($video->playbackSpeed())));
             } else {
                 $plan = Plan::fromArray($video->plan ?? []);
             }
@@ -93,7 +93,7 @@ class GenerateVideo implements ShouldQueue
             // Every version plays the same plan. A failure on any of them goes
             // back to the AI, and the corrected plan is recorded on all again.
             while (true) {
-                $plan = $plan->fitTo(min($video->target_seconds, (int) config('video-demo.limits.max_seconds', 300)), Recorder::speed());
+                $plan = $plan->fitTo(min($video->target_seconds, (int) config('video-demo.limits.max_seconds', 300)), $video->playbackSpeed());
                 $video->update(['plan' => $plan->toArray()]);
 
                 $this->checkPages($recorder, $video, $plan->paths(), 'Checking the pages in the plan');
@@ -103,7 +103,7 @@ class GenerateVideo implements ShouldQueue
                 foreach ($devices as $device) {
                     $this->stopIfAsked($video);
                     $video->moveTo(VideoStatus::Recording, 'Recording the '.Devices::get($device)['label'].' version');
-                    $result = $recorder->record($plan, "$dir/$device", $video->style ?? [], $device, $video->record_as, $shouldStop);
+                    $result = $recorder->record($plan, "$dir/$device", $video->style ?? [], $device, $video->record_as, $shouldStop, $video->playbackSpeed());
                     $video->addLog($result->summary());
 
                     if (! $result->ok) {
@@ -144,7 +144,7 @@ class GenerateVideo implements ShouldQueue
         $work = Storage::disk(config('video-demo.storage.work_disk'));
         $recordings = [];
         foreach ($results as $device => $result) {
-            $encoder->encode($result->video, $work->path($video->workFile($device)), $work->path($video->workFile($device, 'poster')), $result->trimSeconds, Recorder::speed());
+            $encoder->encode($result->video, $work->path($video->workFile($device)), $work->path($video->workFile($device, 'poster')), $result->trimSeconds, $video->playbackSpeed());
             File::deleteDirectory("$dir/$device");
             $recordings[$device] = ['seconds' => $result->seconds, 'chapters' => $result->chapters];
         }

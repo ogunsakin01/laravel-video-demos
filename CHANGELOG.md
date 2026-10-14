@@ -2,6 +2,14 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/). While the version is 0.x, minor releases may include breaking changes; they will be listed here.
 
+## v0.6.0 - 2026-10-14
+
+Run `php artisan migrate` after updating: there is a new column for each video's speed.
+
+### Added
+
+- Playback speed for each video: choose 1× (real time), 1.25×, 1.5×, 2× or 3× in the new-video form, when asking for a new plan, or when recording the same plan again (free). Also `video-demo:generate --speed=1.5`. `VIDEO_DEMO_SPEED` is now the default for new videos.
+
 ## v0.5.1 - 2026-10-14
 
 ### Changed

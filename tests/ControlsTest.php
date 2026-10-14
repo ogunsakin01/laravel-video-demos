@@ -18,6 +18,7 @@ use Ogunsakin01\VideoDemo\Models\Video;
 use Ogunsakin01\VideoDemo\Models\VideoIdea;
 use Ogunsakin01\VideoDemo\Models\VideoStyle;
 use Ogunsakin01\VideoDemo\Recording\RecordAs;
+use Ogunsakin01\VideoDemo\Recording\Recorder;
 use Ogunsakin01\VideoDemo\Studio\Pages;
 use Ogunsakin01\VideoDemo\VideoDemoServiceProvider;
 
@@ -375,5 +376,36 @@ class ControlsTest extends TestCase
         foreach (['/jobs/{job}', '/jobs', '/logout', '/api/users', '/sitemap.xml', '/invoices/export', '/verify', '/video-demo/studio'] as $left) {
             $this->assertNotContains($left, $paths);
         }
+    }
+
+    public function test_each_video_can_have_its_own_speed(): void
+    {
+        Queue::fake();
+        config(['video-demo.recorder.speed' => 2]);
+
+        // The configured speed is the default, and any speed is kept between 0.25 and 4.
+        $this->assertSame(2.0, Recorder::speed());
+        $this->assertSame(1.2, Recorder::speed(1.2));
+        $this->assertSame(4.0, Recorder::speed(9));
+
+        $this->get('/video-demo/studio/create')->assertSee('Playback speed')->assertSee('name="speed" value="2"', false)->assertSee('1× real time');
+
+        $this->post('/video-demo/studio', [
+            'style_id' => VideoStyle::options()->first()->id, 'devices' => ['desktop'], 'prompt' => 'How to post a job',
+            'target_seconds' => 60, 'model' => 'claude-sonnet-5-5', 'effort' => 'medium', 'visibility' => 'public', 'speed' => '1.25',
+        ])->assertRedirect();
+        $video = Video::firstOrFail();
+        $this->assertSame(1.25, $video->playbackSpeed());
+        $this->get("/video-demo/studio/{$video->id}")->assertSee('1.25×');
+
+        // Recording the same plan again can change the speed, at no AI cost.
+        $video->update(['status' => VideoStatus::Ready, 'plan' => ['title' => 'x', 'summary' => '', 'steps' => [['action' => 'goto', 'url' => '/']]]]);
+        $this->post("/video-demo/studio/{$video->id}/rerecord", ['devices' => ['desktop'], 'speed' => '1'])->assertRedirect();
+        $this->assertSame(1.0, $video->fresh()->playbackSpeed());
+        Queue::assertPushed(GenerateVideo::class, fn ($job) => ! $job->replan);
+
+        // A video without its own speed uses the configured one.
+        $this->assertSame(2.0, $this->video()->playbackSpeed());
+        $this->post('/video-demo/studio', ['speed' => '7'])->assertSessionHasErrors('speed');
     }
 }

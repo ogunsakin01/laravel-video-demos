@@ -22,10 +22,12 @@ class Recorder
      *
      * $recordAs is who to sign in as: a user id or email, "guest" for signed
      * out, or null for video-demo.recorder.login_as. $shouldStop is asked
-     * twice a second; when it returns true the browser is closed.
+     * twice a second; when it returns true the browser is closed. $speed is
+     * how much faster the video will play, or null for the configured speed.
      */
-    public function record(Plan $plan, string $dir, array $style = [], string $device = 'desktop', ?string $recordAs = null, ?Closure $shouldStop = null): RecordingResult
+    public function record(Plan $plan, string $dir, array $style = [], string $device = 'desktop', ?string $recordAs = null, ?Closure $shouldStop = null, ?float $speed = null): RecordingResult
     {
+        $speed = static::speed($speed);
         $screen = Devices::get($device);
         $plan = $plan->forDevice($device);
 
@@ -37,12 +39,12 @@ class Recorder
             ...$this->browserSettings($screen, $recordAs),
             'planPath' => "$dir/plan.json",
             'outDir' => $dir,
-            'speed' => static::speed(),
+            'speed' => $speed,
             'style' => [...VideoStyle::defaults(), ...array_intersect_key($style, array_flip(['theme', 'accent', 'captions', 'pace', 'art']))],
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
         File::delete("$dir/result.json");
 
-        $this->run(static::script('record.cjs'), "$dir/job.json", static::timeoutFor($plan), $shouldStop);
+        $this->run(static::script('record.cjs'), "$dir/job.json", static::timeoutFor($plan, $speed), $shouldStop);
 
         if (! File::exists("$dir/result.json")) {
             throw new RuntimeException('The recorder stopped without a result. Check that Node and Playwright work: php artisan video-demo:install');
@@ -51,7 +53,6 @@ class Recorder
         $result = json_decode(File::get("$dir/result.json"), true) ?: [];
 
         // Lengths and chapter times as they will be in the sped-up video.
-        $speed = static::speed();
         $result['durationMs'] = ($result['durationMs'] ?? 0) / $speed;
         $result['chapters'] = array_map(fn ($c) => [...$c, 'at' => round($c['at'] / $speed, 2)], $result['chapters'] ?? []);
 
@@ -132,10 +133,13 @@ class Recorder
 
     /**
      * Get how many times faster the finished video plays than it was recorded.
+     *
+     * A video's own speed wins over the configured one. Either is kept
+     * between 0.25 and 4.
      */
-    public static function speed(): float
+    public static function speed(?float $speed = null): float
     {
-        return max(0.25, min(4.0, (float) config('video-demo.recorder.speed', 2)));
+        return max(0.25, min(4.0, $speed ?: (float) config('video-demo.recorder.speed', 2)));
     }
 
     /**
@@ -152,9 +156,10 @@ class Recorder
      * It allows twice the plan's length while recording (captions are held
      * longer at higher speeds), and never less than the configured timeout.
      */
-    public static function timeoutFor(Plan $plan): int
+    public static function timeoutFor(Plan $plan, ?float $speed = null): int
     {
-        $recording = $plan->estimatedSeconds(static::speed()) * static::speed();
+        $speed = static::speed($speed);
+        $recording = $plan->estimatedSeconds($speed) * $speed;
 
         return (int) max(config('video-demo.recorder.timeout', 600), ceil($recording * 2 + 120));
     }

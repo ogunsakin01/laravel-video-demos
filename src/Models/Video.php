@@ -9,6 +9,7 @@ use Illuminate\Support\Str;
 use Ogunsakin01\VideoDemo\Ai\Usage;
 use Ogunsakin01\VideoDemo\Enums\VideoStatus;
 use Ogunsakin01\VideoDemo\Recording\Devices;
+use Ogunsakin01\VideoDemo\Recording\Recorder;
 
 /**
  * A video made in the studio, with its plan, recordings, AI usage and log.
@@ -40,6 +41,7 @@ use Ogunsakin01\VideoDemo\Recording\Devices;
  * @property int $version
  * @property ?Carbon $published_at
  * @property ?float $max_cost
+ * @property ?float $speed
  * @property ?int $max_steps
  * @property ?string $record_as
  * @property ?string $record_as_label
@@ -72,6 +74,7 @@ class Video extends Model
             'duration_seconds' => 'float',
             'published_at' => 'datetime',
             'max_cost' => 'float',
+            'speed' => 'float',
             'issues' => 'array',
             'stop_requested' => 'boolean',
         ];
@@ -188,6 +191,14 @@ class Video extends Model
 
         return isset($this->recordings[$device])
             && Storage::disk(config('video-demo.storage.work_disk'))->exists($this->workFile($device));
+    }
+
+    /**
+     * Get how many times faster this video plays than it was recorded.
+     */
+    public function playbackSpeed(): float
+    {
+        return Recorder::speed($this->speed);
     }
 
     /**

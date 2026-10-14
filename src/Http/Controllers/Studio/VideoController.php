@@ -27,6 +27,7 @@ use Ogunsakin01\VideoDemo\Models\VideoRequest;
 use Ogunsakin01\VideoDemo\Models\VideoStyle;
 use Ogunsakin01\VideoDemo\Recording\Devices;
 use Ogunsakin01\VideoDemo\Recording\RecordAs;
+use Ogunsakin01\VideoDemo\Recording\Recorder;
 use Ogunsakin01\VideoDemo\Studio\Examples;
 use Ogunsakin01\VideoDemo\Studio\Pages;
 use Ogunsakin01\VideoDemo\VideoDemoServiceProvider;
@@ -75,6 +76,7 @@ class VideoController extends Controller
                 'target_seconds' => (int) $request->query('target_seconds', 60),
                 'devices' => Devices::defaults(),
                 'max_cost' => (float) config('video-demo.limits.max_cost_per_video', 2.0),
+                'speed' => (float) $request->query('speed', Recorder::speed()),
                 'max_steps' => $request->query('max_steps'),
                 'record_as' => $request->query('record_as', config('video-demo.recorder.login_as') ? '' : RecordAs::GUEST),
                 'idea' => $request->query('idea'),
@@ -248,6 +250,7 @@ class VideoController extends Controller
                 'effort' => ['required', Rule::in(self::EFFORTS)],
                 'max_cost' => ['nullable', 'numeric', 'min:0.01', 'max:100'],
                 'max_steps' => ['nullable', 'integer', 'min:3', 'max:250'],
+                'speed' => ['nullable', 'numeric', 'min:0.25', 'max:4'],
             ]),
             'status' => VideoStatus::Queued,
             'error' => null,
@@ -267,16 +270,18 @@ class VideoController extends Controller
         abort_if($video->status->isWorking(), 409, 'This video is still being made.');
         abort_if(empty($video->plan['steps']), 422, 'This video has no plan to record yet.');
 
-        $chosen = $request->validate([
+        $data = $request->validate([
             'devices' => ['required', 'array', 'min:1'],
             'devices.*' => ['string', Rule::in(Devices::keys())],
-        ])['devices'];
+            'speed' => ['nullable', 'numeric', 'min:0.25', 'max:4'],
+        ]);
 
         $video->update([
             'status' => VideoStatus::Queued,
             'error' => null,
             'stop_requested' => false,
-            'devices' => array_values(array_intersect(Devices::keys(), $chosen)),
+            'devices' => array_values(array_intersect(Devices::keys(), $data['devices'])),
+            'speed' => $data['speed'] ?? $video->speed,
         ]);
         $video->addLog('Queued to record the same plan again');
         GenerateVideo::dispatch($video, replan: false);
@@ -456,6 +461,7 @@ class VideoController extends Controller
             'visibility' => ['required', Rule::in(['public', 'private'])],
             'max_cost' => ['nullable', 'numeric', 'min:0.01', 'max:100'],
             'max_steps' => ['nullable', 'integer', 'min:3', 'max:250'],
+            'speed' => ['nullable', 'numeric', 'min:0.25', 'max:4'],
             'record_as' => ['nullable', 'string', Rule::in(array_keys(RecordAs::options()))],
             'idea' => ['nullable', 'integer'],
             'devices' => ['required', 'array', 'min:1'],

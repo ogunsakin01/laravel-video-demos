@@ -10,7 +10,6 @@ use Ogunsakin01\VideoDemo\Models\Video;
 use Ogunsakin01\VideoDemo\Recording\Devices;
 use Ogunsakin01\VideoDemo\Recording\Plan;
 use Ogunsakin01\VideoDemo\Recording\RecordAs;
-use Ogunsakin01\VideoDemo\Recording\Recorder;
 use Ogunsakin01\VideoDemo\Recording\RecordingResult;
 use RuntimeException;
 
@@ -174,7 +173,7 @@ class Planner
      */
     protected function longCache(Video $video): bool
     {
-        return count($video->deviceList()) * $video->target_seconds * Recorder::speed() > 240;
+        return count($video->deviceList()) * $video->target_seconds * $video->playbackSpeed() > 240;
     }
 
     /**

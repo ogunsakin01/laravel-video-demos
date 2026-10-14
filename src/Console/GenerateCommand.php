@@ -39,6 +39,7 @@ class GenerateCommand extends Command
         {--start= : The path the video starts on, such as /dashboard}
         {--max-cost= : Spending limit in US dollars; the AI plans within it and stops before passing it}
         {--max-steps= : The most steps the plan may have}
+        {--speed= : How much faster the video plays than it was recorded, from 0.25 to 4 (VIDEO_DEMO_SPEED when left out)}
         {--as= : Record as a type of user, such as "admin", "guest" for signed out, or a user id or email}
         {--private : List it in the private library only}
         {--publish : Publish it to the library when it is ready}
@@ -138,6 +139,11 @@ class GenerateCommand extends Command
             throw new \InvalidArgumentException('Max steps must be a whole number of at least 3.');
         }
 
+        $speed = $this->option('speed');
+        if ($speed !== null && (! is_numeric($speed) || $speed < 0.25 || $speed > 4)) {
+            throw new \InvalidArgumentException('The speed must be a number from 0.25 to 4, such as 1.5.');
+        }
+
         $recordAs = $this->option('as') ?: null;
         if ($recordAs !== null) {
             try {
@@ -162,6 +168,7 @@ class GenerateCommand extends Command
             'devices' => array_values(array_intersect(Devices::keys(), $devices)),
             'max_cost' => $maxCost !== null ? (float) $maxCost : null,
             'max_steps' => $maxSteps !== null ? (int) $maxSteps : null,
+            'speed' => $speed !== null ? (float) $speed : null,
             'record_as' => $recordAs,
             'record_as_label' => RecordAs::label($recordAs),
             'status' => VideoStatus::Queued,
@@ -212,6 +219,7 @@ class GenerateCommand extends Command
             'issues' => $video->issues ?? [],
             'versions' => $video->recordedDevices() ?: $video->deviceList(),
             'seconds' => $video->duration_seconds,
+            'speed' => $video->playbackSpeed(),
             'cost' => round($video->cost, 4),
             'published' => $video->isPublished(),
             'studio_url' => route('video-demo.studio.show', $video),

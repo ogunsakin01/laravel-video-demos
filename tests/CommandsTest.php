@@ -68,6 +68,7 @@ class CommandsTest extends TestCase
         $this->assertStringContainsString('Unknown model [gpt-nope]', $this->runJson('video-demo:generate', ['description' => 'x', '--model' => 'gpt-nope'])['error']);
         $this->assertStringContainsString('spending limit must be a number', $this->runJson('video-demo:generate', ['description' => 'x', '--max-cost' => 'lots'])['error']);
         $this->assertStringContainsString('at least 3', $this->runJson('video-demo:generate', ['description' => 'x', '--max-steps' => 1])['error']);
+        $this->assertStringContainsString('from 0.25 to 4', $this->runJson('video-demo:generate', ['description' => 'x', '--speed' => '9'])['error']);
         $this->assertSame(0, Video::count());
 
         $this->artisan('video-demo:generate', ['description' => 'x', '--start' => 'jobs'])->assertFailed();
@@ -88,31 +89,43 @@ class CommandsTest extends TestCase
         ]]]);
 
         // Stand-ins for the browser and ffmpeg, so this runs anywhere.
-        $this->app->instance(Recorder::class, new class extends Recorder
+        $recorder = new class extends Recorder
         {
-            public function record(Plan $plan, string $dir, array $style = [], string $device = 'desktop', ?string $recordAs = null, ?\Closure $shouldStop = null): RecordingResult
+            public array $speeds = [];
+
+            public function record(Plan $plan, string $dir, array $style = [], string $device = 'desktop', ?string $recordAs = null, ?\Closure $shouldStop = null, ?float $speed = null): RecordingResult
             {
+                $this->speeds[] = $speed;
                 File::ensureDirectoryExists($dir);
                 File::put("$dir/raw.webm", 'webm');
 
                 return RecordingResult::fromArray(['ok' => true, 'video' => "$dir/raw.webm", 'durationMs' => 12_000, 'chapters' => [['title' => 'Start', 'at' => 0.5]]], $device);
             }
-        });
-        $this->app->instance(Encoder::class, new class extends Encoder
+        };
+        $encoder = new class extends Encoder
         {
+            public array $speeds = [];
+
             public function encode(string $webm, string $mp4, string $poster, float $trimSeconds = 0, float $speed = 1): void
             {
+                $this->speeds[] = $speed;
                 File::put($mp4, 'mp4');
                 File::put($poster, 'jpg');
             }
-        });
+        };
+        $this->app->instance(Recorder::class, $recorder);
+        $this->app->instance(Encoder::class, $encoder);
 
-        $result = $this->runJson('video-demo:generate', ['description' => 'How a recruiter posts a job', '--devices' => 'desktop,tablet', '--publish' => true]);
+        $result = $this->runJson('video-demo:generate', ['description' => 'How a recruiter posts a job', '--devices' => 'desktop,tablet', '--speed' => '1.2', '--publish' => true]);
         $this->stopFakeAnthropic();
 
         $this->assertSame('ready', $result['status'], (string) $result['error']);
         $this->assertSame('Post a job', $result['title']);
         $this->assertSame(['desktop', 'tablet'], $result['versions']);
+        // The video's own speed reaches the recorder and the encoder.
+        $this->assertSame(1.2, $result['speed']);
+        $this->assertSame([1.2, 1.2], $recorder->speeds);
+        $this->assertSame([1.2, 1.2], $encoder->speeds);
         $this->assertSame(12.0, (float) $result['seconds']);
         $this->assertGreaterThan(0, $result['cost']);
         $this->assertTrue($result['published']);

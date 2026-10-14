@@ -118,10 +118,10 @@ VIDEO_DEMO_FFMPEG=/Users/you/.local/bin/ffmpeg-remotion
 1. **Move to the new version.** While the package is below 1.0, each minor version (0.2, 0.3…) may include breaking changes, so Composer's `^` keeps you on the one you installed: `composer update` won't move `^0.2` to 0.3. Ask for the new one by name:
 
    ```bash
-   composer require ogunsakin01/laravel-video-demos:^0.5
+   composer require ogunsakin01/laravel-video-demos:^0.6
    ```
 
-   Patch releases (0.5.0 to 0.5.1) arrive with a normal `composer update`.
+   Patch releases (0.6.0 to 0.6.1) arrive with a normal `composer update`.
 2. **Restart your queue workers.** A running `php artisan queue:work` keeps the code it loaded when it started, so without a restart videos are still made by the old version, even though the studio pages show the new one:
 
    ```bash
@@ -146,6 +146,7 @@ The studio is where videos are made. It is only registered when `APP_ENV` is `lo
   - **Start page**: search the pages the chosen type of user can open, by title or address, or type any path (`/jobs/5`). The list comes from your GET routes that need no parameters, each opened as that user to keep the ones that return a page; the title is the page's heading. Logout, delete, export and API routes are never opened.
   - **Spending limit**: the most this video may cost ($2 unless you change it, or `limits.max_cost_per_video`). The AI is told its budget, sees how many requests it has left, and stops before a request that would go over. The form warns you if even the lowest estimate is above the limit.
   - **Max steps**: the most steps the plan may have. Fewer steps make a shorter, cheaper plan.
+  - **Playback speed**: how much faster the video plays than it was recorded, from 1× (real time) to 3×. See [Speed](#speed).
 - **Video page**: watch each version, read the plan, see the actual cost and progress, publish or unpublish, record the same plan again (free), or ask the AI for a new plan.
   - **Stop** a video while it is being made: at once if it is still queued, otherwise before the next AI request or by closing the browser mid-recording. You pay only for what was used so far. **Try again** starts it over.
   - **Pages are checked first.** Before planning, the start page is opened as the chosen user; before recording, every page in the plan is. A page that returns an error, sends the user to sign in, throws a JavaScript error or doesn't load stops the video there, with the problem listed at the top of the page (including Laravel's error message), so no AI is spent on a page that can't work. An error from your app during recording also stops it, instead of asking the AI to "repair" a plan that was right.
@@ -179,7 +180,7 @@ php artisan video-demo:publish post-a-job          # or --unpublish
 php artisan video-demo:refresh                     # re-record published videos after UI changes, no AI cost
 ```
 
-`video-demo:generate` also takes `--title`, `--model`, `--effort`, `--start=/path`, `--private`, `--max-cost=0.50` (the spending limit in dollars), `--max-steps=20`, `--as=` (a user type such as `admin`, `guest`, or a user id or email) and `--queue` (queue it and return straight away). With `--json`, broken pages found before recording are listed under `issues`. `video-demo:suggest --replace` starts the ideas over.
+`video-demo:generate` also takes `--title`, `--model`, `--effort`, `--start=/path`, `--private`, `--max-cost=0.50` (the spending limit in dollars), `--max-steps=20`, `--speed=1.5`, `--as=` (a user type such as `admin`, `guest`, or a user id or email) and `--queue` (queue it and return straight away). With `--json`, broken pages found before recording are listed under `issues`. `video-demo:suggest --replace` starts the ideas over.
 
 ## The library
 
@@ -233,7 +234,9 @@ The AI writes one plan for all of them. Each extra version only adds recording t
 
 ### Speed
 
-Videos play at twice the speed they were recorded, which makes clicks, typing and page changes snappy. Captions, title cards and pauses are held twice as long while recording, so they still stay up long enough to read. Change it with `VIDEO_DEMO_SPEED` (1 for real time).
+Videos play faster than they were recorded, which makes clicks, typing and page changes snappy. Captions, title cards and pauses are held longer while recording, so they still stay up long enough to read.
+
+Choose the speed for each video in the new-video form (1× real time, 1.25×, 1.5×, 2× or 3×), with `video-demo:generate --speed=1.5`, or when you record the same plan again, which costs nothing. New videos start at `VIDEO_DEMO_SPEED`, 2× unless you change it.
 
 If your app shows videos, set `VIDEO_DEMO_BROWSER_CHANNEL=chrome` to record with installed Chrome: Playwright's own Chromium can't play MP4.
 

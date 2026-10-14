@@ -27,7 +27,7 @@ php artisan video-demo:publish post-a-job [--unpublish]
 php artisan video-demo:refresh        # re-record published videos from their saved plans, no AI cost
 ```
 
-`generate` options: `--title`, `--length` (seconds), `--style` (clean, quick, detailed, showcase, ad, or a custom style), `--devices` (desktop, tv, tablet, mobile), `--model`, `--effort` (Claude only), `--start` (a path), `--private`, `--max-cost` (spending limit in dollars), `--max-steps`, `--as` (a user type such as `admin`, `guest`, or a user id or email), `--publish`, `--queue`, `--json`. It waits for the video, prints an estimated cost first, and exits non-zero with an `error` on failure; broken pages found before recording are listed under `issues`.
+`generate` options: `--title`, `--length` (seconds), `--style` (clean, quick, detailed, showcase, ad, or a custom style), `--devices` (desktop, tv, tablet, mobile), `--model`, `--effort` (Claude only), `--start` (a path), `--private`, `--max-cost` (spending limit in dollars), `--max-steps`, `--speed` (0.25 to 4; 1 is real time), `--as` (a user type such as `admin`, `guest`, or a user id or email), `--publish`, `--queue`, `--json`. It waits for the video, prints an estimated cost first, and exits non-zero with an `error` on failure; broken pages found before recording are listed under `issues`.
 
 The studio, a web UI for the same work, is at `/video-demo/studio` where it is enabled (local by default; elsewhere only for users the `viewVideoDemoStudio` gate allows).
 
@@ -44,7 +44,7 @@ Library pages: `/help/videos` (public) and `/admin/videos` (private videos too).
 ## Key facts
 
 - Configuration: `config/video-demo.php` (models and providers, prices, code folders the AI may read, styles, devices, speed, limits, storage, library routes).
-- Videos play at 2x the recorded speed by default; captions and title cards are held longer so they stay readable.
+- Videos play at 2x the recorded speed by default, and each video can set its own (1x real time to 3x in the studio); captions and title cards are held longer so they stay readable.
 - Styles set the AI's direction and the look of cards and captions; the "ad" style has animated abstract line art.
 - Secrets in code and pages are redacted before anything is sent to the AI. The AI can only read folders in `ai.code.paths`.
 - Plan steps can reach into iframes (embedded payment fields). CAPTCHAs, SMS codes and social logins can't be automated.
