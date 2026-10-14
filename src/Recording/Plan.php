@@ -1,0 +1,181 @@
+<?php
+
+namespace Ogunsakin01\VideoDemo\Recording;
+
+/**
+ * The step list Claude writes and the recorder plays. Stored with each video,
+ * so a video can be recorded again after the UI changes without asking
+ * Claude again.
+ */
+final class Plan
+{
+    public const ACTIONS = ['goto', 'click', 'type', 'select', 'check', 'press', 'hover', 'scroll', 'wait', 'caption', 'card', 'pause'];
+
+    /** Rough time each action takes on screen, in milliseconds, before pauses */
+    protected const ACTION_MS = [
+        'goto' => 1500, 'click' => 1300, 'type' => 1000, 'select' => 1400, 'check' => 1200,
+        'press' => 400, 'hover' => 1000, 'scroll' => 900, 'wait' => 500,
+    ];
+
+    /** Characters typed per second by the recorder */
+    protected const TYPING_PER_SECOND = 18;
+
+    /** @param list<array<string, mixed>> $steps */
+    public function __construct(
+        public string $title,
+        public string $summary,
+        public array $steps,
+    ) {}
+
+    public static function fromArray(array $data): self
+    {
+        return new self((string) ($data['title'] ?? ''), (string) ($data['summary'] ?? ''), array_values($data['steps'] ?? []));
+    }
+
+    public function toArray(): array
+    {
+        return ['title' => $this->title, 'summary' => $this->summary, 'steps' => $this->steps];
+    }
+
+    /** The steps a version plays: those without only_on, and those naming it */
+    public function forDevice(string $device): self
+    {
+        $steps = array_values(array_filter(
+            $this->steps,
+            fn ($s) => empty($s['only_on']) || in_array($device, $s['only_on'], true),
+        ));
+
+        return new self($this->title, $this->summary, $steps);
+    }
+
+    /** Estimated length of the recording, in seconds */
+    public function estimatedSeconds(): float
+    {
+        return array_sum(array_map(fn ($s) => $this->stepMs($s), $this->steps)) / 1000;
+    }
+
+    /**
+     * Stretches or shrinks captions, cards and pauses so the video lands near
+     * the target length. Actions keep their natural speed, and nothing is cut
+     * to less than half or more than three times its planned time.
+     */
+    public function fitTo(int $targetSeconds): self
+    {
+        $flexibleMs = 0;
+        $fixedMs = 0;
+        foreach ($this->steps as $step) {
+            $this->isFlexible($step) ? $flexibleMs += $this->stepMs($step) : $fixedMs += $this->stepMs($step);
+        }
+
+        if ($flexibleMs === 0) {
+            return $this;
+        }
+
+        $factor = max(0.5, min(3.0, ($targetSeconds * 1000 - $fixedMs) / $flexibleMs));
+
+        $steps = array_map(function ($step) use ($factor) {
+            if ($this->isFlexible($step)) {
+                $step['ms'] = (int) round($this->stepMs($step) * $factor);
+            }
+
+            return $step;
+        }, $this->steps);
+
+        return new self($this->title, $this->summary, $steps);
+    }
+
+    /** Chapters for the player, from the steps that start one */
+    public function chapters(): array
+    {
+        $chapters = [];
+        $elapsed = 0;
+        foreach ($this->steps as $step) {
+            if (! empty($step['chapter'])) {
+                $chapters[] = ['title' => $step['chapter'], 'at' => round($elapsed / 1000, 1)];
+            }
+            $elapsed += $this->stepMs($step);
+        }
+
+        return $chapters;
+    }
+
+    protected function isFlexible(array $step): bool
+    {
+        return in_array($step['action'] ?? null, ['caption', 'card', 'pause'], true);
+    }
+
+    protected function stepMs(array $step): int
+    {
+        $action = $step['action'] ?? 'pause';
+
+        if ($this->isFlexible($step)) {
+            return (int) ($step['ms'] ?? 2500);
+        }
+
+        $ms = self::ACTION_MS[$action] ?? 1000;
+        if ($action === 'type') {
+            $ms += (int) (strlen((string) ($step['value'] ?? '')) / self::TYPING_PER_SECOND * 1000);
+        }
+
+        // A pause the plan adds after an action
+        return $ms + (int) ($step['ms'] ?? 0);
+    }
+
+    /** JSON schema for the submit_plan tool, strict-mode compatible */
+    public static function schema(): array
+    {
+        $nullableString = fn (string $description) => ['type' => ['string', 'null'], 'description' => $description];
+
+        return [
+            'type' => 'object',
+            'properties' => [
+                'title' => ['type' => 'string', 'description' => 'Short video title, as a user would search for it'],
+                'summary' => ['type' => 'string', 'description' => 'One or two sentences on what the video shows'],
+                'steps' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'action' => ['type' => 'string', 'enum' => self::ACTIONS],
+                            'why' => ['type' => 'string', 'description' => 'What this step is for, in a few words. Not shown in the video.'],
+                            'url' => $nullableString('goto: a path such as /jobs/create'),
+                            'target' => [
+                                'anyOf' => [
+                                    [
+                                        'type' => 'object',
+                                        'description' => 'The element to act on. Give one way to find it, the way a user would see it.',
+                                        'properties' => [
+                                            'role' => $nullableString('ARIA role: button, link, textbox, combobox, checkbox, tab, menuitem, heading…'),
+                                            'name' => $nullableString('Accessible name, used with role: the visible label or text'),
+                                            'label' => $nullableString('Form field label text'),
+                                            'placeholder' => $nullableString('Input placeholder text'),
+                                            'text' => $nullableString('Visible text of the element'),
+                                            'selector' => $nullableString('CSS selector, only when nothing above identifies it'),
+                                        ],
+                                        'required' => ['role', 'name', 'label', 'placeholder', 'text', 'selector'],
+                                        'additionalProperties' => false,
+                                    ],
+                                    ['type' => 'null'],
+                                ],
+                            ],
+                            'value' => $nullableString('type: the text; select: the option label; press: the key, such as Enter'),
+                            'title' => $nullableString('caption or card: the heading'),
+                            'text' => $nullableString('caption or card: one short sentence under the heading'),
+                            'ms' => ['type' => ['integer', 'null'], 'description' => 'caption, card, pause: how long it shows. Other actions: extra pause afterwards.'],
+                            'chapter' => $nullableString('Starts a chapter with this name at this step'),
+                            'only_on' => [
+                                'type' => ['array', 'null'],
+                                'items' => ['type' => 'string', 'enum' => Devices::keys()],
+                                'description' => 'Run this step only on these versions, for example ["mobile"] to open the menu that small screens hide navigation behind. Null runs it on every version.',
+                            ],
+                        ],
+                        'required' => ['action', 'why', 'url', 'target', 'value', 'title', 'text', 'ms', 'chapter', 'only_on'],
+                        'additionalProperties' => false,
+                    ],
+                ],
+            ],
+            'required' => ['title', 'summary', 'steps'],
+            'additionalProperties' => false,
+        ];
+    }
+}

@@ -1,0 +1,262 @@
+{
+  "title": "The library",
+  "summary": "What your app's users see.",
+  "style": {
+    "theme": "light",
+    "accent": "#171717",
+    "captions": "bottom",
+    "pace": "normal"
+  },
+  "devices": [
+    "desktop",
+    "mobile"
+  ],
+  "steps": [
+    {
+      "action": "card",
+      "why": "Opening",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "What your users see",
+      "text": "Short how-to videos, inside your app and in a help library.",
+      "ms": 3600,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "goto",
+      "why": "The host app",
+      "url": "/",
+      "target": null,
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": "Inside your app",
+      "only_on": null
+    },
+    {
+      "action": "caption",
+      "why": "Explain embedding",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "Drop a video into any page",
+      "text": "<x-video-demo::player slug=\"post-a-job\" />",
+      "ms": 3800,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "click",
+      "why": "Play it",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": null,
+        "placeholder": null,
+        "text": null,
+        "selector": "aside video"
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": 3500,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "type",
+      "why": "Search from the app",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": null,
+        "placeholder": "How do I…",
+        "text": null,
+        "selector": null
+      },
+      "value": "applicants",
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": "Search the library",
+      "only_on": null
+    },
+    {
+      "action": "press",
+      "why": "Run the search",
+      "url": null,
+      "target": null,
+      "value": "Enter",
+      "title": null,
+      "text": null,
+      "ms": 800,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "caption",
+      "why": "Explain the library",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "A help library, ready made",
+      "text": "Public and staff-only pages, at the addresses you choose.",
+      "ms": 3600,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "click",
+      "why": "Open a video",
+      "url": null,
+      "target": {
+        "role": "link",
+        "name": "Review applicants",
+        "label": null,
+        "placeholder": null,
+        "text": null,
+        "selector": null
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "caption",
+      "why": "Explain chapters",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "Chapters to jump straight in",
+      "text": "Taken from the plan as the video records.",
+      "ms": 3200,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "click",
+      "why": "Jump to a chapter",
+      "url": null,
+      "target": {
+        "role": "button",
+        "name": "Publish",
+        "label": null,
+        "placeholder": null,
+        "text": null,
+        "selector": null
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": 2600,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "goto",
+      "why": "A video with every version",
+      "url": "/help/videos/post-a-job",
+      "target": null,
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": "Every screen",
+      "only_on": null
+    },
+    {
+      "action": "click",
+      "why": "Switch to mobile",
+      "url": null,
+      "target": {
+        "role": "button",
+        "name": "Mobile",
+        "label": null,
+        "placeholder": null,
+        "text": null,
+        "selector": null
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": 2200,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "caption",
+      "why": "Explain versions",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "The right version for each screen",
+      "text": "The player picks the version that fits. Viewers can switch.",
+      "ms": 3600,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "goto",
+      "why": "A search with no answer",
+      "url": "/help/videos?q=company+logo",
+      "target": null,
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": "Ask for what is missing",
+      "only_on": null
+    },
+    {
+      "action": "caption",
+      "why": "Explain requests",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "Nothing yet? Users can ask",
+      "text": "Requests show up in your studio as ideas for the next video.",
+      "ms": 3600,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "click",
+      "why": "Ask for one",
+      "url": null,
+      "target": {
+        "role": "button",
+        "name": "Ask for a video on this",
+        "label": null,
+        "placeholder": null,
+        "text": null,
+        "selector": null
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": 1800,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "card",
+      "why": "Closing",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "Made on your machine. Watched everywhere.",
+      "text": "Videos publish to any Laravel disk, such as S3 or R2.",
+      "ms": 3800,
+      "chapter": null,
+      "only_on": null
+    }
+  ]
+}

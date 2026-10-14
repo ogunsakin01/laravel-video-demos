@@ -1,0 +1,23 @@
+laravel: '@testbench'
+
+providers:
+  - Ogunsakin01\VideoDemo\VideoDemoServiceProvider
+  - Workbench\App\Providers\WorkbenchServiceProvider
+
+migrations: true
+
+env:
+  - APP_ENV=local
+  - DB_CONNECTION=sqlite
+  - SESSION_DRIVER=file
+  - CACHE_STORE=file
+
+workbench:
+  start: '/video-demo/studio'
+  install: false
+  build:
+    - create-sqlite-db
+    - db-wipe
+    - migrate-fresh:
+        --seed: true
+        --seeder: Workbench\Database\Seeders\DemoSeeder

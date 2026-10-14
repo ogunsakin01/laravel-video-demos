@@ -1,0 +1,396 @@
+{
+  "title": "The studio",
+  "summary": "Making, checking and publishing a video in the studio.",
+  "style": {
+    "theme": "light",
+    "accent": "#171717",
+    "captions": "bottom",
+    "pace": "normal"
+  },
+  "steps": [
+    {
+      "action": "card",
+      "why": "Opening",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "Laravel Video Demo",
+      "text": "Describe a flow in your app. Claude records a walkthrough of it.",
+      "ms": 3800,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "goto",
+      "why": "Studio home",
+      "url": "/video-demo/studio",
+      "target": null,
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": "The studio",
+      "only_on": null
+    },
+    {
+      "action": "caption",
+      "why": "The list",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "Every video in one place",
+      "text": "Status, length and what Claude cost. The studio only runs on your machine.",
+      "ms": 3600,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "click",
+      "why": "Start a video",
+      "url": null,
+      "target": {
+        "role": "link",
+        "name": "New video",
+        "label": null,
+        "placeholder": null,
+        "text": null,
+        "selector": null
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": "Describe it",
+      "only_on": null
+    },
+    {
+      "action": "type",
+      "why": "A rough note",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": "What should the video show?",
+        "placeholder": null,
+        "text": null,
+        "selector": null
+      },
+      "value": "approve holiday request",
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "click",
+      "why": "Let Claude fill it in",
+      "url": null,
+      "target": {
+        "role": "button",
+        "name": "Complete with AI",
+        "label": null,
+        "placeholder": null,
+        "text": null,
+        "selector": null
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "wait",
+      "why": "The note appears",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": null,
+        "placeholder": null,
+        "text": "Edit anything before you generate",
+        "selector": null
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": 800,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "caption",
+      "why": "Explain",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "Complete with AI",
+      "text": "A few words become a title, a full description, a start page and a length.",
+      "ms": 3800,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "scroll",
+      "why": "Versions",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": null,
+        "placeholder": null,
+        "text": "Claude writes one plan for all of them",
+        "selector": null
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "click",
+      "why": "Add tablet",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": null,
+        "placeholder": null,
+        "text": "Tablet",
+        "selector": null
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": 300,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "click",
+      "why": "Add mobile",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": null,
+        "placeholder": null,
+        "text": "Mobile",
+        "selector": null
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": 300,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "caption",
+      "why": "Explain versions",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "Every screen from one plan",
+      "text": "Desktop, TV, tablet and mobile. Extra versions cost recording time, not Claude credit.",
+      "ms": 4000,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "select",
+      "why": "Pick a style",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": "Style",
+        "placeholder": null,
+        "text": null,
+        "selector": null
+      },
+      "value": "Product showcase",
+      "title": null,
+      "text": null,
+      "ms": 600,
+      "chapter": "Choose a style",
+      "only_on": null
+    },
+    {
+      "action": "caption",
+      "why": "Explain styles",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "A style for every purpose",
+      "text": "Each style tells Claude how to write the video and sets how it looks.",
+      "ms": 3600,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "hover",
+      "why": "Point at generate",
+      "url": null,
+      "target": {
+        "role": "button",
+        "name": "Generate video",
+        "label": null,
+        "placeholder": null,
+        "text": null,
+        "selector": null
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "caption",
+      "why": "Explain cost",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "See the cost first",
+      "text": "An estimate before anything is spent, charged to your own API key.",
+      "ms": 3600,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "goto",
+      "why": "Styles page",
+      "url": "/video-demo/studio/styles",
+      "target": null,
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "caption",
+      "why": "Explain",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "Make styles your own",
+      "text": "Start from the defaults in the config file, then add as many as you like.",
+      "ms": 3600,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "goto",
+      "why": "A finished video",
+      "url": "/video-demo/studio/1",
+      "target": null,
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": "Review and publish",
+      "only_on": null
+    },
+    {
+      "action": "caption",
+      "why": "Explain review",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "Watch it before anyone else does",
+      "text": "Check every version, the plan Claude wrote and what it actually cost.",
+      "ms": 3800,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "click",
+      "why": "Mobile version",
+      "url": null,
+      "target": {
+        "role": "button",
+        "name": "Mobile",
+        "label": null,
+        "placeholder": null,
+        "text": null,
+        "selector": null
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": 2200,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "click",
+      "why": "Show the plan",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": null,
+        "placeholder": null,
+        "text": "Plan · 13 steps",
+        "selector": null
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": 1600,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "hover",
+      "why": "Point at publish",
+      "url": null,
+      "target": {
+        "role": "button",
+        "name": "Publish this version",
+        "label": null,
+        "placeholder": null,
+        "text": null,
+        "selector": null
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "caption",
+      "why": "Explain publishing",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "Publish when it is right",
+      "text": "It appears in your app’s video library, public or staff-only.",
+      "ms": 3600,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "card",
+      "why": "Closing",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "Free and open source",
+      "text": "composer require ogunsakin01/laravel-video-demos",
+      "ms": 3800,
+      "chapter": null,
+      "only_on": null
+    }
+  ]
+}

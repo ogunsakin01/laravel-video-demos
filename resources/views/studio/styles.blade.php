@@ -1,0 +1,107 @@
+@php
+  use Ogunsakin01\VideoDemo\Models\VideoStyle;
+  $form = $editing ?? new VideoStyle(VideoStyle::defaults());
+@endphp
+<x-video-demo::layout title="Styles" badge="Studio · local" :home="route('video-demo.studio.index')">
+  <x-slot:nav>
+    <a class="vd-btn" href="{{ route('video-demo.studio.index') }}">All videos</a>
+    <a class="vd-btn vd-btn-primary" href="{{ route('video-demo.studio.create') }}">New video</a>
+  </x-slot:nav>
+
+  <section class="vd-hero">
+    <div>
+      <p class="vd-eyebrow">Studio</p>
+      <h1>Styles</h1>
+      <p class="vd-sub">How Claude writes each video and how its title cards and captions look. The first ones come from the <code>styles</code> section of <code>config/video-demo.php</code>.</p>
+    </div>
+  </section>
+
+  <div class="vd-split">
+    <div class="vd-stack">
+      @foreach ($styles as $style)
+        @php($dark = $style->theme === 'dark')
+        <article class="vd-card" style="display:grid;grid-template-columns:132px minmax(0,1fr);gap:18px;align-items:start">
+          {{-- A small picture of the style's title card --}}
+          <div aria-hidden="true" style="aspect-ratio:16/10;border-radius:8px;border:1px solid var(--vd-border);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:{{ $dark ? '#171717' : '#faf8f3' }}">
+            <span style="width:16px;height:2px;border-radius:2px;background:{{ $dark && strtolower($style->accent) === '#171717' ? '#fafaf8' : $style->accent }}"></span>
+            <span style="width:62%;height:6px;border-radius:3px;background:{{ $dark ? '#fafaf8' : '#171717' }}"></span>
+            <span style="width:44%;height:4px;border-radius:2px;background:{{ $dark ? 'rgba(250,250,248,.5)' : '#b8b5ae' }}"></span>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
+              <h2 style="margin:0">{{ $style->name }}</h2>
+              <div class="vd-actions">
+                <a class="vd-btn vd-btn-sm" href="{{ route('video-demo.studio.styles.index', ['edit' => $style->id]) }}">Edit</a>
+                <form method="post" action="{{ route('video-demo.studio.styles.destroy', $style) }}" onsubmit="return confirm('Delete this style?')">@csrf @method('delete')
+                  <button class="vd-btn vd-btn-sm vd-btn-ghost vd-btn-danger">Delete</button>
+                </form>
+              </div>
+            </div>
+            <p class="vd-small vd-muted" style="margin:6px 0 10px">{{ $style->direction }}</p>
+            <div class="vd-actions">
+              <span class="vd-pill">{{ VideoStyle::THEMES[$style->theme] ?? $style->theme }} cards</span>
+              <span class="vd-pill">Captions at the {{ strtolower(VideoStyle::CAPTIONS[$style->captions] ?? $style->captions) }}</span>
+              <span class="vd-pill">{{ VideoStyle::PACES[$style->pace] ?? $style->pace }} pace</span>
+              <span class="vd-pill" style="display:inline-flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:3px;background:{{ $style->accent }};border:1px solid var(--vd-border)"></span>{{ $style->accent }}</span>
+            </div>
+          </div>
+        </article>
+      @endforeach
+    </div>
+
+    <form method="post" class="vd-card vd-stack"
+      action="{{ $editing ? route('video-demo.studio.styles.update', $editing) : route('video-demo.studio.styles.store') }}">
+      @csrf
+      @if ($editing) @method('put') @endif
+      <h2 style="margin:0">{{ $editing ? 'Edit '.$editing->name : 'Add a style' }}</h2>
+      <div>
+        <label for="name">Name</label>
+        <input type="text" id="name" name="name" required maxlength="80" value="{{ old('name', $form->name) }}" placeholder="Onboarding series">
+        @error('name')<span class="vd-error">{{ $message }}</span>@enderror
+      </div>
+      <div>
+        <label for="direction">Direction for Claude</label>
+        <textarea id="direction" name="direction" required maxlength="2000" placeholder="Friendly and brief. Address the viewer as “you”. One caption per screen.">{{ old('direction', $form->direction) }}</textarea>
+        <span class="vd-hint">Tone, how much to explain, and when to use title cards and captions.</span>
+        @error('direction')<span class="vd-error">{{ $message }}</span>@enderror
+      </div>
+      <div class="vd-row">
+        <div>
+          <label for="theme">Cards</label>
+          <select id="theme" name="theme">
+            @foreach (VideoStyle::THEMES as $value => $label)
+              <option value="{{ $value }}" @selected(old('theme', $form->theme) === $value)>{{ $label }}</option>
+            @endforeach
+          </select>
+        </div>
+        <div>
+          <label for="captions">Captions</label>
+          <select id="captions" name="captions">
+            @foreach (VideoStyle::CAPTIONS as $value => $label)
+              <option value="{{ $value }}" @selected(old('captions', $form->captions) === $value)>{{ $label }}</option>
+            @endforeach
+          </select>
+        </div>
+      </div>
+      <div class="vd-row">
+        <div>
+          <label for="pace">Pace</label>
+          <select id="pace" name="pace">
+            @foreach (VideoStyle::PACES as $value => $label)
+              <option value="{{ $value }}" @selected(old('pace', $form->pace) === $value)>{{ $label }}</option>
+            @endforeach
+          </select>
+        </div>
+        <div>
+          <label for="accent">Accent</label>
+          <input type="text" id="accent" name="accent" required pattern="#[0-9a-fA-F]{6}" value="{{ old('accent', $form->accent) }}" class="vd-mono">
+          @error('accent')<span class="vd-error">{{ $message }}</span>@enderror
+        </div>
+      </div>
+      <div class="vd-actions">
+        <button class="vd-btn vd-btn-primary">{{ $editing ? 'Save style' : 'Add style' }}</button>
+        @if ($editing)<a class="vd-btn vd-btn-ghost" href="{{ route('video-demo.studio.styles.index') }}">Cancel</a>@endif
+      </div>
+    </form>
+  </div>
+</x-video-demo::layout>

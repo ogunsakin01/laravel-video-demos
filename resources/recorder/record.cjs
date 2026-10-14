@@ -1,0 +1,230 @@
+// Plays a video plan in a real browser and records it.
+//   node record.cjs <job.json>
+// The job file gives the plan file, the app's address, an optional sign-in
+// link, the window size and where to write the recording. Writes result.json
+// next to the recording: ok, how long it ran, and on failure the step that
+// failed, the error and what was on the page (for Claude to fix the plan).
+const fs = require('fs');
+const path = require('path');
+const { chromium } = require('playwright');
+const { CURSOR_JS, OVERLAY_JS, setPace, typingDelay, pause, glide, click, scrollBy, scrollTo } = require('./helpers.cjs');
+
+const job = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+const plan = JSON.parse(fs.readFileSync(job.planPath, 'utf8'));
+const style = Object.assign({ theme: 'light', accent: '#171717', captions: 'bottom', pace: 'normal' }, job.style || {});
+setPace(style.pace);
+const FIND_TIMEOUT = 8000;
+const SNAPSHOT_LIMIT = 12000;
+
+const url = p => job.baseUrl.replace(/\/$/, '') + '/' + String(p).replace(/^\//, '');
+
+function locate(page, t) {
+  if (!t) throw new Error('This step needs a target.');
+  let loc;
+  if (t.role) loc = page.getByRole(t.role, t.name ? { name: t.name } : {});
+  else if (t.label) loc = page.getByLabel(t.label);
+  else if (t.placeholder) loc = page.getByPlaceholder(t.placeholder);
+  else if (t.text) loc = page.getByText(t.text);
+  else if (t.selector) loc = page.locator(t.selector);
+  else throw new Error('The target has no role, label, placeholder, text or selector.');
+  return loc.filter({ visible: true }).first();
+}
+
+function describe(t) {
+  if (!t) return 'nothing';
+  return Object.entries(t).filter(([, v]) => v).map(([k, v]) => `${k} "${v}"`).join(', ');
+}
+
+async function find(page, t) {
+  const loc = locate(page, t);
+  try {
+    await loc.waitFor({ state: 'visible', timeout: FIND_TIMEOUT });
+  } catch {
+    throw new Error(`Could not find a visible element with ${describe(t)}.`);
+  }
+  return loc;
+}
+
+async function settle(page) {
+  await page.waitForLoadState('load').catch(() => {});
+  await page.waitForLoadState('networkidle', { timeout: 4000 }).catch(() => {});
+}
+
+async function run(page, step, isLast) {
+  const extra = step.ms || 0;
+  switch (step.action) {
+    case 'goto':
+      await page.goto(url(step.url), { waitUntil: 'load' });
+      await settle(page);
+      if (/\/login\b/.test(new URL(page.url()).pathname) && !/\/login\b/.test(step.url)) {
+        throw new Error(`Opening ${step.url} went to the sign-in page instead. ${job.loginPath ? "The recorder's user may not have access." : 'The recorder is signed out; set video-demo.recorder.login_as.'}`);
+      }
+      await pause(page, 700 + extra);
+      return;
+    case 'click': {
+      await click(page, await find(page, step.target));
+      await settle(page);
+      await pause(page, 500 + extra);
+      return;
+    }
+    case 'hover': {
+      const loc = await find(page, step.target);
+      await glide(page, loc);
+      await loc.hover();
+      await pause(page, 600 + extra);
+      return;
+    }
+    case 'check': {
+      const loc = await find(page, step.target);
+      await glide(page, loc);
+      await loc.check();
+      await pause(page, 400 + extra);
+      return;
+    }
+    case 'type': {
+      const loc = await find(page, step.target);
+      await click(page, loc);
+      if (await loc.inputValue().catch(() => '')) await loc.fill('');
+      await loc.pressSequentially(String(step.value), { delay: typingDelay() });
+      await pause(page, 400 + extra);
+      return;
+    }
+    case 'select': {
+      const loc = await find(page, step.target);
+      await glide(page, loc);
+      const isNative = await loc.evaluate(el => el.tagName === 'SELECT');
+      if (isNative) {
+        await loc.selectOption({ label: String(step.value) });
+      } else {
+        await click(page, loc);
+        await click(page, await find(page, { role: 'option', name: String(step.value) }));
+      }
+      await pause(page, 500 + extra);
+      return;
+    }
+    case 'press':
+      await page.keyboard.press(String(step.value));
+      await settle(page);
+      await pause(page, 300 + extra);
+      return;
+    case 'scroll':
+      if (step.target) await scrollTo(page, await find(page, step.target));
+      else await scrollBy(page, page.viewportSize().height * 0.7);
+      await pause(page, 400 + extra);
+      return;
+    case 'wait':
+      if (step.target) {
+        const loc = locate(page, step.target);
+        await loc.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {
+          throw new Error(`Waited 15 seconds for ${describe(step.target)} to appear.`);
+        });
+      } else {
+        await settle(page);
+      }
+      await pause(page, extra);
+      return;
+    case 'caption':
+      await page.evaluate(([t, s]) => window.__demoOverlay.caption(t, s), [step.title, step.text || '']);
+      await pause(page, step.ms || 3000);
+      // The last step stays on screen, so the video doesn't end mid-fade
+      if (isLast) return;
+      await page.evaluate(() => window.__demoOverlay.hide());
+      await pause(page, 350);
+      return;
+    case 'card':
+      await page.evaluate(([t, s]) => window.__demoOverlay.card(t, s), [step.title, step.text || '']);
+      await pause(page, step.ms || 3500);
+      if (isLast) return;
+      await page.evaluate(() => window.__demoOverlay.hide());
+      await pause(page, 450);
+      return;
+    case 'pause':
+      await pause(page, step.ms || 1500);
+      return;
+    default:
+      throw new Error(`Unknown action ${step.action}.`);
+  }
+}
+
+// What was on the page when a step failed, for Claude to fix the plan
+async function snapshot(page) {
+  try {
+    const tree = await page.locator('body').ariaSnapshot({ timeout: 3000 });
+    return tree.length > SNAPSHOT_LIMIT ? tree.slice(0, SNAPSHOT_LIMIT) + '\n… cut' : tree;
+  } catch {
+    return '';
+  }
+}
+
+(async () => {
+  const result = { ok: false, video: null, durationMs: 0, trimMs: 0, chapters: [], failedStep: null, error: null, url: null, title: null, snapshot: null };
+  const browser = await chromium.launch(job.channel ? { channel: job.channel } : {});
+  let page;
+  try {
+    // Playwright records at the page's own size, so each version is recorded at its screen size
+    const common = {
+      viewport: job.viewport,
+      hasTouch: !!job.touch,
+      // Phones get mobile layout handling (the page's meta viewport)
+      isMobile: !!job.touch && job.viewport.width < 600,
+      ignoreHTTPSErrors: !!job.ignoreHttpsErrors,
+    };
+
+    // Sign in first, outside the recording
+    let storageState;
+    if (job.loginPath) {
+      const ctx = await browser.newContext(common);
+      const p = await ctx.newPage();
+      const res = await p.goto(url(job.loginPath), { waitUntil: 'load' });
+      if (!res || res.status() >= 400) throw new Error(`Signing in failed with HTTP ${res ? res.status() : 'no response'}. Is the studio enabled and the app running at ${job.baseUrl}?`);
+      storageState = await ctx.storageState();
+      await ctx.close();
+    }
+
+    const recordingStarted = Date.now();
+    const context = await browser.newContext({ ...common, storageState, recordVideo: { dir: job.outDir, size: job.viewport } });
+    await context.addInitScript(`window.__demoStyle = ${JSON.stringify(style)};`);
+    // Touch screens show where a finger taps instead of a cursor
+    if (job.touch) await context.addInitScript('window.__demoTouch = true;');
+    await context.addInitScript(CURSOR_JS);
+    await context.addInitScript(OVERLAY_JS);
+    page = await context.newPage();
+    // Installed Chrome starts with a shorter window, and its capture only takes
+    // the full size after a real navigation. So wait, then navigate to a plain
+    // page for anything shown before the first page opens, and cut everything
+    // before that from the video.
+    await page.waitForTimeout(600);
+    const blank = `<html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="margin:0;background:${style.theme === 'dark' ? '#171717' : '#faf8f3'}"></body></html>`;
+    await page.goto('data:text/html,' + encodeURIComponent(blank));
+    await page.waitForTimeout(400);
+    const started = Date.now();
+    result.trimMs = started - recordingStarted;
+
+    for (let i = 0; i < plan.steps.length; i++) {
+      const step = plan.steps[i];
+      if (step.chapter) result.chapters.push({ title: step.chapter, at: (Date.now() - started) / 1000 });
+      try {
+        await run(page, step, i === plan.steps.length - 1);
+      } catch (e) {
+        result.failedStep = i + 1;
+        result.error = String(e.message || e).split('\n')[0];
+        result.url = page.url();
+        result.title = await page.title().catch(() => '');
+        result.snapshot = await snapshot(page);
+        break;
+      }
+    }
+
+    result.durationMs = Date.now() - started;
+    result.ok = result.failedStep === null;
+    const video = page.video();
+    await context.close();
+    if (video) result.video = await video.path();
+  } catch (e) {
+    result.error = String(e.message || e).split('\n')[0];
+  } finally {
+    await browser.close();
+    fs.writeFileSync(path.join(job.outDir, 'result.json'), JSON.stringify(result, null, 2));
+  }
+  process.exit(0);
+})();

@@ -1,0 +1,232 @@
+{
+  "title": "Post a job",
+  "summary": "The sample clip the demo app's videos play, recorded from the demo app.",
+  "site": "app",
+  "out": "workbench/demo-assets",
+  "devices": [
+    "desktop",
+    "tv",
+    "tablet",
+    "mobile"
+  ],
+  "style": {
+    "theme": "light",
+    "accent": "#171717",
+    "captions": "bottom",
+    "pace": "normal"
+  },
+  "steps": [
+    {
+      "action": "card",
+      "why": "Opening",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "Post a job",
+      "text": "From an empty form to a live listing.",
+      "ms": 3000,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "goto",
+      "why": "Start on the jobs page",
+      "url": "/",
+      "target": null,
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": "Open the form",
+      "only_on": null
+    },
+    {
+      "action": "click",
+      "why": "Open the form",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": null,
+        "placeholder": null,
+        "text": null,
+        "selector": ".hero .btn"
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "caption",
+      "why": "Explain",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "Start with the basics",
+      "text": "A clear title helps the right people find the job.",
+      "ms": 3000,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "type",
+      "why": "Title",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": "Job title",
+        "placeholder": null,
+        "text": null,
+        "selector": null
+      },
+      "value": "Senior Laravel Developer",
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": "Fill in the details",
+      "only_on": null
+    },
+    {
+      "action": "select",
+      "why": "Contract",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": "Contract",
+        "placeholder": null,
+        "text": null,
+        "selector": null
+      },
+      "value": "Contract",
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "select",
+      "why": "Location",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": "Location",
+        "placeholder": null,
+        "text": null,
+        "selector": null
+      },
+      "value": "Remote",
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "type",
+      "why": "About",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": "About the role",
+        "placeholder": null,
+        "text": null,
+        "selector": null
+      },
+      "value": "Build and look after our Laravel apps with a small, friendly team.",
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "check",
+      "why": "Remote",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": "Open to remote applicants",
+        "placeholder": null,
+        "text": null,
+        "selector": null
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "click",
+      "why": "Publish",
+      "url": null,
+      "target": {
+        "role": "button",
+        "name": "Publish job",
+        "label": null,
+        "placeholder": null,
+        "text": null,
+        "selector": null
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": "Publish",
+      "only_on": null
+    },
+    {
+      "action": "wait",
+      "why": "Confirmation",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": null,
+        "placeholder": null,
+        "text": "Your job is live.",
+        "selector": null
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": 600,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "caption",
+      "why": "Result",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "Live straight away",
+      "text": "Applicants can find it on your careers page now.",
+      "ms": 2800,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "card",
+      "why": "Closing",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "Your job is live",
+      "text": "That is all it takes.",
+      "ms": 2600,
+      "chapter": null,
+      "only_on": null
+    }
+  ]
+}

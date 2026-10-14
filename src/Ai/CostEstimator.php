@@ -1,0 +1,72 @@
+<?php
+
+namespace Ogunsakin01\VideoDemo\Ai;
+
+/**
+ * Estimates what one video costs before it is made.
+ *
+ * Simulates the planning conversation: Claude reads some code each turn, the
+ * conversation grows, and earlier turns are read back from the prompt cache.
+ * Longer videos mean more pages to read and more steps to write. The range
+ * allows for the code being easier or harder to follow than average, and for
+ * one repair round. After each video, compare with its actual cost.
+ */
+class CostEstimator
+{
+    // Measured guesses; tune these against the actual costs your videos show
+    protected const SYSTEM_TOKENS = 3_500;
+    protected const TOKENS_PER_ROUTE = 25;
+    protected const CODE_TOKENS_PER_TURN = 3_000;
+    protected const OUTPUT_TOKENS_PER_TURN = 400;
+    protected const TOKENS_PER_STEP = 90;
+    protected const SECONDS_PER_STEP = 2.5;
+    protected const REPAIR_SNAPSHOT_TOKENS = 4_000;
+
+    /** Thinking tokens per turn, by effort */
+    protected const THINKING = ['low' => 300, 'medium' => 900, 'high' => 1_800, 'xhigh' => 3_000, 'max' => 5_000];
+
+    /** @return array{low: float, high: float, expected: float, turns: int} */
+    public function estimate(string $model, string $effort, int $targetSeconds, int $routeCount): array
+    {
+        $thinking = self::THINKING[$effort] ?? self::THINKING['high'];
+        $steps = (int) ceil($targetSeconds / self::SECONDS_PER_STEP);
+        $turns = min(4 + (int) ceil($targetSeconds / 20), (int) config('video-demo.limits.max_turns', 30));
+
+        $usage = new Usage;
+        // The first request writes the instructions and route list to the cache
+        $history = self::SYSTEM_TOKENS + $routeCount * self::TOKENS_PER_ROUTE;
+        $usage = $usage->plus($this->turn($model, cached: 0, fresh: $history, output: self::OUTPUT_TOKENS_PER_TURN + $thinking));
+        $history += self::OUTPUT_TOKENS_PER_TURN;
+
+        // Each later turn reads the history from the cache and adds new code
+        for ($i = 1; $i < $turns; $i++) {
+            $usage = $usage->plus($this->turn($model, $history, self::CODE_TOKENS_PER_TURN, self::OUTPUT_TOKENS_PER_TURN + $thinking));
+            $history += self::CODE_TOKENS_PER_TURN + self::OUTPUT_TOKENS_PER_TURN;
+        }
+
+        // The plan itself
+        $planOutput = $steps * self::TOKENS_PER_STEP + $thinking * 2;
+        $usage = $usage->plus($this->turn($model, $history, 0, $planOutput));
+        $expected = $usage->cost;
+
+        // One repair: the failure and page snapshot, then a revised plan
+        $repair = $this->turn($model, $history + $planOutput, self::REPAIR_SNAPSHOT_TOKENS, $planOutput)->cost;
+
+        return [
+            'low' => round($expected * 0.6, 4),
+            'expected' => round($expected + $repair * 0.5, 4),
+            'high' => round(($expected + $repair) * 1.5, 4),
+            'turns' => $turns + 1,
+        ];
+    }
+
+    protected function turn(string $model, int $cached, int $fresh, int $output): Usage
+    {
+        return new Usage(
+            cacheWrite: $fresh,
+            cacheRead: $cached,
+            output: $output,
+            cost: Pricing::cost($model, 0, $fresh, $cached, $output),
+        );
+    }
+}

@@ -1,0 +1,14 @@
+* text=auto eol=lf
+
+*.mp4 binary
+*.jpg binary
+
+# Kept out of the package Composer installs: tests, the demo app and its videos
+/.github export-ignore
+/docs export-ignore
+/tests export-ignore
+/workbench export-ignore
+/.gitattributes export-ignore
+/.gitignore export-ignore
+/phpunit.xml export-ignore
+/testbench.yaml export-ignore
