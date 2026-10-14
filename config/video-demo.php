@@ -195,6 +195,13 @@ return [
         'login_as' => env('VIDEO_DEMO_LOGIN_AS'),
         'guard' => null,
 
+        // The types of user a video can be recorded as. Found from the app's
+        // roles (spatie/laravel-permission, Laratrust, Bouncer, a role_id or
+        // role column, or an is_admin flag). If the app models them some
+        // other way, list them here: label => the user to sign in as.
+        // 'user_types' => ['Admin' => 'admin@example.com', 'Customer' => 'jane@example.com'],
+        'user_types' => [],
+
         // Playwright's own Chromium can't play MP4 (H.264) video. If your app
         // shows videos, set this to "chrome" to record with installed Chrome.
         'channel' => env('VIDEO_DEMO_BROWSER_CHANNEL'),

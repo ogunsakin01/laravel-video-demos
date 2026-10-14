@@ -30,11 +30,24 @@
           </div>
         </div>
       @else
+        <form method="post" action="{{ route('video-demo.studio.bulk') }}" id="vd-bulk-form">
+        @csrf
+        <div class="vd-bulk" id="vd-bulk" hidden>
+          <span class="vd-small" id="vd-bulk-count" aria-live="polite" style="flex:1;min-width:0">0 selected</span>
+          <button class="vd-btn vd-btn-sm" name="action" value="unpublish">Unpublish</button>
+          <button class="vd-btn vd-btn-sm vd-btn-primary" name="action" value="publish">Publish</button>
+        </div>
         <table class="vd-table">
-          <thead><tr><th>Video</th><th>Status</th><th>Length</th><th>Cost</th><th>Library</th></tr></thead>
+          <thead><tr>
+            <th class="vd-check"><input type="checkbox" id="vd-select-all" aria-label="Select all videos"></th>
+            <th>Video</th><th>Status</th><th>Length</th><th>Cost</th><th>Library</th>
+          </tr></thead>
           <tbody>
             @foreach ($videos as $video)
               <tr>
+                <td class="vd-check"><input type="checkbox" name="videos[]" value="{{ $video->id }}" data-row
+                  aria-label="Select {{ $video->title ?: \Illuminate\Support\Str::limit($video->prompt, 60) }}"
+                  data-ready="{{ $video->status === \Ogunsakin01\VideoDemo\Enums\VideoStatus::Ready ? 1 : 0 }}" data-published="{{ $video->isPublished() ? 1 : 0 }}"></td>
                 <td>
                   <a href="{{ route('video-demo.studio.show', $video) }}">{{ $video->title ?: \Illuminate\Support\Str::limit($video->prompt, 60) }}</a>
                   <div class="vd-small vd-muted">{{ $video->updated_at->diffForHumans() }}</div>
@@ -53,6 +66,7 @@
             @endforeach
           </tbody>
         </table>
+        </form>
       @endif
     </div>
 
@@ -65,6 +79,40 @@
 
   <x-slot:scripts>
     <script>
+      // Bulk publish: tick videos, then Publish or Unpublish
+      (() => {
+        const form = document.getElementById('vd-bulk-form');
+        if (!form) return;
+        const all = document.getElementById('vd-select-all');
+        const rows = [...form.querySelectorAll('[data-row]')];
+        const bar = document.getElementById('vd-bulk');
+        const count = document.getElementById('vd-bulk-count');
+        const [unpublish, publish] = bar.querySelectorAll('button');
+        const sync = () => {
+          const ticked = rows.filter(r => r.checked);
+          const ready = ticked.filter(r => r.dataset.ready === '1').length;
+          const live = ticked.filter(r => r.dataset.published === '1').length;
+          bar.hidden = ticked.length === 0;
+          count.textContent = ticked.length + ' selected' + (ticked.length && ready < ticked.length ? ` · ${ready} ready to publish` : '');
+          publish.disabled = ready === 0;
+          unpublish.disabled = live === 0;
+          all.checked = ticked.length === rows.length;
+          all.indeterminate = ticked.length > 0 && ticked.length < rows.length;
+        };
+        all.addEventListener('change', () => { rows.forEach(r => { r.checked = all.checked; }); sync(); });
+        rows.forEach(r => r.addEventListener('change', sync));
+        form.addEventListener('submit', e => {
+          const b = e.submitter;
+          const keep = document.createElement('input');
+          keep.type = 'hidden'; keep.name = b.name; keep.value = b.value;
+          form.append(keep);
+          bar.querySelectorAll('button').forEach(x => { x.disabled = true; });
+          b.setAttribute('aria-busy', 'true');
+          b.textContent = b.value === 'publish' ? 'Publishing…' : 'Unpublishing…';
+        });
+        sync();
+      })();
+
       (async () => {
         const list = document.getElementById('vd-requests');
         const note = document.getElementById('vd-requests-note');

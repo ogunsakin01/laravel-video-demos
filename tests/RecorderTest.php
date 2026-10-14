@@ -162,6 +162,12 @@ class RecorderTest extends TestCase
             $this->assertStringContainsString("reading 'render'", $problems['/chart']['detail']);
             $this->assertSame(404, $problems['/missing']['status']);
 
+            // The start-page list keeps only pages that answer with HTML, titled by their heading
+            $scan = (new Recorder)->scanPages(['/', '/reports', '/settings', '/chart', '/missing', '/feed.json'], 'guest');
+            $this->assertSame([['path' => '/', 'title' => 'Welcome'], ['path' => '/chart', 'title' => 'Chart']], collect($scan['pages'])->sortBy('path')->values()->all());
+            $this->assertSame(['/feed.json' => 'not a page (application/json)', '/missing' => 'HTTP 404', '/reports' => 'HTTP 500', '/settings' => 'redirects'],
+                collect($scan['skipped'])->sortBy('path')->pluck('reason', 'path')->all());
+
             // During recording, an error from the app stops the job instead of asking the AI to repair the plan
             $result = (new Recorder)->record(new Plan('x', 'x', [
                 $this->step('goto', ['url' => '/server-recording']),

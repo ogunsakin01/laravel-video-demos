@@ -24,6 +24,10 @@ switch ($path) {
         http_response_code(500);
         echo '<!doctype html><title>Server Error</title><div class="exception-message">Call to a member function on null</div>';
         break;
+    case '/feed.json':
+        header('Content-Type: application/json');
+        echo '{"items":[]}';
+        break;
     default:
         http_response_code(404);
         echo '<!doctype html><title>Not Found</title><h1>404 Not Found</h1>';

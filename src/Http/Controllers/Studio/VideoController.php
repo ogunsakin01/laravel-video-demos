@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Ogunsakin01\VideoDemo\Ai\CodeTools;
@@ -18,6 +19,7 @@ use Ogunsakin01\VideoDemo\Ai\PlanningFailed;
 use Ogunsakin01\VideoDemo\Ai\Pricing;
 use Ogunsakin01\VideoDemo\Enums\VideoStatus;
 use Ogunsakin01\VideoDemo\Jobs\GenerateVideo;
+use Ogunsakin01\VideoDemo\Library\Manifest;
 use Ogunsakin01\VideoDemo\Library\Publisher;
 use Ogunsakin01\VideoDemo\Models\Video;
 use Ogunsakin01\VideoDemo\Models\VideoIdea;
@@ -26,6 +28,7 @@ use Ogunsakin01\VideoDemo\Models\VideoStyle;
 use Ogunsakin01\VideoDemo\Recording\Devices;
 use Ogunsakin01\VideoDemo\Recording\RecordAs;
 use Ogunsakin01\VideoDemo\Studio\Examples;
+use Ogunsakin01\VideoDemo\Studio\Pages;
 use Ogunsakin01\VideoDemo\VideoDemoServiceProvider;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Throwable;
@@ -87,6 +90,23 @@ class VideoController extends Controller
         $data = $request->validate($this->rules(forEstimate: true));
 
         return response()->json($estimator->estimate($data['model'], $data['effort'], (int) $data['target_seconds'], $code->routeCount()));
+    }
+
+    /** Pages a video can start on, as the chosen user, for the start-page list */
+    public function pages(Request $request, Pages $pages): JsonResponse
+    {
+        $data = $request->validate([
+            'record_as' => ['nullable', 'string', Rule::in(array_keys(RecordAs::options()))],
+            'fresh' => ['nullable', 'boolean'],
+        ]);
+
+        try {
+            return response()->json($pages->for(($data['record_as'] ?? '') === '' ? null : $data['record_as'], (bool) ($data['fresh'] ?? false)));
+        } catch (Throwable $e) {
+            report($e);
+
+            return response()->json(['error' => 'Could not check the pages: '.$e->getMessage()], 502);
+        }
     }
 
     /** "Complete with AI": turns a rough note into the form's fields */
@@ -265,6 +285,57 @@ class VideoController extends Controller
         }
 
         return back()->with('status', 'Published to the library.');
+    }
+
+    /**
+     * Publishes or unpublishes the videos ticked on the list. Videos that
+     * aren't ready, or are already as asked, are skipped and counted.
+     */
+    public function bulk(Request $request, Publisher $publisher, Manifest $manifest): RedirectResponse
+    {
+        $data = $request->validate([
+            'action' => ['required', Rule::in(['publish', 'unpublish'])],
+            'videos' => ['required', 'array', 'min:1'],
+            'videos.*' => ['integer'],
+        ], ['videos.required' => 'Tick at least one video.']);
+
+        $done = $skipped = 0;
+        $failed = [];
+        foreach (Video::whereKey($data['videos'])->get() as $video) {
+            if ($data['action'] === 'unpublish') {
+                if (! $video->isPublished()) {
+                    $skipped++;
+
+                    continue;
+                }
+                $publisher->unpublish($video);
+                $done++;
+
+                continue;
+            }
+
+            $live = $video->isPublished() && ($manifest->find($video->slug, 'private')['version'] ?? null) === $video->version;
+            if ($video->status !== VideoStatus::Ready || ! $video->hasRecording() || $live) {
+                $skipped++;
+
+                continue;
+            }
+
+            try {
+                $publisher->publish($video);
+                $done++;
+            } catch (Throwable $e) {
+                $failed[] = ($video->title ?: $video->slug).': '.$e->getMessage();
+            }
+        }
+
+        $verb = $data['action'] === 'publish' ? 'Published' : 'Unpublished';
+        $message = sprintf('%s %d %s.', $verb, $done, Str::plural('video', $done))
+            .($skipped ? sprintf(' Skipped %d: %s.', $skipped, $data['action'] === 'publish' ? 'not ready, or already published at their latest version' : 'not published') : '');
+
+        return redirect()->route('video-demo.studio.index')
+            ->with('status', $message)
+            ->with('error', $failed ? 'Could not publish '.implode('; ', $failed) : null);
     }
 
     public function unpublish(Video $video, Publisher $publisher): RedirectResponse

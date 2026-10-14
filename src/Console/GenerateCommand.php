@@ -35,7 +35,7 @@ class GenerateCommand extends Command
         {--start= : The path the video starts on, such as /dashboard}
         {--max-cost= : Spending limit in US dollars; the AI plans within it and stops before passing it}
         {--max-steps= : The most steps the plan may have}
-        {--as= : Record as this user (id or email), or "guest" for signed out}
+        {--as= : Record as a type of user, such as "admin", "guest" for signed out, or a user id or email}
         {--private : List it in the private library only}
         {--publish : Publish it to the library when it is ready}
         {--queue : Queue it and return straight away, instead of waiting}
@@ -122,11 +122,12 @@ class GenerateCommand extends Command
         }
 
         $recordAs = $this->option('as') ?: null;
-        if ($recordAs !== null && $recordAs !== RecordAs::GUEST) {
+        if ($recordAs !== null) {
             try {
-                $recordAs = (string) RecordAs::find($recordAs)->getAuthIdentifier();
-            } catch (\RuntimeException $e) {
-                throw new \InvalidArgumentException($e->getMessage());
+                $recordAs = RecordAs::parse($recordAs);
+            } catch (\RuntimeException) {
+                $types = implode(', ', array_keys(RecordAs::types()));
+                throw new \InvalidArgumentException("Unknown user type [$recordAs]. Choose guest".($types ? ", $types" : '').', or a user id or email.');
             }
         }
 

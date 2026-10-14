@@ -15,6 +15,7 @@ Route::middleware(AuthorizeStudio::class)->group(function () {
     Route::post('/estimate', [VideoController::class, 'estimate'])->name('estimate');
     Route::post('/complete', [VideoController::class, 'complete'])->name('complete');
     Route::get('/requests', [VideoController::class, 'requests'])->name('requests');
+    Route::get('/pages', [VideoController::class, 'pages'])->name('pages');
     Route::get('/examples', [VideoController::class, 'examples'])->name('examples');
     Route::get('/ideas', [SuggestionController::class, 'index'])->name('suggestions.index');
     Route::post('/ideas', [SuggestionController::class, 'store'])->name('suggestions.store');
@@ -25,6 +26,7 @@ Route::middleware(AuthorizeStudio::class)->group(function () {
     Route::put('/styles/{style}', [StyleController::class, 'update'])->name('styles.update');
     Route::delete('/styles/{style}', [StyleController::class, 'destroy'])->name('styles.destroy');
 
+    Route::post('/bulk', [VideoController::class, 'bulk'])->name('bulk');
     Route::get('/{video}', [VideoController::class, 'show'])->name('show');
     Route::get('/{video}/status', [VideoController::class, 'status'])->name('status');
     Route::get('/{video}/file/{device}/{kind}', [VideoController::class, 'file'])->whereIn('kind', ['video', 'poster'])->name('file');

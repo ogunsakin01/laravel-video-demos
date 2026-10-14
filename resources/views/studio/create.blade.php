@@ -70,15 +70,9 @@
         @error('style_id')<span class="vd-error">{{ $message }}</span>@enderror
       </div>
 
-      <div class="vd-row">
-        <div>
-          <label for="title">Title <span class="vd-optional">optional</span></label>
-          <input type="text" id="title" name="title" value="{{ old('title', $defaults['title']) }}" maxlength="160" placeholder="The AI suggests one">
-        </div>
-        <div>
-          <label for="start_path">Start page <span class="vd-optional">optional</span></label>
-          <input type="text" id="start_path" name="start_path" value="{{ old('start_path', $defaults['start_path']) }}" placeholder="/dashboard">
-        </div>
+      <div>
+        <label for="title">Title <span class="vd-optional">optional</span></label>
+        <input type="text" id="title" name="title" value="{{ old('title', $defaults['title']) }}" maxlength="160" placeholder="The AI suggests one">
       </div>
 
       <div>
@@ -88,8 +82,25 @@
             <option value="{{ $value }}" @selected((string) old('record_as', $defaults['record_as']) === (string) $value)>{{ $label }}</option>
           @endforeach
         </select>
-        <span class="vd-hint">The video shows what this user sees. Each role sees different menus and pages.</span>
+        <span class="vd-hint">
+          @if (collect(array_keys($recordAs))->contains(fn ($k) => str_starts_with((string) $k, 'type:')))
+            The video shows what this type of user sees: each role has its own menus and pages. A user of that type is signed in for the recording.
+          @else
+            No user types were found in your app's roles. List them in <code>video-demo.recorder.user_types</code> to choose between them here.
+          @endif
+        </span>
         @error('record_as')<span class="vd-error">{{ $message }}</span>@enderror
+      </div>
+
+      <div>
+        <label for="start_path">Start page <span class="vd-optional">optional</span></label>
+        <div class="vd-combo">
+          <input type="text" id="start_path" name="start_path" value="{{ old('start_path', $defaults['start_path']) }}" placeholder="Search your pages, or type a path such as /jobs/5"
+            role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="vd-pages" autocomplete="off" spellcheck="false">
+          <ul class="vd-combo-list" id="vd-pages" role="listbox" aria-label="Pages" hidden></ul>
+        </div>
+        <span class="vd-hint" id="vd-pages-note">The pages this user can open are listed when you click the field.</span>
+        @error('start_path')<span class="vd-error">{{ $message }}</span>@enderror
       </div>
 
       <hr class="vd-divider">
@@ -221,8 +232,110 @@
         };
         form.elements.model.addEventListener('change', syncEffort);
         syncEffort();
-        form.addEventListener('submit', () => { effort.disabled = false; });
+        form.addEventListener('submit', e => {
+          const submit = form.querySelector('button[type=submit]');
+          // One video per click
+          if (submit.getAttribute('aria-busy')) { e.preventDefault(); return; }
+          effort.disabled = false;
+          submit.setAttribute('aria-busy', 'true');
+          submit.textContent = 'Starting…';
+        });
         estimate();
+
+        // Start page: a searchable list of the pages the chosen user can open,
+        // found by opening each GET route in a browser. Any path can be typed too.
+        (() => {
+          const input = form.elements.start_path;
+          const list = document.getElementById('vd-pages');
+          const pagesNote = document.getElementById('vd-pages-note');
+          const who = form.elements.record_as;
+          const endpoint = @json(route('video-demo.studio.pages'));
+          const cache = {};
+          let pages = null, shown = [], active = -1, loading = null;
+
+          const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+          const setNote = (html) => { pagesNote.innerHTML = html; };
+
+          async function load(fresh = false) {
+            const key = who.value;
+            if (cache[key] && !fresh) { pages = cache[key].pages; describe(cache[key]); return; }
+            pages = null;
+            setNote('Checking which pages this user can open…');
+            render();
+            const mine = loading = fetch(endpoint + '?' + new URLSearchParams({ record_as: key, fresh: fresh ? 1 : 0 }), { headers: { Accept: 'application/json' } })
+              .then(r => r.json());
+            try {
+              const d = await mine;
+              if (loading !== mine) return;
+              if (d.error) throw new Error(d.error);
+              cache[key] = d;
+              pages = d.pages;
+              describe(d);
+            } catch (e) {
+              pages = [];
+              setNote(esc(e.message || 'Could not check the pages.') + ' You can still type a path.');
+            }
+            render();
+          }
+
+          function describe(d) {
+            setNote(d.pages.length + ' pages this user can open' + (d.skipped ? ', ' + d.skipped + ' other routes left out (they redirect, fail or aren’t pages)' : '')
+              + '. Pages that need an id, such as /jobs/5, can be typed. <button type="button" class="vd-link" id="vd-pages-refresh">Check again</button>');
+            document.getElementById('vd-pages-refresh').addEventListener('click', () => load(true));
+          }
+
+          function render() {
+            list.replaceChildren();
+            if (pages === null) {
+              list.innerHTML = '<li class="vd-combo-empty" aria-disabled="true"><span class="vd-combo-spinner" aria-hidden="true"></span>Checking pages…</li>';
+              return;
+            }
+            const q = input.value.trim().toLowerCase();
+            shown = pages.filter(p => !q || p.path.toLowerCase().includes(q) || (p.title || '').toLowerCase().includes(q) || (p.name || '').toLowerCase().includes(q)).slice(0, 80);
+            if (!shown.length) {
+              list.innerHTML = '<li class="vd-combo-empty" aria-disabled="true">' + (q.startsWith('/') ? 'No listed page matches. ' + esc(q) + ' will be used as typed.' : 'No page matches.') + '</li>';
+              active = -1;
+              return;
+            }
+            active = Math.min(active, shown.length - 1);
+            shown.forEach((p, i) => {
+              const li = document.createElement('li');
+              li.id = 'vd-page-' + i;
+              li.setAttribute('role', 'option');
+              li.setAttribute('aria-selected', String(i === active));
+              li.innerHTML = '<span class="vd-combo-title">' + esc(p.title || p.path) + '</span><span class="vd-combo-path">' + esc(p.path) + '</span>';
+              li.addEventListener('mousedown', e => { e.preventDefault(); choose(i); });
+              list.append(li);
+            });
+          }
+
+          const open = () => { list.hidden = false; input.setAttribute('aria-expanded', 'true'); render(); };
+          const close = () => { list.hidden = true; input.setAttribute('aria-expanded', 'false'); input.removeAttribute('aria-activedescendant'); active = -1; };
+          function choose(i) {
+            input.value = shown[i].path;
+            close();
+          }
+          function move(by) {
+            if (list.hidden) open();
+            if (!shown.length) return;
+            active = (active + by + shown.length) % shown.length;
+            render();
+            const el = document.getElementById('vd-page-' + active);
+            input.setAttribute('aria-activedescendant', el.id);
+            el.scrollIntoView({ block: 'nearest' });
+          }
+
+          input.addEventListener('focus', () => { if (pages === null && !loading) load(); open(); });
+          input.addEventListener('input', () => { active = -1; open(); });
+          input.addEventListener('blur', () => setTimeout(close, 100));
+          input.addEventListener('keydown', e => {
+            if (e.key === 'ArrowDown') { e.preventDefault(); move(1); }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); move(-1); }
+            else if (e.key === 'Enter' && !list.hidden && active >= 0) { e.preventDefault(); choose(active); }
+            else if (e.key === 'Escape' && !list.hidden) { e.preventDefault(); close(); }
+          });
+          who.addEventListener('change', () => { loading = null; pages = null; if (document.activeElement === input) load(); else setNote('The pages this user can open are listed when you click the field.'); });
+        })();
 
         // Show what the chosen style asks the AI to do
         const styleSelect = form.elements.style_id;
@@ -238,7 +351,7 @@
         complete.addEventListener('click', async () => {
           complete.disabled = true;
           label.textContent = 'Writing…';
-          complete.querySelector('svg').classList.add('vd-spin');
+          complete.setAttribute('aria-busy', 'true');
           status.removeAttribute('data-error');
           try {
             const res = await post(@json(route('video-demo.studio.complete')), { prompt: form.elements.prompt.value, model: form.elements.model.value });
@@ -256,7 +369,7 @@
           } finally {
             complete.disabled = false;
             label.textContent = 'Complete with AI';
-            complete.querySelector('svg').classList.remove('vd-spin');
+            complete.removeAttribute('aria-busy');
           }
         });
       })();

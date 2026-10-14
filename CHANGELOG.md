@@ -2,6 +2,22 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/). While the version is 0.x, minor releases may include breaking changes; they will be listed here.
 
+## v0.5.0 - 2026-10-14
+
+### Added
+
+- Bulk publish: tick videos on the studio's list to publish or unpublish them together.
+- The start page is a searchable list of the pages the chosen user can open, with their headings, found by opening each GET route that needs no parameters in a browser. Any path can still be typed.
+
+### Changed
+
+- "Record as" lists types of user (Admin, Member…) instead of individual users. Types are found from spatie/laravel-permission, Laratrust, Bouncer, a `role_id` or role column, or an `is_admin` flag, or listed in `recorder.user_types`. A user of the type is signed in for the recording, preferring one without other roles. `generate --as` takes a type. Videos already saved with a user keep it.
+- The busy state on the AI buttons is a ring spinner instead of the icon turning.
+
+### Fixed
+
+- spatie/laravel-permission roles weren't found, so "Record as" offered no roles in apps using it.
+
 ## v0.4.0 - 2026-10-14
 
 Run `php artisan migrate` after updating (a new migration), and start a worker for the package's queue: `php artisan queue:work video-demo`.

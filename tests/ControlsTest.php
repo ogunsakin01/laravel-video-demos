@@ -2,8 +2,11 @@
 
 namespace Ogunsakin01\VideoDemo\Tests;
 
+use Closure;
 use Illuminate\Foundation\Auth\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Ogunsakin01\VideoDemo\Ai\Planner;
@@ -15,8 +18,8 @@ use Ogunsakin01\VideoDemo\Models\Video;
 use Ogunsakin01\VideoDemo\Models\VideoIdea;
 use Ogunsakin01\VideoDemo\Models\VideoStyle;
 use Ogunsakin01\VideoDemo\Recording\RecordAs;
+use Ogunsakin01\VideoDemo\Studio\Pages;
 use Ogunsakin01\VideoDemo\VideoDemoServiceProvider;
-use RuntimeException;
 
 /** Spending limits, step limits, Stop, who a video is recorded as, embed code and the queue */
 class ControlsTest extends TestCase
@@ -29,18 +32,23 @@ class ControlsTest extends TestCase
         ]);
     }
 
-    protected function users(): void
+    /** Users with a role column: one admin and two members */
+    protected function users(?Closure $columns = null): void
     {
-        Schema::create('users', function ($table) {
+        Schema::create('users', function ($table) use ($columns) {
             $table->id();
             $table->string('email');
             $table->string('password');
+            $columns ? $columns($table) : $table->string('role')->nullable();
             $table->rememberToken();
             $table->timestamps();
         });
         config(['auth.providers.users.model' => User::class]);
-        User::forceCreate(['email' => 'admin@example.com', 'password' => 'x']);
-        User::forceCreate(['email' => 'member@example.com', 'password' => 'x']);
+        if (! $columns) {
+            User::forceCreate(['email' => 'admin@example.com', 'password' => 'x', 'role' => 'admin']);
+            User::forceCreate(['email' => 'member@example.com', 'password' => 'x', 'role' => 'member']);
+            User::forceCreate(['email' => 'second-member@example.com', 'password' => 'x', 'role' => 'member']);
+        }
     }
 
     public function test_prices_match_the_published_rates(): void
@@ -80,7 +88,8 @@ class ControlsTest extends TestCase
         $this->users();
         $idea = VideoIdea::create(['title' => 'Post a job', 'prompt' => 'How to post a job', 'target_seconds' => 60, 'style' => 'quick']);
 
-        $this->get('/video-demo/studio/create')->assertSee('Guest (signed out)')->assertSee('member@example.com')->assertSee('Spending limit');
+        // User types, not users
+        $this->get('/video-demo/studio/create')->assertSee('Guest (signed out)')->assertSee('value="type:member"', false)->assertDontSee('member@example.com')->assertSee('Spending limit');
 
         $this->post('/video-demo/studio', [
             'style_id' => VideoStyle::options()->first()->id,
@@ -92,39 +101,117 @@ class ControlsTest extends TestCase
             'visibility' => 'public',
             'max_cost' => '0.75',
             'max_steps' => '12',
-            'record_as' => '2',
+            'record_as' => 'type:member',
             'idea' => $idea->id,
         ])->assertRedirect();
 
         $video = Video::firstOrFail();
         $this->assertSame(0.75, $video->spendLimit());
         $this->assertSame(12, $video->max_steps);
-        $this->assertSame('2', $video->record_as);
-        $this->assertSame('member@example.com', $video->record_as_label);
+        $this->assertSame('type:member', $video->record_as);
+        $this->assertSame('Member', $video->record_as_label);
         $this->assertSame($video->id, $idea->fresh()->video_id);
         Queue::assertPushed(GenerateVideo::class, fn ($job) => $job->connection === VideoDemoServiceProvider::QUEUE_CONNECTION && $job->queue === 'video-demo');
 
-        $this->get("/video-demo/studio/{$video->id}")->assertSee('$0.75')->assertSee('member@example.com');
+        $this->get("/video-demo/studio/{$video->id}")->assertSee('$0.75')->assertSee('Member');
 
-        // An unknown user is refused
-        $this->post('/video-demo/studio', ['record_as' => '99'])->assertSessionHasErrors('record_as');
+        // An unknown type is refused
+        $this->post('/video-demo/studio', ['record_as' => 'type:owner'])->assertSessionHasErrors('record_as');
     }
 
-    public function test_record_as_finds_users_and_guests(): void
+    public function test_record_as_offers_the_apps_user_types(): void
     {
         $this->users();
-        config(['video-demo.recorder.login_as' => 'admin@example.com']);
+        config(['video-demo.recorder.login_as' => 'second-member@example.com']);
 
-        $options = RecordAs::options();
-        $this->assertSame('The default user (admin@example.com)', $options['']);
-        $this->assertSame('Guest (signed out)', $options[RecordAs::GUEST]);
-        $this->assertSame('member@example.com', $options['2']);
+        $this->assertSame([
+            '' => 'The default user (second-member@example.com)',
+            'guest' => 'Guest (signed out)',
+            'type:admin' => 'Admin',
+            'type:member' => 'Member',
+        ], RecordAs::options());
 
         $this->assertNull(RecordAs::resolve(RecordAs::GUEST));
-        $this->assertSame('admin@example.com', RecordAs::resolve(null)->email);
+        $this->assertSame('admin@example.com', RecordAs::resolve('type:admin')->email);
+        // The default user is used when they are of that type
+        $this->assertSame('second-member@example.com', RecordAs::resolve('type:member')->email);
+        // Videos from 0.4.0 stored a user
         $this->assertSame('member@example.com', RecordAs::resolve('member@example.com')->email);
-        $this->expectException(RuntimeException::class);
-        RecordAs::resolve('nobody@example.com');
+
+        // The command takes a type's key or label
+        $this->assertSame('type:admin', RecordAs::parse('Admin'));
+        $this->assertSame('guest', RecordAs::parse('guest'));
+
+        $this->expectExceptionMessage('The user type [owner] wasn');
+        RecordAs::resolve('type:owner');
+    }
+
+    public function test_user_types_come_from_a_roles_table(): void
+    {
+        $this->users(fn ($t) => $t->foreignId('role_id')->nullable());
+        Schema::create('roles', function ($t) {
+            $t->id();
+            $t->string('name');
+        });
+        DB::table('roles')->insert([['name' => 'editor'], ['name' => 'viewer']]);
+        User::forceCreate(['email' => 'ed@example.com', 'password' => 'x', 'role_id' => 1]);
+        User::forceCreate(['email' => 'vi@example.com', 'password' => 'x', 'role_id' => 2]);
+
+        $this->assertSame(['type:editor' => 'Editor', 'type:viewer' => 'Viewer'], array_slice(RecordAs::options(), 1));
+        $this->assertSame('vi@example.com', RecordAs::resolve('type:viewer')->email);
+    }
+
+    public function test_user_types_come_from_a_pivot_table(): void
+    {
+        $this->users(fn ($t) => null);
+        Schema::create('roles', function ($t) {
+            $t->id();
+            $t->string('name');
+            $t->string('display_name')->nullable();
+        });
+        Schema::create('role_user', function ($t) {
+            $t->foreignId('role_id');
+            $t->foreignId('user_id');
+        });
+        DB::table('roles')->insert([['name' => 'owner', 'display_name' => 'Shop owner'], ['name' => 'staff', 'display_name' => null]]);
+        User::forceCreate(['email' => 'a@example.com', 'password' => 'x']);
+        User::forceCreate(['email' => 'b@example.com', 'password' => 'x']);
+        DB::table('role_user')->insert([['role_id' => 1, 'user_id' => 2], ['role_id' => 2, 'user_id' => 1]]);
+
+        $this->assertSame(['type:owner' => 'Shop owner', 'type:staff' => 'Staff'], array_slice(RecordAs::options(), 1));
+        $this->assertSame('b@example.com', RecordAs::resolve('type:owner')->email);
+
+        // Someone with both roles isn't picked for either while a user with
+        // just that role exists, even when they are the default user
+        User::forceCreate(['email' => 'both@example.com', 'password' => 'x']);
+        DB::table('role_user')->insert([['role_id' => 1, 'user_id' => 3], ['role_id' => 2, 'user_id' => 3]]);
+        config(['video-demo.recorder.login_as' => 'both@example.com']);
+        $this->assertSame('a@example.com', RecordAs::resolve('type:staff')->email);
+        $this->assertSame('b@example.com', RecordAs::resolve('type:owner')->email);
+    }
+
+    public function test_user_types_come_from_an_admin_flag_or_the_config(): void
+    {
+        $this->users(fn ($t) => $t->boolean('is_admin')->default(false));
+        User::forceCreate(['email' => 'boss@example.com', 'password' => 'x', 'is_admin' => true]);
+        User::forceCreate(['email' => 'jo@example.com', 'password' => 'x']);
+
+        $this->assertSame(['type:admin' => 'Admin', 'type:user' => 'Other users'], array_slice(RecordAs::options(), 1));
+        $this->assertSame('jo@example.com', RecordAs::resolve('type:user')->email);
+
+        // Listing them in the config wins
+        config(['video-demo.recorder.user_types' => ['Account owner' => 'boss@example.com']]);
+        $this->assertSame(['type:account-owner' => 'Account owner'], array_slice(RecordAs::options(), 1));
+        $this->assertSame('boss@example.com', RecordAs::resolve('type:account-owner')->email);
+    }
+
+    public function test_a_type_without_users_explains_itself(): void
+    {
+        $this->users(fn ($t) => $t->string('role')->nullable());
+        config(['video-demo.recorder.user_types' => ['Auditor' => 'missing@example.com']]);
+
+        $this->expectExceptionMessage('missing@example.com');
+        RecordAs::resolve('type:auditor');
     }
 
     public function test_stop_ends_a_queued_video_at_once_and_a_running_one_at_its_next_step(): void
@@ -223,5 +310,65 @@ class ControlsTest extends TestCase
         ]);
         $this->assertStringContainsString('retry_after=90', VideoDemoServiceProvider::queueWarning());
         $this->assertStringContainsString('retry_after=90', $this->get('/video-demo/studio/create')->getContent());
+    }
+
+    public function test_bulk_publish_and_unpublish(): void
+    {
+        Storage::fake('public');
+        Storage::fake('local');
+        $make = function (string $title, VideoStatus $status) {
+            $video = $this->video(['title' => $title, 'status' => $status, 'version' => 1, 'devices' => ['desktop'],
+                'recordings' => $status === VideoStatus::Ready ? ['desktop' => ['seconds' => 20.0, 'chapters' => []]] : null,
+                'plan' => ['title' => $title, 'summary' => '', 'steps' => []]]);
+            if ($status === VideoStatus::Ready) {
+                Storage::disk('local')->put($video->workFile('desktop'), 'mp4');
+                Storage::disk('local')->put($video->workFile('desktop', 'poster'), 'jpg');
+            }
+
+            return $video;
+        };
+        $a = $make('Post a job', VideoStatus::Ready);
+        $b = $make('Invite a teammate', VideoStatus::Ready);
+        $c = $make('Run payroll', VideoStatus::Failed);
+
+        $this->get('/video-demo/studio')->assertSee('id="vd-select-all"', false)->assertSee('name="videos[]"', false);
+
+        $this->post('/video-demo/studio/bulk', ['action' => 'publish', 'videos' => [$a->id, $b->id, $c->id]])
+            ->assertRedirect('/video-demo/studio')
+            ->assertSessionHas('status', 'Published 2 videos. Skipped 1: not ready, or already published at their latest version.');
+        $this->assertTrue($a->fresh()->isPublished() && $b->fresh()->isPublished());
+        $this->assertNotNull(app(Manifest::class)->find('invite-a-teammate', 'public'));
+
+        // Already live at this version: nothing to do
+        $this->post('/video-demo/studio/bulk', ['action' => 'publish', 'videos' => [$a->id]])->assertSessionHas('status', 'Published 0 videos. Skipped 1: not ready, or already published at their latest version.');
+
+        $this->post('/video-demo/studio/bulk', ['action' => 'unpublish', 'videos' => [$a->id, $c->id]])->assertSessionHas('status', 'Unpublished 1 video. Skipped 1: not published.');
+        $this->assertFalse($a->fresh()->isPublished());
+        $this->assertNull(app(Manifest::class)->find('post-a-job', 'public'));
+
+        $this->post('/video-demo/studio/bulk', ['action' => 'publish'])->assertSessionHasErrors('videos');
+    }
+
+    public function test_start_pages_are_get_routes_without_parameters(): void
+    {
+        Route::get('/dashboard', fn () => 'x')->name('dashboard');
+        Route::get('/jobs/{job}', fn () => 'x');
+        Route::get('/reports/{year?}', fn () => 'x');
+        Route::post('/jobs', fn () => 'x');
+        Route::get('/logout', fn () => 'x')->name('logout');
+        Route::get('/api/users', fn () => 'x');
+        Route::get('/sitemap.xml', fn () => 'x');
+        Route::get('/invoices/export', fn () => 'x');
+        Route::get('/verify', fn () => 'x')->middleware('signed');
+        app('router')->getRoutes()->refreshNameLookups();
+
+        $paths = array_keys(app(Pages::class)->candidates());
+
+        $this->assertContains('/dashboard', $paths);
+        $this->assertContains('/reports', $paths);
+        $this->assertContains('/help/videos', $paths);
+        foreach (['/jobs/{job}', '/jobs', '/logout', '/api/users', '/sitemap.xml', '/invoices/export', '/verify', '/video-demo/studio'] as $left) {
+            $this->assertNotContains($left, $paths);
+        }
     }
 }

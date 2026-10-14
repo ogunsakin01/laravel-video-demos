@@ -93,6 +93,37 @@ class Recorder
         return $result['problems'] ?? [];
     }
 
+    /**
+     * Which of these paths are pages the given user can open: 200 with HTML,
+     * not a redirect. Each comes back with the page's heading or title.
+     *
+     * @param  list<string>  $paths
+     * @return array{pages: list<array{path: string, title: string}>, skipped: list<array{path: string, reason: string}>}
+     */
+    public function scanPages(array $paths, ?string $recordAs = null): array
+    {
+        $dir = static::workDir(trim(config('video-demo.storage.work_path'), '/').'/checks/'.uniqid('pages-'));
+        File::ensureDirectoryExists($dir);
+        File::put("$dir/job.json", json_encode([
+            ...$this->browserSettings(Devices::get('desktop'), $recordAs),
+            'paths' => $paths,
+            'outDir' => $dir,
+        ], JSON_UNESCAPED_SLASHES));
+
+        try {
+            $this->run(static::script('pages.cjs'), "$dir/job.json", 60 + count($paths) * 5);
+            $result = File::exists("$dir/result.json") ? json_decode(File::get("$dir/result.json"), true) : null;
+        } finally {
+            File::deleteDirectory($dir);
+        }
+
+        if (! is_array($result)) {
+            throw new RuntimeException('The page scan stopped without a result. Check that Node and Playwright work: php artisan video-demo:install');
+        }
+
+        return ['pages' => $result['pages'] ?? [], 'skipped' => $result['skipped'] ?? []];
+    }
+
     /** How many times faster the finished video plays than it was recorded */
     public static function speed(): float
     {

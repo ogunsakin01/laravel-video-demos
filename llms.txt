@@ -27,7 +27,7 @@ php artisan video-demo:publish post-a-job [--unpublish]
 php artisan video-demo:refresh        # re-record published videos from their saved plans, no AI cost
 ```
 
-`generate` options: `--title`, `--length` (seconds), `--style` (clean, quick, detailed, showcase, ad, or a custom style), `--devices` (desktop, tv, tablet, mobile), `--model`, `--effort` (Claude only), `--start` (a path), `--private`, `--max-cost` (spending limit in dollars), `--max-steps`, `--as` (user id or email, or `guest`), `--publish`, `--queue`, `--json`. It waits for the video, prints an estimated cost first, and exits non-zero with an `error` on failure; broken pages found before recording are listed under `issues`.
+`generate` options: `--title`, `--length` (seconds), `--style` (clean, quick, detailed, showcase, ad, or a custom style), `--devices` (desktop, tv, tablet, mobile), `--model`, `--effort` (Claude only), `--start` (a path), `--private`, `--max-cost` (spending limit in dollars), `--max-steps`, `--as` (a user type such as `admin`, `guest`, or a user id or email), `--publish`, `--queue`, `--json`. It waits for the video, prints an estimated cost first, and exits non-zero with an `error` on failure; broken pages found before recording are listed under `issues`.
 
 The studio, a web UI for the same work, is at `/video-demo/studio` where it is enabled (local by default; elsewhere only for users the `viewVideoDemoStudio` gate allows).
 
@@ -51,7 +51,7 @@ Library pages: `/help/videos` (public) and `/admin/videos` (private videos too).
 - Each video records its actual AI cost and has a spending limit (default `limits.max_cost_per_video`, $2): the AI is told its budget and stops before going over. A video can be stopped from the studio at any time.
 - The default model is the cheapest one marked `reliable` whose provider has a key (Claude Sonnet 5.5); `VIDEO_DEMO_MODEL` overrides it.
 - Pages are checked for errors (HTTP errors, sign-in redirects, JavaScript errors) before planning and recording, so no AI is spent on broken pages.
-- Videos can be recorded as any user or role (spatie/laravel-permission roles are listed), or as a guest.
+- Videos are recorded as a type of user (found from spatie/laravel-permission, Laratrust, Bouncer, a role column or an is_admin flag, or `recorder.user_types`), or as a guest.
 - Suggested ideas are saved in the database and can be added to or replaced.
 
 ## Docs

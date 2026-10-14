@@ -83,7 +83,7 @@
         e.target.append(keep);
         e.target.querySelectorAll('button').forEach(b => { b.disabled = true; });
         (button.querySelector('span') || button).textContent = button.dataset.busy;
-        button.querySelector('svg')?.classList.add('vd-spin');
+        button.setAttribute('aria-busy', 'true');
       });
     </script>
   </x-slot:scripts>

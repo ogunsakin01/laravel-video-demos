@@ -76,6 +76,8 @@ VIDEO_DEMO_BASE_URL=https://myapp.test
 VIDEO_DEMO_NAME="Acme help videos"
 ```
 
+If you serve the app with `php artisan serve`, give it a few workers (`PHP_CLI_SERVER_WORKERS=4` in `.env`): the studio opens your pages in a browser while answering a request, and a single worker can't do both.
+
 Make sure `APP_URL` is the address you open the app at (`https://myapp.test`, not `http://localhost`): the recorder and the library's links use it.
 
 Start a worker for the package's queue and open the studio at `/video-demo/studio`:
@@ -116,10 +118,10 @@ VIDEO_DEMO_FFMPEG=/Users/you/.local/bin/ffmpeg-remotion
 1. **Move to the new version.** While the package is below 1.0, each minor version (0.2, 0.3…) may include breaking changes, so Composer's `^` keeps you on the one you installed: `composer update` won't move `^0.2` to 0.3. Ask for the new one by name:
 
    ```bash
-   composer require ogunsakin01/laravel-video-demos:^0.4
+   composer require ogunsakin01/laravel-video-demos:^0.5
    ```
 
-   Patch releases (0.4.0 to 0.4.1) arrive with a normal `composer update`.
+   Patch releases (0.5.0 to 0.5.1) arrive with a normal `composer update`.
 2. **Restart your queue workers.** A running `php artisan queue:work` keeps the code it loaded when it started, so without a restart videos are still made by the old version, even though the studio pages show the new one:
 
    ```bash
@@ -138,8 +140,10 @@ VIDEO_DEMO_FFMPEG=/Users/you/.local/bin/ffmpeg-remotion
 
 The studio is where videos are made. It is only registered when `APP_ENV` is `local` (or `VIDEO_DEMO_STUDIO=true`), and never in production unless you set `studio.allow_in_production`. Its routes, including the signed sign-in link the recorder uses, do not exist when it is off.
 
+- **Videos**: every video with its status, length and cost. Tick several to **Publish** or **Unpublish** them together; videos that aren't ready, or are already published at their latest version, are skipped.
 - **New video**: describe the flow, or use **Complete with AI**. Choose the length (a target: captions and pauses stretch or shrink to fit), the versions to record, a style, the model and the effort. The estimated cost updates as you change them.
-  - **Record as**: who the video shows the app as: the default user, a guest (signed out), or any user. Apps using [spatie/laravel-permission](https://github.com/spatie/laravel-permission) get a few users of each role to pick from, so you can make the admin's video and the member's video of the same flow.
+  - **Record as**: the type of user the video shows the app as, such as Admin or Member, or a guest (signed out). Types come from the way your app models roles: [spatie/laravel-permission](https://github.com/spatie/laravel-permission), Laratrust, Bouncer, a `role_id` or `role`/`type` column on users, or an `is_admin` flag. For the recording, a user of that type is signed in, preferring one with no other roles (so a Member video isn't recorded by someone who is also an admin) and the default user when they qualify. If your app does roles another way, list the types in `recorder.user_types`: `'Admin' => 'admin@example.com'`.
+  - **Start page**: search the pages the chosen type of user can open, by title or address, or type any path (`/jobs/5`). The list comes from your GET routes that need no parameters, each opened as that user to keep the ones that return a page; the title is the page's heading. Logout, delete, export and API routes are never opened.
   - **Spending limit**: the most this video may cost ($2 unless you change it, or `limits.max_cost_per_video`). The AI is told its budget, sees how many requests it has left, and stops before a request that would go over. The form warns you if even the lowest estimate is above the limit.
   - **Max steps**: the most steps the plan may have. Fewer steps make a shorter, cheaper plan.
 - **Video page**: watch each version, read the plan, see the actual cost and progress, publish or unpublish, record the same plan again (free), or ask the AI for a new plan.
@@ -175,7 +179,7 @@ php artisan video-demo:publish post-a-job          # or --unpublish
 php artisan video-demo:refresh                     # re-record published videos after UI changes, no AI cost
 ```
 
-`video-demo:generate` also takes `--title`, `--model`, `--effort`, `--start=/path`, `--private`, `--max-cost=0.50` (the spending limit in dollars), `--max-steps=20`, `--as=` (a user id or email, or `guest`) and `--queue` (queue it and return straight away). With `--json`, broken pages found before recording are listed under `issues`. `video-demo:suggest --replace` starts the ideas over.
+`video-demo:generate` also takes `--title`, `--model`, `--effort`, `--start=/path`, `--private`, `--max-cost=0.50` (the spending limit in dollars), `--max-steps=20`, `--as=` (a user type such as `admin`, `guest`, or a user id or email) and `--queue` (queue it and return straight away). With `--json`, broken pages found before recording are listed under `issues`. `video-demo:suggest --replace` starts the ideas over.
 
 ## The library
 
@@ -287,6 +291,7 @@ Everything is in [`config/video-demo.php`](config/video-demo.php), with comments
 | `ai.code.redact`, `ai.code.redact_patterns` | Hiding secrets before code is sent |
 | `ai.notes` | Anything the AI should know that the code doesn't say, such as your sample data or test card numbers |
 | `recorder.login_as` | The user the recorder signs in as by default |
+| `recorder.user_types` | The types of user to record as, when they can't be found from your roles |
 | `recorder.check_pages` | Check pages for errors before planning and recording (on by default) |
 | `queue.connection`, `queue.retry_after` | The queue videos run on; leave the connection empty to use the package's own |
 | `ui.name` (`VIDEO_DEMO_NAME`) | The name on the studio and library pages |
