@@ -31,6 +31,18 @@ php artisan video-demo:refresh        # re-record published videos from their sa
 
 The studio, a web UI for the same work, is at `/video-demo/studio` where it is enabled (local by default; elsewhere only for users the `viewVideoDemoStudio` gate allows).
 
+## From PHP
+
+```php
+use Ogunsakin01\VideoDemo\Facades\VideoDemo;
+
+$video = VideoDemo::make('How a manager approves leave', ['style' => 'spotlight', 'as' => 'manager', 'max_cost' => 0.5, 'speed' => 1.5]);
+VideoDemo::publish($video);
+VideoDemo::library(); VideoDemo::search('leave'); VideoDemo::pages(as: 'manager'); VideoDemo::checkPages(['/leave']);
+```
+
+`Ogunsakin01\VideoDemo\Events\VideoStatusChanged` fires when a video's status changes. `php artisan video-demo:clean` frees disk space.
+
 ## Show videos
 
 ```blade
@@ -45,7 +57,7 @@ Library pages: `/help/videos` (public) and `/admin/videos` (private videos too).
 
 - Configuration: `config/video-demo.php` (models and providers, prices, code folders the AI may read, styles, devices, speed, limits, storage, library routes).
 - Videos play at 2x the recorded speed by default, and each video can set its own (1x real time to 3x in the studio); captions and title cards are held longer so they stay readable.
-- Styles set the AI's direction and the look of cards and captions; the "ad" style has animated abstract line art.
+- Styles set the AI's direction and the look of cards and captions; "ad" has animated abstract line art, and "spotlight" records the app in dark mode, zooms in on each step and highlights it.
 - Secrets in code and pages are redacted before anything is sent to the AI. The AI can only read folders in `ai.code.paths`.
 - Plan steps can reach into iframes (embedded payment fields). CAPTCHAs, SMS codes and social logins can't be automated.
 - Each video records its actual AI cost and has a spending limit (default `limits.max_cost_per_video`, $2): the AI is told its budget and stops before going over. A video can be stopped from the studio at any time.

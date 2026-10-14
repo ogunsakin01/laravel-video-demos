@@ -69,7 +69,7 @@ class StyleController extends Controller
      */
     protected function validated(Request $request): array
     {
-        return $request->validate([
+        return [...$request->validate([
             'name' => ['required', 'string', 'max:80'],
             'direction' => ['required', 'string', 'max:2000'],
             'theme' => ['required', Rule::in(array_keys(VideoStyle::THEMES))],
@@ -77,6 +77,7 @@ class StyleController extends Controller
             'captions' => ['required', Rule::in(array_keys(VideoStyle::CAPTIONS))],
             'pace' => ['required', Rule::in(array_keys(VideoStyle::PACES))],
             'art' => ['required', Rule::in(array_keys(VideoStyle::ARTS))],
-        ]);
+            'app_theme' => ['nullable', Rule::in(array_keys(VideoStyle::APP_THEMES))],
+        ]), 'app_theme' => $request->input('app_theme') ?: 'auto', 'zoom' => $request->boolean('zoom'), 'highlight' => $request->boolean('highlight')];
     }
 }

@@ -6,6 +6,7 @@ use Anthropic\Client;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Ogunsakin01\VideoDemo\Ai\Claude;
+use Ogunsakin01\VideoDemo\Console\CleanCommand;
 use Ogunsakin01\VideoDemo\Console\GenerateCommand;
 use Ogunsakin01\VideoDemo\Console\InstallCommand;
 use Ogunsakin01\VideoDemo\Console\ListCommand;
@@ -30,6 +31,7 @@ class VideoDemoServiceProvider extends ServiceProvider
         $this->registerQueueConnection();
 
         $this->app->singleton(Manifest::class);
+        $this->app->singleton(VideoDemo::class);
 
         // The package gets its own client, so it never changes how the app
         // itself talks to Anthropic.
@@ -55,6 +57,7 @@ class VideoDemoServiceProvider extends ServiceProvider
 
             $this->commands([
                 InstallCommand::class,
+                CleanCommand::class,
                 GenerateCommand::class,
                 ListCommand::class,
                 PublishCommand::class,

@@ -1,0 +1,507 @@
+{
+  "title": "Laravel Video Demos",
+  "summary": "Social post video.",
+  "style": {
+    "theme": "light",
+    "accent": "#c4532d",
+    "captions": "bottom",
+    "pace": "normal",
+    "art": "abstract"
+  },
+  "screens": {
+    "square": {
+      "label": "Square",
+      "width": 800,
+      "height": 800
+    }
+  },
+  "devices": [
+    "square"
+  ],
+  "out": "docs/social",
+  "steps": [
+    {
+      "action": "card",
+      "why": "",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "Your Laravel app’s how-to videos, made by AI",
+      "text": "Describe a flow. Get a recorded walkthrough.",
+      "ms": 3300,
+      "chapter": null
+    },
+    {
+      "action": "goto",
+      "why": "",
+      "url": "/video-demo/studio/create",
+      "target": null,
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": "Describe it"
+    },
+    {
+      "action": "type",
+      "why": "",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": "What should the video show?",
+        "placeholder": null,
+        "text": null,
+        "selector": null
+      },
+      "value": "approve holiday request",
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": null
+    },
+    {
+      "action": "click",
+      "why": "",
+      "url": null,
+      "target": {
+        "role": "button",
+        "name": "Complete with AI",
+        "label": null,
+        "placeholder": null,
+        "text": null,
+        "selector": null
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": null
+    },
+    {
+      "action": "wait",
+      "why": "",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": null,
+        "placeholder": null,
+        "text": "Edit anything before you generate",
+        "selector": null
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": 600,
+      "chapter": null
+    },
+    {
+      "action": "caption",
+      "why": "",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "A few words are enough",
+      "text": "The AI reads your code and writes the brief.",
+      "ms": 2900,
+      "chapter": null
+    },
+    {
+      "action": "scroll",
+      "why": "",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": null,
+        "placeholder": null,
+        "text": "The AI writes one plan for all of them",
+        "selector": null
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": "Every screen"
+    },
+    {
+      "action": "click",
+      "why": "",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": null,
+        "placeholder": null,
+        "text": "Mobile",
+        "selector": null
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": 250,
+      "chapter": null
+    },
+    {
+      "action": "caption",
+      "why": "",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "Desktop, mobile, tablet, TV",
+      "text": "One plan, recorded on every screen.",
+      "ms": 2900,
+      "chapter": null
+    },
+    {
+      "action": "select",
+      "why": "",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": "Style",
+        "placeholder": null,
+        "text": null,
+        "selector": null
+      },
+      "value": "Promo ad",
+      "title": null,
+      "text": null,
+      "ms": 500,
+      "chapter": null
+    },
+    {
+      "action": "caption",
+      "why": "",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "Tutorials, quick tips, even ads",
+      "text": "Pick a style, or make your own.",
+      "ms": 2900,
+      "chapter": null
+    },
+    {
+      "action": "scroll",
+      "why": "",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": "Spending limit",
+        "placeholder": null,
+        "text": null,
+        "selector": null
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": "Costs"
+    },
+    {
+      "action": "type",
+      "why": "",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": "Spending limit",
+        "placeholder": null,
+        "text": null,
+        "selector": null
+      },
+      "value": "0.50",
+      "title": null,
+      "text": null,
+      "ms": 300,
+      "chapter": null
+    },
+    {
+      "action": "caption",
+      "why": "",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "Know the cost up front",
+      "text": "Set a limit per video. Stop it any time.",
+      "ms": 2900,
+      "chapter": null
+    },
+    {
+      "action": "goto",
+      "why": "",
+      "url": "/video-demo/studio",
+      "target": null,
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": "Checked first"
+    },
+    {
+      "action": "click",
+      "why": "",
+      "url": null,
+      "target": {
+        "role": "link",
+        "name": "Send this month's payslips",
+        "label": null,
+        "placeholder": null,
+        "text": null,
+        "selector": null
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": null
+    },
+    {
+      "action": "caption",
+      "why": "",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "Broken pages are caught first",
+      "text": "A 500 error costs you nothing in AI credit.",
+      "ms": 2900,
+      "chapter": null
+    },
+    {
+      "action": "goto",
+      "why": "",
+      "url": "/video-demo/studio/1",
+      "target": null,
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": "Review and publish"
+    },
+    {
+      "action": "caption",
+      "why": "",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "Review every version",
+      "text": "Then publish it to your help library.",
+      "ms": 2900,
+      "chapter": null
+    },
+    {
+      "action": "scroll",
+      "why": "",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": null,
+        "placeholder": null,
+        "text": "Blade, in this app",
+        "selector": null
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": null
+    },
+    {
+      "action": "caption",
+      "why": "",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "Embed it anywhere",
+      "text": "One Blade tag, or plain HTML.",
+      "ms": 2900,
+      "chapter": null
+    },
+    {
+      "action": "goto",
+      "why": "",
+      "url": "/",
+      "target": null,
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": "Inside your app"
+    },
+    {
+      "action": "click",
+      "why": "",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": null,
+        "placeholder": null,
+        "text": null,
+        "selector": "aside video"
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": 2400,
+      "chapter": null
+    },
+    {
+      "action": "caption",
+      "why": "",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "Right where users need it",
+      "text": "Videos inside your own pages.",
+      "ms": 2900,
+      "chapter": null
+    },
+    {
+      "action": "goto",
+      "why": "",
+      "url": "/help/videos",
+      "target": null,
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": "The help library"
+    },
+    {
+      "action": "type",
+      "why": "",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": null,
+        "placeholder": null,
+        "text": null,
+        "selector": "#vd-q"
+      },
+      "value": "applicants",
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": null
+    },
+    {
+      "action": "press",
+      "why": "",
+      "url": null,
+      "target": null,
+      "value": "Enter",
+      "title": null,
+      "text": null,
+      "ms": 700,
+      "chapter": null
+    },
+    {
+      "action": "caption",
+      "why": "",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "A searchable help library, built in",
+      "text": "Users find the answer, and watch it.",
+      "ms": 2900,
+      "chapter": null
+    },
+    {
+      "action": "goto",
+      "why": "",
+      "url": "/video-demo/studio/ideas",
+      "target": null,
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": "Ideas"
+    },
+    {
+      "action": "click",
+      "why": "",
+      "url": null,
+      "target": {
+        "role": "button",
+        "name": "Suggest videos",
+        "label": null,
+        "placeholder": null,
+        "text": null,
+        "selector": null
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": null
+    },
+    {
+      "action": "wait",
+      "why": "",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": null,
+        "placeholder": null,
+        "text": "Post your first job",
+        "selector": null
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": 500,
+      "chapter": null
+    },
+    {
+      "action": "caption",
+      "why": "",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "Not sure what to make first?",
+      "text": "The AI suggests the videos your users need.",
+      "ms": 2900,
+      "chapter": null
+    },
+    {
+      "action": "card",
+      "why": "",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "Your AI agents can make them too",
+      "text": "php artisan video-demo:generate \"…\" --json",
+      "ms": 3000,
+      "chapter": null
+    },
+    {
+      "action": "card",
+      "why": "",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "Claude, OpenAI, Gemini or a local model",
+      "text": "Your key, your machine. See the cost before you spend.",
+      "ms": 3000,
+      "chapter": null
+    },
+    {
+      "action": "card",
+      "why": "",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "Free and open source",
+      "text": "composer require ogunsakin01/laravel-video-demos",
+      "ms": 4000,
+      "chapter": null
+    }
+  ]
+}

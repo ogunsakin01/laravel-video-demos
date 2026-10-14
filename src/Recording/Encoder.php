@@ -2,6 +2,7 @@
 
 namespace Ogunsakin01\VideoDemo\Recording;
 
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use RuntimeException;
 use Symfony\Component\Process\Exception\ProcessSignaledException;
@@ -12,6 +13,11 @@ use Symfony\Component\Process\Exception\ProcessStartFailedException;
  */
 class Encoder
 {
+    /**
+     * Frames per second of finished videos.
+     */
+    public const FPS = 30;
+
     /**
      * Encode a WebM recording to MP4 and save a poster frame.
      *
@@ -26,11 +32,37 @@ class Encoder
         $this->run([$ffmpeg, '-y', '-v', 'error',
             // Squeezes the timestamps, so frames play $speed times faster.
             '-itsscale', number_format(1 / $speed, 6, '.', ''),
-            '-i', $webm, '-ss', number_format($trimSeconds / $speed, 2, '.', ''), '-r', '30',
+            '-i', $webm, '-ss', number_format($trimSeconds / $speed, 2, '.', ''), '-r', (string) self::FPS,
             '-c:v', 'libx264', '-crf', '26', '-preset', 'slow', '-pix_fmt', 'yuv420p',
             '-movflags', '+faststart', '-an', $mp4]);
 
-        $this->run([$ffmpeg, '-y', '-v', 'error', '-ss', '2', '-i', $mp4, '-frames:v', '1', '-q:v', '4', $poster]);
+        $this->poster($mp4, $poster);
+    }
+
+    /**
+     * Save a poster frame from an MP4.
+     */
+    public function poster(string $mp4, string $poster): void
+    {
+        $this->run([config('video-demo.recorder.ffmpeg', 'ffmpeg'), '-y', '-v', 'error', '-ss', '2', '-i', $mp4, '-frames:v', '1', '-q:v', '4', $poster]);
+    }
+
+    /**
+     * Split an MP4 into numbered JPEG frames in $dir.
+     */
+    public function frames(string $mp4, string $dir): void
+    {
+        File::ensureDirectoryExists($dir);
+        $this->run([config('video-demo.recorder.ffmpeg', 'ffmpeg'), '-y', '-v', 'error', '-i', $mp4, '-r', (string) self::FPS, '-q:v', '2', "$dir/%05d.jpg"]);
+    }
+
+    /**
+     * Join numbered JPEG frames from $dir into an MP4.
+     */
+    public function join(string $dir, string $mp4): void
+    {
+        $this->run([config('video-demo.recorder.ffmpeg', 'ffmpeg'), '-y', '-v', 'error', '-framerate', (string) self::FPS, '-i', "$dir/%05d.jpg",
+            '-c:v', 'libx264', '-crf', '26', '-preset', 'slow', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-an', $mp4]);
     }
 
     /**

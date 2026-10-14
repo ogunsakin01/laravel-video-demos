@@ -6,6 +6,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf-token" content="{{ csrf_token() }}">
   <title>{{ $title ? $title.' · ' : '' }}{{ config('video-demo.ui.name') }}</title>
+  @if ($favicon = \Ogunsakin01\VideoDemo\Support\Favicon::find())
+    <link rel="icon" href="{{ $favicon['href'] }}" @if ($favicon['type']) type="{{ $favicon['type'] }}" @endif>
+  @endif
   @include('video-demo::partials.styles')
 </head>
 <body class="vd">

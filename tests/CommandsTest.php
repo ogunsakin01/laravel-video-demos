@@ -62,7 +62,7 @@ class CommandsTest extends TestCase
 
     public function test_generate_explains_bad_options(): void
     {
-        $this->assertSame('Unknown style [cinema]. Choose one of: clean, quick, detailed, showcase, ad.', $this->runJson('video-demo:generate', ['description' => 'x', '--style' => 'cinema'])['error']);
+        $this->assertSame('Unknown style [cinema]. Choose one of: clean, quick, detailed, showcase, ad, spotlight.', $this->runJson('video-demo:generate', ['description' => 'x', '--style' => 'cinema'])['error']);
         $this->assertStringContainsString('Unknown versions: watch', $this->runJson('video-demo:generate', ['description' => 'x', '--devices' => 'desktop,watch'])['error']);
         $this->assertStringContainsString('between 10 and 300', $this->runJson('video-demo:generate', ['description' => 'x', '--length' => 2])['error']);
         $this->assertStringContainsString('Unknown model [gpt-nope]', $this->runJson('video-demo:generate', ['description' => 'x', '--model' => 'gpt-nope'])['error']);

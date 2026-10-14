@@ -51,6 +51,9 @@
               <span class="vd-pill">Captions at the {{ strtolower(VideoStyle::CAPTIONS[$style->captions] ?? $style->captions) }}</span>
               <span class="vd-pill">{{ VideoStyle::PACES[$style->pace] ?? $style->pace }} pace</span>
               @if ($style->art === 'abstract')<span class="vd-pill">Abstract art</span>@endif
+              @if ($style->app_theme !== 'auto')<span class="vd-pill">App in {{ strtolower(VideoStyle::APP_THEMES[$style->app_theme] ?? $style->app_theme) }}</span>@endif
+              @if ($style->zoom)<span class="vd-pill">Zooms in on each step</span>@endif
+              @if ($style->highlight)<span class="vd-pill">Highlights each step</span>@endif
               <span class="vd-pill" style="display:inline-flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:3px;background:{{ $style->accent }};border:1px solid var(--vd-border)"></span>{{ $style->accent }}</span>
             </div>
           </div>
@@ -115,6 +118,20 @@
           @endforeach
         </select>
         <span class="vd-hint">Abstract line art draws itself behind title cards, and the words rise into place, like an ad.</span>
+      </div>
+      <div>
+        <label for="app_theme">App appearance</label>
+        <select id="app_theme" name="app_theme">
+          @foreach (VideoStyle::APP_THEMES as $value => $label)
+            <option value="{{ $value }}" @selected(old('app_theme', $form->app_theme ?? 'auto') === $value)>{{ $label }}</option>
+          @endforeach
+        </select>
+        <span class="vd-hint">Records the app in light or dark mode, for apps that follow the device's setting.</span>
+      </div>
+      <div class="vd-stack-sm">
+        <label class="vd-check-row"><input type="checkbox" name="zoom" value="1" @checked(old('zoom', $form->zoom ?? false))> Zoom in on each step</label>
+        <label class="vd-check-row"><input type="checkbox" name="highlight" value="1" @checked(old('highlight', $form->highlight ?? false))> Highlight what is being used, dimming the rest</label>
+        <span class="vd-hint">Together, these give the video a polished, close-up feel, like the Spotlight style.</span>
       </div>
       <div class="vd-actions">
         <button class="vd-btn vd-btn-primary">{{ $editing ? 'Save style' : 'Add style' }}</button>

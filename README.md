@@ -118,10 +118,10 @@ VIDEO_DEMO_FFMPEG=/Users/you/.local/bin/ffmpeg-remotion
 1. **Move to the new version.** While the package is below 1.0, each minor version (0.2, 0.3…) may include breaking changes, so Composer's `^` keeps you on the one you installed: `composer update` won't move `^0.2` to 0.3. Ask for the new one by name:
 
    ```bash
-   composer require ogunsakin01/laravel-video-demos:^0.6
+   composer require ogunsakin01/laravel-video-demos:^0.7
    ```
 
-   Patch releases (0.6.0 to 0.6.1) arrive with a normal `composer update`.
+   Patch releases (0.7.0 to 0.7.1) arrive with a normal `composer update`.
 2. **Restart your queue workers.** A running `php artisan queue:work` keeps the code it loaded when it started, so without a restart videos are still made by the old version, even though the studio pages show the new one:
 
    ```bash
@@ -151,7 +151,12 @@ The studio is where videos are made. It is only registered when `APP_ENV` is `lo
   - **Stop** a video while it is being made: at once if it is still queued, otherwise before the next AI request or by closing the browser mid-recording. You pay only for what was used so far. **Try again** starts it over.
   - **Pages are checked first.** Before planning, the start page is opened as the chosen user; before recording, every page in the plan is. A page that returns an error, sends the user to sign in, throws a JavaScript error or doesn't load stops the video there, with the problem listed at the top of the page (including Laravel's error message), so no AI is spent on a page that can't work. An error from your app during recording also stops it, instead of asking the AI to "repair" a plan that was right.
   - **Embed**: once published, copy the code to show it anywhere: the Blade component for your own pages, or a plain HTML `<video>` tag.
-- **Styles**: how the AI writes each video (its "direction") and how cards and captions look: light or dark, accent colour, captions at the top or bottom, pace, and **art**. With abstract art, title cards get line art that draws itself on and drifts, and the words rise into place, like an ad. The defaults are Clean walkthrough, Quick tip, Detailed tutorial, Product showcase and **Promo ad**; they come from `config/video-demo.php` and are copied into the database the first time. Add and edit your own on this page.
+- **Styles**: how the AI writes each video (its "direction") and how cards and captions look: light or dark, accent colour, captions at the top or bottom, pace, and **art**. With abstract art, title cards get line art that draws itself on and drifts, and the words rise into place, like an ad. A style can also set:
+  - **App appearance**: record the app in light or dark mode, for apps that follow the device's setting.
+  - **Zoom**: the camera eases in on each button and field as it is used, and pulls back out for captions, title cards and new pages.
+  - **Highlight**: an outline around what is being used, with the rest of the page dimmed.
+
+  The defaults are Clean walkthrough, Quick tip, Detailed tutorial, Product showcase, Promo ad and **Spotlight**, which turns all three on, in dark mode, for a polished feature reel. They come from `config/video-demo.php` and are copied into the database the first time. Add and edit your own on this page.
 
 On a developer's machine the studio is open. Anywhere else it is enabled (a staging server, say), only users your `viewVideoDemoStudio` gate allows can use it, and without that gate it is closed:
 
@@ -159,7 +164,7 @@ On a developer's machine the studio is open. Anywhere else it is enabled (a stag
 Gate::define('viewVideoDemoStudio', fn ($user) => $user->isAdmin());
 ```
 - **Ideas**: not sure what to make first? The AI reads your routes and suggests the videos your users most need, each with a description, length, start page and style. **Make this video** opens it in the form, filled in. Ideas are saved: **Suggest more** adds new ones without repeating those you have, **Replace all** starts over, and ideas made into videos are marked with a link to the video. It costs about a cent or two.
-- **Examples**: sample videos made with this package, in each style and screen size, with **Make one like this**.
+- **Examples**: the same short video made in each built-in style, so you can compare them, with **Make one like this** to start one in that style. The videos stream from the package's GitHub repository; nothing is stored in your app. Turn the page off with `VIDEO_DEMO_EXAMPLES=false`.
 - **Requested by users**: searches in your library that found nothing. Click one to start a video.
 
 ## From the command line
@@ -178,6 +183,7 @@ php artisan video-demo:suggest                     # ideas for the videos worth 
 php artisan video-demo:list
 php artisan video-demo:publish post-a-job          # or --unpublish
 php artisan video-demo:refresh                     # re-record published videos after UI changes, no AI cost
+php artisan video-demo:clean                       # free disk space (see Disk space)
 ```
 
 `video-demo:generate` also takes `--title`, `--model`, `--effort`, `--start=/path`, `--private`, `--max-cost=0.50` (the spending limit in dollars), `--max-steps=20`, `--speed=1.5`, `--as=` (a user type such as `admin`, `guest`, or a user id or email) and `--queue` (queue it and return straight away). With `--json`, broken pages found before recording are listed under `issues`. `video-demo:suggest --replace` starts the ideas over.
@@ -210,6 +216,77 @@ To restyle the library pages, publish the views:
 ```bash
 php artisan vendor:publish --tag=video-demo-views
 ```
+
+## Using it from your own code
+
+Everything the studio does is available through the `VideoDemo` facade, so you can build your own screens, make videos from your own jobs, or skip the studio entirely.
+
+```php
+use Ogunsakin01\VideoDemo\Facades\VideoDemo;
+
+// Queue a video. Every option is optional; a bad one throws InvalidArgumentException.
+$video = VideoDemo::make('How a manager approves a holiday request', [
+    'title' => 'Approve a holiday request',
+    'start' => '/time-off',
+    'length' => 60,               // seconds
+    'style' => 'spotlight',       // a style key or name
+    'devices' => ['desktop', 'mobile'],
+    'model' => 'claude-sonnet-5-5',
+    'max_cost' => 0.50,           // US dollars
+    'max_steps' => 20,
+    'speed' => 1.5,
+    'as' => 'manager',            // a user type, 'guest', or a user id or email
+    'private' => false,
+    'queue' => true,              // false makes it now, in this process
+]);
+
+VideoDemo::estimate('claude-sonnet-5-5', 'medium', 60);  // ['low' => …, 'expected' => …, 'high' => …]
+VideoDemo::stop($video);
+VideoDemo::retry($video);                     // a new plan
+VideoDemo::rerecord($video, speed: 1.0);      // the same plan again, at no AI cost
+VideoDemo::publish($video);                   // or unpublish()
+
+VideoDemo::videos();                          // every video, newest first
+VideoDemo::find('approve-a-holiday-request'); // by id or slug
+VideoDemo::library('public');                 // published videos, as the library shows them
+VideoDemo::search('holiday');
+VideoDemo::url($entry, 'video', 'mobile');    // a published video's MP4 or poster address
+
+VideoDemo::suggest();                         // ideas from the AI, saved
+VideoDemo::ideas();
+VideoDemo::styles();
+VideoDemo::userTypes();                       // the user types found from your roles
+VideoDemo::models();
+VideoDemo::pages(as: 'manager');              // pages that user type can open, with their headings
+VideoDemo::checkPages(['/time-off', '/reports'], as: 'manager');  // broken pages, at no AI cost
+```
+
+`Video` is an Eloquent model (`Ogunsakin01\VideoDemo\Models\Video`) with the status, plan, cost, log and recordings, so you can query it like any other. When a video's status changes, the package fires `Ogunsakin01\VideoDemo\Events\VideoStatusChanged`, with the video and the old and new status. Listen for it to send a notification when a video is ready, or to refresh your own screens:
+
+```php
+Event::listen(function (VideoStatusChanged $event) {
+    if ($event->to === VideoStatus::Ready) {
+        $event->video->title; // notify someone, publish it, …
+    }
+});
+```
+
+The library and the player work without the studio: `<x-video-demo::player slug="…" />` and `VideoDemo::library()` read the published videos.
+
+## Disk space
+
+The package itself is about 500 KB. The example videos are not part of it: the Examples page streams them from GitHub. What takes space is on the machine that makes videos:
+
+- **The recorder's browser.** `video-demo:install` installs Playwright and Chromium (a few hundred MB, shared with other projects that use Playwright).
+- **Working files.** Each video keeps its finished MP4s for the studio's preview and for publishing, and runs that stop early can leave raw recordings behind.
+
+```bash
+php artisan video-demo:clean --dry-run   # what would be removed, and how much it frees
+php artisan video-demo:clean             # leftover working files: raw recordings, temporary files, files of deleted videos
+php artisan video-demo:clean --browser   # also the Playwright install and its browser (video-demo:install puts them back)
+```
+
+Finished videos and the library are never touched. Production needs neither the browser nor the working files: only the published videos on the storage disk.
 
 ## Publishing to production
 
@@ -304,6 +381,7 @@ Everything is in [`config/video-demo.php`](config/video-demo.php), with comments
 | `studio.gate` | Who may use the studio outside local |
 | `limits` | The default spending limit, and request and repair limits per video |
 | `ui.accent`, `ui.logo`, `ui.font_url` | The look of the studio and library |
+| `ui.favicon` (`VIDEO_DEMO_FAVICON`) | The browser tab icon; your app's own favicon is used when it is empty |
 
 ## AI providers
 

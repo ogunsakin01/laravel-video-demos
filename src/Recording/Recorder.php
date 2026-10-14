@@ -40,7 +40,7 @@ class Recorder
             'planPath' => "$dir/plan.json",
             'outDir' => $dir,
             'speed' => $speed,
-            'style' => [...VideoStyle::defaults(), ...array_intersect_key($style, array_flip(['theme', 'accent', 'captions', 'pace', 'art']))],
+            'style' => [...VideoStyle::defaults(), ...array_intersect_key($style, array_flip(['theme', 'accent', 'captions', 'pace', 'art', 'app_theme', 'zoom', 'highlight']))],
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
         File::delete("$dir/result.json");
 
@@ -55,6 +55,7 @@ class Recorder
         // Lengths and chapter times as they will be in the sped-up video.
         $result['durationMs'] = ($result['durationMs'] ?? 0) / $speed;
         $result['chapters'] = array_map(fn ($c) => [...$c, 'at' => round($c['at'] / $speed, 2)], $result['chapters'] ?? []);
+        $result['focus'] = array_map(fn ($f) => [...$f, 't' => round($f['t'] / 1000 / $speed, 3)], $result['focus'] ?? []);
 
         return RecordingResult::fromArray($result, $device);
     }
@@ -129,6 +130,45 @@ class Recorder
         }
 
         return ['pages' => $result['pages'] ?? [], 'skipped' => $result['skipped'] ?? []];
+    }
+
+    /**
+     * Zoom a finished MP4 in on each step, in place.
+     *
+     * The frames are drawn through a virtual camera by camera.cjs, between
+     * ffmpeg splitting the video and joining it again. Returns false, leaving
+     * the video as it was, when that doesn't work.
+     *
+     * @param  list<array{s: float, z: float, x: float, y: float}>  $keyframes
+     */
+    public function applyCamera(string $mp4, array $keyframes, int $width, int $height, Encoder $encoder): bool
+    {
+        if (count($keyframes) < 2) {
+            return false;
+        }
+
+        $dir = static::workDir(trim(config('video-demo.storage.work_path'), '/').'/camera/'.uniqid());
+        try {
+            $encoder->frames($mp4, "$dir/in");
+            File::put("$dir/job.json", json_encode([
+                'framesDir' => "$dir/in", 'outDir' => "$dir/out", 'width' => $width, 'height' => $height,
+                'fps' => Encoder::FPS, 'move' => Camera::MOVE, 'keys' => $keyframes, 'channel' => config('video-demo.recorder.channel'),
+            ], JSON_UNESCAPED_SLASHES));
+            $this->run(static::script('camera.cjs'), "$dir/job.json", 600);
+            if (! File::exists("$dir/out/done.json")) {
+                return false;
+            }
+            $encoder->join("$dir/out", "$dir/zoomed.mp4");
+            File::move("$dir/zoomed.mp4", $mp4);
+
+            return true;
+        } catch (RuntimeException $e) {
+            report($e);
+
+            return false;
+        } finally {
+            File::deleteDirectory($dir);
+        }
     }
 
     /**

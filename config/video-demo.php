@@ -336,6 +336,10 @@ return [
         // The URL of an image shown next to the name, or null for none.
         'logo' => null,
 
+        // The browser tab icon. Left empty, the app's own favicon is used:
+        // favicon.svg, favicon.ico, favicon.png or apple-touch-icon.png in public/.
+        'favicon' => env('VIDEO_DEMO_FAVICON'),
+
         // The colour of buttons and highlights. The default near-black turns
         // light in dark mode.
         'accent' => '#171717',
@@ -363,7 +367,10 @@ return [
     | of title cards and captions, "captions" puts them at the top or bottom,
     | "pace" (relaxed, normal or brisk) sets how fast the video moves, and
     | "art" (none or abstract) puts animated line art behind title cards,
-    | with the words rising into place, like an ad.
+    | with the words rising into place, like an ad. "app_theme" (auto, light
+    | or dark) is the colour scheme the app is recorded in, for apps that
+    | follow the system setting. "zoom" moves the camera in on each step and
+    | "highlight" outlines what is being used, dimming the rest.
     |
     */
 
@@ -409,6 +416,19 @@ return [
             'captions' => 'bottom',
             'pace' => 'brisk',
             'art' => 'abstract',
+        ],
+        'spotlight' => [
+            'name' => 'Spotlight',
+            'direction' => 'A polished feature reel. Open on a card with one bold line about what the viewer gains. Show each key moment with a caption of under eight words that names the benefit, not the button. Keep the steps that show something worth seeing and skip routine ones. Close on a card naming the result.',
+            'theme' => 'dark',
+            'accent' => '#e5693d',
+            'captions' => 'bottom',
+            'pace' => 'normal',
+            'art' => 'abstract',
+            // Record the app in dark mode, zoom in on each step, and outline what is being used.
+            'app_theme' => 'dark',
+            'zoom' => true,
+            'highlight' => true,
         ],
     ],
 

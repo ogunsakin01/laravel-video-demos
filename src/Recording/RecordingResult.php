@@ -21,6 +21,7 @@ final readonly class RecordingResult
         public ?string $snapshot,
         public ?string $device = null,
         public ?array $appError = null,
+        public array $focus = [],
     ) {}
 
     /**
@@ -41,6 +42,7 @@ final readonly class RecordingResult
             $r['snapshot'] ?? null,
             $device,
             $r['appError'] ?? null,
+            $r['focus'] ?? [],
         );
     }
 

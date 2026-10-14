@@ -108,6 +108,28 @@ class DemoSeeder extends Seeder
             'created_at' => now()->subHours(2), 'updated_at' => now()->subHours(2),
         ]);
 
+        // A video stopped by the page check: the app had a bug, so no AI was spent.
+        Video::create([
+            'title' => 'Send this month\'s payslips',
+            'style' => $styles->first()->snapshot(),
+            'devices' => ['desktop'],
+            'prompt' => 'How a payroll admin checks and sends this month\'s payslips.',
+            'start_path' => '/payroll',
+            'target_seconds' => 60, 'model' => 'claude-sonnet-5-5', 'effort' => 'high',
+            'status' => VideoStatus::Failed,
+            'error' => "A page isn't working, so nothing was recorded: /payroll: The page returned HTTP 500.",
+            'issues' => [
+                ['path' => '/payroll', 'problem' => 'The page returned HTTP 500', 'status' => 500, 'url' => null, 'detail' => 'Undefined variable $period (resources/views/payroll/index.blade.php:14)'],
+            ],
+            'log' => [
+                ['at' => now()->subMinutes(20)->toIso8601String(), 'message' => 'Queued'],
+                ['at' => now()->subMinutes(20)->addSeconds(2)->toIso8601String(), 'message' => 'Checking the start page (1)'],
+                ['at' => now()->subMinutes(20)->addSeconds(6)->toIso8601String(), 'message' => "Failed: A page isn't working, so nothing was recorded: /payroll: The page returned HTTP 500."],
+            ],
+            'cost' => 0, 'estimate_low' => 0.17, 'estimate_high' => 0.52,
+            'created_at' => now()->subMinutes(20), 'updated_at' => now()->subMinutes(20),
+        ]);
+
         foreach (['How do I add a second admin?', 'Where do I change the company logo?', 'Can I export applicants to a spreadsheet?'] as $i => $question) {
             VideoRequest::create(['question' => $question, 'created_at' => now()->subDays($i + 1)]);
         }

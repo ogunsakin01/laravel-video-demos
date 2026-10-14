@@ -2,6 +2,24 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/). While the version is 0.x, minor releases may include breaking changes; they will be listed here.
 
+## v0.7.0 - 2026-10-14
+
+Run `php artisan migrate` after updating: it adds the new style settings, and the Spotlight style for apps that already have styles.
+
+### Added
+
+- **The Spotlight style**: the app recorded in dark mode, the camera zooming in on each button and field as it is used, an outline around what is being used with the rest dimmed, and title cards and captions whose words rise into place. A polished feature reel, made from the same plan as any other video.
+- Three new style settings, for any style, on the Styles page: **App appearance** (record the app in light or dark mode), **Zoom** and **Highlight**. The zoom is added after recording, so clicks and typing behave exactly as before, and it works with any ffmpeg build; if it ever fails, the video is kept without it.
+- **The `VideoDemo` facade**, for apps that build their own screens or make videos from their own code: `make`, `estimate`, `stop`, `retry`, `rerecord`, `publish`, `unpublish`, `videos`, `find`, `library`, `search`, `url`, `suggest`, `ideas`, `styles`, `userTypes`, `models`, `pages` and `checkPages`.
+- **The `VideoStatusChanged` event**, fired whenever a video moves to another status, such as Ready or Failed.
+- **`php artisan video-demo:clean`**: frees disk space by removing raw recordings, temporary files and files of deleted videos; `--browser` also removes the recorder's Playwright install; `--dry-run` lists what would go.
+- The studio and library use your app's own favicon (or `VIDEO_DEMO_FAVICON`).
+- The Examples page shows the same video in each of the six built-in styles, so they are easy to compare.
+
+### Changed
+
+- `video-demo:generate` makes videos through the facade, so the command and your own code check options the same way.
+
 ## v0.6.0 - 2026-10-14
 
 Run `php artisan migrate` after updating: there is a new column for each video's speed.

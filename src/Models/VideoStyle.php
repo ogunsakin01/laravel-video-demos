@@ -20,6 +20,9 @@ use Illuminate\Support\Str;
  * @property string $captions
  * @property string $pace
  * @property string $art
+ * @property string $app_theme
+ * @property bool $zoom
+ * @property bool $highlight
  * @property int $position
  */
 class VideoStyle extends Model
@@ -36,9 +39,19 @@ class VideoStyle extends Model
      */
     public const ARTS = ['none' => 'None', 'abstract' => 'Abstract line art'];
 
+    public const APP_THEMES = ['auto' => 'As the app shows it', 'light' => 'Light mode', 'dark' => 'Dark mode'];
+
     protected $table = 'video_demo_styles';
 
     protected $guarded = ['id'];
+
+    /**
+     * Get the attributes that should be cast.
+     */
+    protected function casts(): array
+    {
+        return ['zoom' => 'boolean', 'highlight' => 'boolean'];
+    }
 
     /**
      * Get all styles, copying the defaults from config the first time.
@@ -70,7 +83,7 @@ class VideoStyle extends Model
      */
     public static function defaults(): array
     {
-        return ['theme' => 'light', 'accent' => '#171717', 'captions' => 'bottom', 'pace' => 'normal', 'art' => 'none'];
+        return ['theme' => 'light', 'accent' => '#171717', 'captions' => 'bottom', 'pace' => 'normal', 'art' => 'none', 'app_theme' => 'auto', 'zoom' => false, 'highlight' => false];
     }
 
     /**
@@ -90,6 +103,6 @@ class VideoStyle extends Model
      */
     public function snapshot(): array
     {
-        return $this->only(['key', 'name', 'direction', 'theme', 'accent', 'captions', 'pace', 'art']);
+        return $this->only(['key', 'name', 'direction', 'theme', 'accent', 'captions', 'pace', 'art', 'app_theme', 'zoom', 'highlight']);
     }
 }

@@ -91,7 +91,10 @@
         "laravel": {
             "providers": [
                 "Ogunsakin01\\VideoDemo\\VideoDemoServiceProvider"
-            ]
+            ],
+            "aliases": {
+                "VideoDemo": "Ogunsakin01\\VideoDemo\\Facades\\VideoDemo"
+            }
         }
     },
     "config": {

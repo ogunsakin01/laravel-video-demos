@@ -4,6 +4,7 @@ namespace Ogunsakin01\VideoDemo\Tests;
 
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
+use Ogunsakin01\VideoDemo\Recording\Camera;
 use Ogunsakin01\VideoDemo\Recording\Encoder;
 use Ogunsakin01\VideoDemo\Recording\Plan;
 use Ogunsakin01\VideoDemo\Recording\Recorder;
@@ -141,6 +142,36 @@ class RecorderTest extends TestCase
         $this->assertSame(2, $result->failedStep);
         $this->assertStringContainsString('iframe (target.frame: '.$frame.')', $result->snapshot);
         $this->assertStringContainsString('textbox "Card number"', $result->snapshot);
+    }
+
+    public function test_spotlight_notes_each_step_and_zooms_in_on_it(): void
+    {
+        $plan = new Plan('Post a job', 'Posting a job.', [
+            $this->step('goto', ['url' => '/index.html']),
+            $this->step('type', ['target' => ['label' => 'Job title'], 'value' => 'Laravel developer']),
+            $this->step('caption', ['title' => 'Then publish', 'ms' => 500]),
+            $this->step('click', ['target' => ['role' => 'button', 'name' => 'Publish job']]),
+        ]);
+        $style = ['theme' => 'dark', 'accent' => '#e5693d', 'art' => 'abstract', 'app_theme' => 'dark', 'zoom' => true, 'highlight' => true];
+
+        $result = (new Recorder)->record($plan, $this->out, $style);
+        $this->assertTrue($result->ok, $result->summary());
+
+        // The steps that used an element were noted with where it was; the caption pulled back.
+        $elements = array_values(array_filter($result->focus, fn ($f) => empty($f['wide'])));
+        $this->assertCount(2, $elements);
+        $this->assertGreaterThan(0, $elements[0]['w']);
+        $this->assertTrue(collect($result->focus)->contains(fn ($f) => ! empty($f['wide'])));
+
+        $encoder = new Encoder;
+        $encoder->encode($result->video, "$this->out/video.mp4", "$this->out/poster.jpg", $result->trimSeconds, Recorder::speed());
+        $before = $this->duration("$this->out/video.mp4");
+
+        $keys = Camera::keyframes($result->focus, 1280, 800);
+        $this->assertGreaterThan(1, max(array_column($keys, 'z')));
+        $this->assertTrue((new Recorder)->applyCamera("$this->out/video.mp4", $keys, 1280, 800, $encoder));
+        // Same length after the camera pass.
+        $this->assertEqualsWithDelta($before, $this->duration("$this->out/video.mp4"), 0.2);
     }
 
     public function test_checks_pages_before_any_ai_is_spent(): void

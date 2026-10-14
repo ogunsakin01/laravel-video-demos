@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Ogunsakin01\VideoDemo\Ai\Usage;
 use Ogunsakin01\VideoDemo\Enums\VideoStatus;
+use Ogunsakin01\VideoDemo\Events\VideoStatusChanged;
 use Ogunsakin01\VideoDemo\Recording\Devices;
 use Ogunsakin01\VideoDemo\Recording\Recorder;
 
@@ -123,8 +124,13 @@ class Video extends Model
      */
     public function moveTo(VideoStatus $status, ?string $message = null): void
     {
+        $from = $this->getOriginal('status');
         $this->status = $status;
         $message ? $this->addLog($message) : $this->save();
+
+        if ($from !== $status) {
+            VideoStatusChanged::dispatch($this, $from instanceof VideoStatus ? $from : VideoStatus::tryFrom((string) $from), $status);
+        }
     }
 
     /**

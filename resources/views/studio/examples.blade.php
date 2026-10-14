@@ -7,7 +7,7 @@
     <div>
       <p class="vd-eyebrow">Studio</p>
       <h1>Examples</h1>
-      <p class="vd-sub">Videos made with this package. Yours are made the same way: the AI reads your app's code, plans the walkthrough, and it's recorded in a browser.</p>
+      <p class="vd-sub">The same short video, made in each built-in style, so you can compare them. Pick one and "Make one like this" starts a video of your app in that style.</p>
     </div>
   </section>
 
@@ -47,7 +47,7 @@
     @endforeach
   </div>
 
-  <p class="vd-small vd-muted" style="margin-top:20px">These videos come from the package's demo app and are streamed from its GitHub repository. Turn this page off with <code>VIDEO_DEMO_EXAMPLES=false</code>.</p>
+  <p class="vd-small vd-muted" style="margin-top:20px">These videos come from the package's demo app and stream from its GitHub repository: nothing is stored in your app. Turn this page off with <code>VIDEO_DEMO_EXAMPLES=false</code>.</p>
 
   <x-slot:scripts>
     <script>

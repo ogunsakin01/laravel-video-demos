@@ -34,8 +34,8 @@ class StyleTest extends TestCase
 
         $this->post('/video-demo/studio/styles', $style)->assertRedirect('/video-demo/studio/styles');
         $added = VideoStyle::where('name', 'Onboarding series')->firstOrFail();
-        // The five defaults from config, plus this one.
-        $this->assertSame(6, VideoStyle::count());
+        // The six defaults from config, plus this one.
+        $this->assertSame(7, VideoStyle::count());
         $this->assertSame('#0f766e', $added->accent);
         $this->assertSame('abstract', $added->art);
         $this->assertSame('abstract', $added->snapshot()['art']);
@@ -46,7 +46,7 @@ class StyleTest extends TestCase
         $this->post('/video-demo/studio/styles', [...$style, 'accent' => 'teal'])->assertSessionHasErrors('accent');
 
         $this->delete("/video-demo/studio/styles/{$added->id}")->assertRedirect();
-        $this->assertSame(5, VideoStyle::count());
+        $this->assertSame(6, VideoStyle::count());
         $this->assertSame('Promo ad', VideoStyle::where('key', 'ad')->value('name'));
     }
 
@@ -57,5 +57,22 @@ class StyleTest extends TestCase
 
         $this->delete("/video-demo/studio/styles/{$only->id}")->assertSessionHas('error');
         $this->assertSame(1, VideoStyle::count());
+    }
+
+    public function test_spotlight_is_a_built_in_style_with_zoom_and_highlight(): void
+    {
+        $spotlight = VideoStyle::options()->firstWhere('key', 'spotlight');
+        $this->assertSame(['dark', true, true], [$spotlight->app_theme, $spotlight->zoom, $spotlight->highlight]);
+        $this->assertSame(['app_theme' => 'dark', 'zoom' => true, 'highlight' => true], array_intersect_key($spotlight->snapshot(), array_flip(['app_theme', 'zoom', 'highlight'])));
+
+        $this->get('/video-demo/studio/styles')->assertSee('Spotlight')->assertSee('Zooms in on each step')->assertSee('App appearance');
+
+        // The settings can be turned on for any style.
+        $style = VideoStyle::options()->firstWhere('key', 'clean');
+        $this->put("/video-demo/studio/styles/{$style->id}", [
+            'name' => 'Clean walkthrough', 'direction' => 'Calm.', 'theme' => 'light', 'accent' => '#171717', 'captions' => 'bottom', 'pace' => 'normal', 'art' => 'none',
+            'app_theme' => 'dark', 'zoom' => '1',
+        ])->assertRedirect();
+        $this->assertSame(['dark', true, false], [$style->fresh()->app_theme, $style->fresh()->zoom, $style->fresh()->highlight]);
     }
 }

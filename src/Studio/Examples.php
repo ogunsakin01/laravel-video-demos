@@ -12,7 +12,7 @@ class Examples
     /**
      * The jsDelivr address of the sample videos, pinned to a release.
      */
-    public const DEFAULT_URL = 'https://cdn.jsdelivr.net/gh/ogunsakin01/laravel-video-demos@v0.6.0';
+    public const DEFAULT_URL = 'https://cdn.jsdelivr.net/gh/ogunsakin01/laravel-video-demos@v0.7.0';
 
     /**
      * Determine if the Examples page should be shown.
@@ -31,7 +31,7 @@ class Examples
     }
 
     /**
-     * Get the sample videos.
+     * Get the sample videos: the same short video made in each built-in style.
      *
      * @return list<array{key: string, title: string, about: string, style: string, style_key: string, versions: array<string, array{video: string, poster: string, seconds: int}>}>
      */
@@ -42,36 +42,52 @@ class Examples
 
         return [
             [
-                'key' => 'studio-tour',
-                'title' => 'A product tour',
-                'about' => 'The studio showing itself off: bold title cards with line art that draws itself on, short captions, and quick cuts through the main features.',
-                'style' => 'Promo ad',
-                'style_key' => 'ad',
-                'versions' => ['desktop' => $version('docs/studio-tour', 65)],
+                'key' => 'clean',
+                'title' => 'Clean walkthrough',
+                'about' => 'Calm and clear: an opening card, a short caption for each part of the flow, and a closing card.',
+                'style' => 'Clean walkthrough',
+                'style_key' => 'clean',
+                'versions' => ['desktop' => $version('docs/examples/example-clean', 29)],
             ],
             [
-                'key' => 'library-tour',
-                'title' => 'A feature walkthrough, desktop and mobile',
-                'about' => 'One plan recorded for two screens. On the phone, the same steps play in the mobile layout, with taps instead of a cursor.',
-                'style' => 'Promo ad',
-                'style_key' => 'ad',
-                'versions' => [
-                    'desktop' => $version('docs/library-tour', 57),
-                    'mobile' => $version('docs/library-tour-mobile', 58),
-                ],
+                'key' => 'quick',
+                'title' => 'Quick tip',
+                'about' => 'As short as it can be: no title cards, one caption to set it up, then straight through the steps.',
+                'style' => 'Quick tip',
+                'style_key' => 'quick',
+                'versions' => ['desktop' => $version('docs/examples/example-quick', 18)],
             ],
             [
-                'key' => 'post-a-job',
-                'title' => 'A how-to, on every screen',
-                'about' => 'Filling in and publishing a form, from the opening card to the result, recorded for desktop, TV, tablet and mobile from one plan.',
+                'key' => 'detailed',
+                'title' => 'Detailed tutorial',
+                'about' => 'For people new to the app: captions explain why each step matters and what happens after saving.',
+                'style' => 'Detailed tutorial',
+                'style_key' => 'detailed',
+                'versions' => ['desktop' => $version('docs/examples/example-detailed', 49)],
+            ],
+            [
+                'key' => 'showcase',
+                'title' => 'Product showcase',
+                'about' => 'For a marketing page: dark title cards with line art, upbeat captions at the top, and a strong finish.',
+                'style' => 'Product showcase',
+                'style_key' => 'showcase',
+                'versions' => ['desktop' => $version('docs/examples/example-showcase', 29)],
+            ],
+            [
+                'key' => 'ad',
+                'title' => 'Promo ad',
+                'about' => 'A short ad: bold title cards with line art that draws itself on, and captions of a few words.',
                 'style' => 'Promo ad',
                 'style_key' => 'ad',
-                'versions' => [
-                    'desktop' => $version('workbench/demo-assets/sample', 28),
-                    'tv' => $version('workbench/demo-assets/sample-tv', 28),
-                    'tablet' => $version('workbench/demo-assets/sample-tablet', 29),
-                    'mobile' => $version('workbench/demo-assets/sample-mobile', 28),
-                ],
+                'versions' => ['desktop' => $version('docs/examples/example-ad', 19)],
+            ],
+            [
+                'key' => 'spotlight',
+                'title' => 'Spotlight',
+                'about' => 'The app in dark mode, with the camera zooming in on each step and an outline around what is being used.',
+                'style' => 'Spotlight',
+                'style_key' => 'spotlight',
+                'versions' => ['desktop' => $version('docs/examples/example-spotlight', 32)],
             ],
         ];
     }

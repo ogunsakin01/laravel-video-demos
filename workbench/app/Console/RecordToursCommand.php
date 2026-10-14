@@ -5,6 +5,7 @@ namespace Workbench\App\Console;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
+use Ogunsakin01\VideoDemo\Recording\Camera;
 use Ogunsakin01\VideoDemo\Recording\Devices;
 use Ogunsakin01\VideoDemo\Recording\Encoder;
 use Ogunsakin01\VideoDemo\Recording\Plan;
@@ -18,6 +19,8 @@ use Ogunsakin01\VideoDemo\Recording\Recorder;
  *   "out": folder to write to (default "docs"), as <name>[-<device>].mp4 and .jpg
  *   "site": "app" for the demo app (default), "fixture" for tests/fixtures/app
  *   "style": the look of cards and captions, as on the studio's Styles page
+ *   "style_key": a built-in style from config('video-demo.styles') instead, such as "spotlight"
+ *   "screens": extra screen sizes for this tour, such as a square one for social posts
  *
  *   vendor/bin/testbench workbench:build
  *   vendor/bin/testbench serve --port=8123
@@ -42,6 +45,10 @@ class RecordToursCommand extends Command
         foreach ($tours as $tour) {
             $data = json_decode(File::get("$root/workbench/tours/$tour.json"), true);
             $plan = Plan::fromArray($data);
+            $style = isset($data['style_key']) ? config('video-demo.styles.'.$data['style_key']) : ($data['style'] ?? []);
+            foreach ($data['screens'] ?? [] as $key => $screen) {
+                config(["video-demo.devices.$key" => [...['touch' => false], ...$screen]]);
+            }
             $devices = $data['devices'] ?? ['desktop'];
             $out = "$root/".($data['out'] ?? 'docs');
             config(['video-demo.recorder.base_url' => ($data['site'] ?? 'app') === 'fixture'
@@ -52,7 +59,7 @@ class RecordToursCommand extends Command
                 $name = $tour.($device === 'desktop' ? '' : "-$device");
                 $work = storage_path("video-demo/tours/$name");
 
-                $result = $recorder->record($plan, $work, $data['style'] ?? [], $device);
+                $result = $recorder->record($plan, $work, $style, $device);
                 if (! $result->ok) {
                     $this->components->error("$name: {$result->summary()}");
 
@@ -61,6 +68,15 @@ class RecordToursCommand extends Command
 
                 File::ensureDirectoryExists($out);
                 $encoder->encode($result->video, "$out/$name.mp4", "$out/$name.jpg", $result->trimSeconds, Recorder::speed());
+                if (! empty($style['zoom'])) {
+                    $screen = Devices::get($device);
+                    $keys = Camera::keyframes($result->focus, $screen['width'], $screen['height'], $screen['touch'] ? 1.5 : 1.8);
+                    if ($recorder->applyCamera("$out/$name.mp4", $keys, $screen['width'], $screen['height'], $encoder)) {
+                        $encoder->poster("$out/$name.mp4", "$out/$name.jpg");
+                    } else {
+                        $this->components->warn("$name: the zoom could not be added.");
+                    }
+                }
                 if (! isset($data['out'])) {
                     $this->preview("$out/$name.mp4", "$out/$name.gif", $device === 'mobile' ? 260 : 720);
                 }

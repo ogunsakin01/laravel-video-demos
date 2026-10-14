@@ -249,4 +249,25 @@ async function click(page, locator) {
   await locator.click();
 }
 
-module.exports = { CURSOR_JS, OVERLAY_JS, setPace, typingDelay, pause, glide, click, scrollBy, scrollTo };
+// An outline around the element being used, dimming the rest of the page, for
+// styles with "highlight". Solid colours only.
+const HIGHLIGHT_JS = `
+(() => {
+  if (window.__demoHighlight) return;
+  const accent = (window.__demoStyle && window.__demoStyle.accent) || '#e5693d';
+  const box = document.createElement('div');
+  box.style.cssText = 'position:fixed;z-index:2147483645;pointer-events:none;border-radius:10px;border:3px solid ' + accent + ';box-shadow:0 0 0 200vmax rgba(8,8,7,.5);opacity:0;transition:opacity .35s ease, left .45s ease, top .45s ease, width .45s ease, height .45s ease';
+  const attach = () => { if (!box.isConnected && document.body) document.body.appendChild(box); };
+  window.__demoHighlight = {
+    show(r) {
+      attach();
+      const pad = 8;
+      box.style.left = (r.x - pad) + 'px'; box.style.top = (r.y - pad) + 'px';
+      box.style.width = (r.width + pad * 2) + 'px'; box.style.height = (r.height + pad * 2) + 'px';
+      box.style.opacity = '1';
+    },
+    hide() { box.style.opacity = '0'; },
+  };
+})();`;
+
+module.exports = { CURSOR_JS, OVERLAY_JS, HIGHLIGHT_JS, setPace, typingDelay, pause, glide, click, scrollBy, scrollTo };

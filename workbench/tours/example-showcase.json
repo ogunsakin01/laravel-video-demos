@@ -1,0 +1,211 @@
+{
+  "title": "Post a job (Product showcase)",
+  "summary": "The Product showcase example for the studio's Examples page.",
+  "site": "app",
+  "out": "docs/examples",
+  "devices": [
+    "desktop"
+  ],
+  "style_key": "showcase",
+  "steps": [
+    {
+      "action": "card",
+      "why": "",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "Hire faster",
+      "text": "Post a job in seconds.",
+      "ms": 3000,
+      "chapter": null
+    },
+    {
+      "action": "goto",
+      "why": "",
+      "url": "/",
+      "target": null,
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": "Open the form"
+    },
+    {
+      "action": "click",
+      "why": "",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": null,
+        "placeholder": null,
+        "text": null,
+        "selector": ".hero .btn"
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": null
+    },
+    {
+      "action": "caption",
+      "why": "",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "One simple form",
+      "text": "Everything a great listing needs.",
+      "ms": 2600,
+      "chapter": null
+    },
+    {
+      "action": "type",
+      "why": "",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": "Job title",
+        "placeholder": null,
+        "text": null,
+        "selector": null
+      },
+      "value": "Senior Laravel Developer",
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": "Fill in the details"
+    },
+    {
+      "action": "select",
+      "why": "",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": "Contract",
+        "placeholder": null,
+        "text": null,
+        "selector": null
+      },
+      "value": "Contract",
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": null
+    },
+    {
+      "action": "select",
+      "why": "",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": "Location",
+        "placeholder": null,
+        "text": null,
+        "selector": null
+      },
+      "value": "Remote",
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": null
+    },
+    {
+      "action": "type",
+      "why": "",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": "About the role",
+        "placeholder": null,
+        "text": null,
+        "selector": null
+      },
+      "value": "Build and look after our Laravel apps with a small, friendly team.",
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": null
+    },
+    {
+      "action": "check",
+      "why": "",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": "Open to remote applicants",
+        "placeholder": null,
+        "text": null,
+        "selector": null
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": null
+    },
+    {
+      "action": "click",
+      "why": "",
+      "url": null,
+      "target": {
+        "role": "button",
+        "name": "Publish job",
+        "label": null,
+        "placeholder": null,
+        "text": null,
+        "selector": null
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": "Publish"
+    },
+    {
+      "action": "wait",
+      "why": "",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": null,
+        "placeholder": null,
+        "text": "Your job is live.",
+        "selector": null
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": 500,
+      "chapter": null
+    },
+    {
+      "action": "caption",
+      "why": "",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "Live the moment you publish",
+      "text": "In front of candidates straight away.",
+      "ms": 2600,
+      "chapter": null
+    },
+    {
+      "action": "card",
+      "why": "",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "Your next hire starts here",
+      "text": "Post your first job today.",
+      "ms": 3000,
+      "chapter": null
+    }
+  ]
+}

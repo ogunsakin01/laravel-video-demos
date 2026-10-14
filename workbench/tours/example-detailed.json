@@ -1,0 +1,244 @@
+{
+  "title": "Post a job (Detailed tutorial)",
+  "summary": "The Detailed tutorial example for the studio's Examples page.",
+  "site": "app",
+  "out": "docs/examples",
+  "devices": [
+    "desktop"
+  ],
+  "style_key": "detailed",
+  "steps": [
+    {
+      "action": "card",
+      "why": "",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "Posting your first job",
+      "text": "What each field does, and what happens when you publish.",
+      "ms": 3400,
+      "chapter": null
+    },
+    {
+      "action": "goto",
+      "why": "",
+      "url": "/",
+      "target": null,
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": "Open the form"
+    },
+    {
+      "action": "click",
+      "why": "",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": null,
+        "placeholder": null,
+        "text": null,
+        "selector": ".hero .btn"
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": null
+    },
+    {
+      "action": "caption",
+      "why": "",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "The job title",
+      "text": "This is what candidates search for, so keep it specific.",
+      "ms": 3000,
+      "chapter": null
+    },
+    {
+      "action": "type",
+      "why": "",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": "Job title",
+        "placeholder": null,
+        "text": null,
+        "selector": null
+      },
+      "value": "Senior Laravel Developer",
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": "Fill in the details"
+    },
+    {
+      "action": "caption",
+      "why": "",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "Contract and location",
+      "text": "Both are filters on the jobs board.",
+      "ms": 2800,
+      "chapter": null
+    },
+    {
+      "action": "select",
+      "why": "",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": "Contract",
+        "placeholder": null,
+        "text": null,
+        "selector": null
+      },
+      "value": "Contract",
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": null
+    },
+    {
+      "action": "select",
+      "why": "",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": "Location",
+        "placeholder": null,
+        "text": null,
+        "selector": null
+      },
+      "value": "Remote",
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": null
+    },
+    {
+      "action": "caption",
+      "why": "",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "About the role",
+      "text": "A few lines on the work and the team.",
+      "ms": 2600,
+      "chapter": null
+    },
+    {
+      "action": "type",
+      "why": "",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": "About the role",
+        "placeholder": null,
+        "text": null,
+        "selector": null
+      },
+      "value": "Build and look after our Laravel apps with a small, friendly team.",
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": null
+    },
+    {
+      "action": "caption",
+      "why": "",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "Open to remote applicants",
+      "text": "Optional. Tick it to reach people working from home.",
+      "ms": 2800,
+      "chapter": null
+    },
+    {
+      "action": "check",
+      "why": "",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": "Open to remote applicants",
+        "placeholder": null,
+        "text": null,
+        "selector": null
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": null
+    },
+    {
+      "action": "caption",
+      "why": "",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "Publish the job",
+      "text": "The listing goes live as soon as you publish.",
+      "ms": 2600,
+      "chapter": null
+    },
+    {
+      "action": "click",
+      "why": "",
+      "url": null,
+      "target": {
+        "role": "button",
+        "name": "Publish job",
+        "label": null,
+        "placeholder": null,
+        "text": null,
+        "selector": null
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": "Publish"
+    },
+    {
+      "action": "wait",
+      "why": "",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": null,
+        "placeholder": null,
+        "text": "Your job is live.",
+        "selector": null
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": 500,
+      "chapter": null
+    },
+    {
+      "action": "card",
+      "why": "",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "Your job is live",
+      "text": "You can edit or close it at any time.",
+      "ms": 3000,
+      "chapter": null
+    }
+  ]
+}

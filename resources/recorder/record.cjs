@@ -7,7 +7,7 @@
 const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
-const { CURSOR_JS, OVERLAY_JS, setPace, typingDelay, pause, glide, click, scrollBy, scrollTo } = require('./helpers.cjs');
+const { CURSOR_JS, OVERLAY_JS, HIGHLIGHT_JS, setPace, typingDelay, pause, glide, click, scrollBy, scrollTo } = require('./helpers.cjs');
 
 const job = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const plan = JSON.parse(fs.readFileSync(job.planPath, 'utf8'));
@@ -17,6 +17,27 @@ const SPEED = job.speed || 1;
 const style = Object.assign({ theme: 'light', accent: '#171717', captions: 'bottom', pace: 'normal', speed: SPEED }, job.style || {});
 setPace(style.pace);
 const FIND_TIMEOUT = 8000;
+
+// Where each step happened, for styles that zoom in on it while encoding:
+// { t: ms since recording started, x, y, w, h } for an element, or { t, wide: true }
+// when the whole page should show again.
+const focus = [];
+let started = 0;
+
+// Bring an element into view, note where it is, and outline it if the style asks.
+async function focusOn(page, loc) {
+  await scrollTo(page, loc).catch(() => {});
+  const box = await loc.boundingBox().catch(() => null);
+  if (!box) return;
+  focus.push({ t: Date.now() - started, x: box.x, y: box.y, w: box.width, h: box.height });
+  if (style.highlight) await page.evaluate(r => window.__demoHighlight && window.__demoHighlight.show(r), box).catch(() => {});
+}
+
+// Show the whole page again: the camera pulls back and the outline goes.
+async function wide(page) {
+  focus.push({ t: Date.now() - started, wide: true });
+  if (style.highlight) await page.evaluate(() => window.__demoHighlight && window.__demoHighlight.hide()).catch(() => {});
+}
 const SNAPSHOT_LIMIT = 12000;
 
 const url = p => job.baseUrl.replace(/\/$/, '') + '/' + String(p).replace(/^\//, '');
@@ -61,6 +82,7 @@ async function run(page, step, isLast) {
   const extra = (step.ms || 0) * SPEED;
   switch (step.action) {
     case 'goto':
+      await wide(page);
       await page.goto(url(step.url), { waitUntil: 'load' });
       await settle(page);
       if (/\/login\b/.test(new URL(page.url()).pathname) && !/\/login\b/.test(step.url)) {
@@ -69,13 +91,16 @@ async function run(page, step, isLast) {
       await pause(page, 700 + extra);
       return;
     case 'click': {
-      await click(page, await find(page, step.target));
+      const loc = await find(page, step.target);
+      await focusOn(page, loc);
+      await click(page, loc);
       await settle(page);
       await pause(page, 500 + extra);
       return;
     }
     case 'hover': {
       const loc = await find(page, step.target);
+      await focusOn(page, loc);
       await glide(page, loc);
       await loc.hover();
       await pause(page, 600 + extra);
@@ -83,6 +108,7 @@ async function run(page, step, isLast) {
     }
     case 'check': {
       const loc = await find(page, step.target);
+      await focusOn(page, loc);
       await glide(page, loc);
       await loc.check();
       await pause(page, 400 + extra);
@@ -90,6 +116,7 @@ async function run(page, step, isLast) {
     }
     case 'type': {
       const loc = await find(page, step.target);
+      await focusOn(page, loc);
       await click(page, loc);
       if (await loc.inputValue().catch(() => '')) await loc.fill('');
       await loc.pressSequentially(String(step.value), { delay: typingDelay() });
@@ -98,6 +125,7 @@ async function run(page, step, isLast) {
     }
     case 'select': {
       const loc = await find(page, step.target);
+      await focusOn(page, loc);
       await glide(page, loc);
       const isNative = await loc.evaluate(el => el.tagName === 'SELECT');
       if (isNative) {
@@ -115,6 +143,7 @@ async function run(page, step, isLast) {
       await pause(page, 300 + extra);
       return;
     case 'scroll':
+      await wide(page);
       if (step.target) await scrollTo(page, await find(page, step.target));
       else await scrollBy(page, page.viewportSize().height * 0.7);
       await pause(page, 400 + extra);
@@ -131,6 +160,7 @@ async function run(page, step, isLast) {
       await pause(page, extra);
       return;
     case 'caption':
+      await wide(page);
       await page.evaluate(([t, s]) => window.__demoOverlay.caption(t, s), [step.title, step.text || '']);
       await pause(page, (step.ms || 3000) * SPEED);
       // The last step stays on screen, so the video doesn't end mid-fade.
@@ -139,6 +169,7 @@ async function run(page, step, isLast) {
       await pause(page, 350 * SPEED);
       return;
     case 'card':
+      await wide(page);
       await page.evaluate(([t, s]) => window.__demoOverlay.card(t, s), [step.title, step.text || '']);
       await pause(page, (step.ms || 3500) * SPEED);
       if (isLast) return;
@@ -182,7 +213,7 @@ async function snapshot(page) {
 }
 
 (async () => {
-  const result = { ok: false, video: null, durationMs: 0, trimMs: 0, chapters: [], failedStep: null, error: null, url: null, title: null, snapshot: null };
+  const result = { ok: false, video: null, durationMs: 0, trimMs: 0, chapters: [], focus, failedStep: null, error: null, url: null, title: null, snapshot: null };
   const browser = await chromium.launch(job.channel ? { channel: job.channel } : {});
   let page;
   try {
@@ -192,6 +223,8 @@ async function snapshot(page) {
       hasTouch: !!job.touch,
       // Phones get mobile layout handling (the page's meta viewport).
       isMobile: !!job.touch && job.viewport.width < 600,
+      // Record the app in light or dark mode, for apps that follow the system setting.
+      ...(style.app_theme === 'dark' || style.app_theme === 'light' ? { colorScheme: style.app_theme } : {}),
       ignoreHTTPSErrors: !!job.ignoreHttpsErrors,
     };
 
@@ -213,6 +246,7 @@ async function snapshot(page) {
     if (job.touch) await context.addInitScript('window.__demoTouch = true;');
     await context.addInitScript(CURSOR_JS);
     await context.addInitScript(OVERLAY_JS);
+    if (style.highlight) await context.addInitScript(HIGHLIGHT_JS);
     page = await context.newPage();
     // Installed Chrome starts with a shorter window, and its capture only takes
     // the full size after a real navigation. So wait, then navigate to a plain
@@ -222,7 +256,9 @@ async function snapshot(page) {
     const blank = `<html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="margin:0;background:${style.theme === 'dark' ? '#171717' : '#faf8f3'}"></body></html>`;
     await page.goto('data:text/html,' + encodeURIComponent(blank));
     await page.waitForTimeout(400);
-    const started = Date.now();
+    started = Date.now();
+    // A new page is shown whole: the camera pulls back the moment it opens.
+    page.on('framenavigated', frame => { if (frame === page.mainFrame()) focus.push({ t: Date.now() - started, wide: true }); });
     result.trimMs = started - recordingStarted;
 
     // Errors from the app itself: a step that fails after one of these is a

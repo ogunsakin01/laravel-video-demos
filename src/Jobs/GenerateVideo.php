@@ -13,6 +13,7 @@ use Ogunsakin01\VideoDemo\Ai\Planner;
 use Ogunsakin01\VideoDemo\Ai\VideoStopped;
 use Ogunsakin01\VideoDemo\Enums\VideoStatus;
 use Ogunsakin01\VideoDemo\Models\Video;
+use Ogunsakin01\VideoDemo\Recording\Camera;
 use Ogunsakin01\VideoDemo\Recording\Devices;
 use Ogunsakin01\VideoDemo\Recording\Encoder;
 use Ogunsakin01\VideoDemo\Recording\Plan;
@@ -144,7 +145,20 @@ class GenerateVideo implements ShouldQueue
         $work = Storage::disk(config('video-demo.storage.work_disk'));
         $recordings = [];
         foreach ($results as $device => $result) {
-            $encoder->encode($result->video, $work->path($video->workFile($device)), $work->path($video->workFile($device, 'poster')), $result->trimSeconds, $video->playbackSpeed());
+            $mp4 = $work->path($video->workFile($device));
+            $poster = $work->path($video->workFile($device, 'poster'));
+            $encoder->encode($result->video, $mp4, $poster, $result->trimSeconds, $video->playbackSpeed());
+
+            // Styles with zoom move a camera in on each step; the video stays as it is if that fails.
+            if (! empty($video->style['zoom']) && $result->focus !== []) {
+                $screen = Devices::get($device);
+                $keys = Camera::keyframes($result->focus, $screen['width'], $screen['height'], $screen['touch'] ? 1.5 : 1.8);
+                if ($recorder->applyCamera($mp4, $keys, $screen['width'], $screen['height'], $encoder)) {
+                    $encoder->poster($mp4, $poster);
+                } else {
+                    $video->addLog('The zoom could not be added to the '.$screen['label'].' version, so it plays without it.');
+                }
+            }
             File::deleteDirectory("$dir/$device");
             $recordings[$device] = ['seconds' => $result->seconds, 'chapters' => $result->chapters];
         }

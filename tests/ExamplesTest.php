@@ -3,6 +3,7 @@
 namespace Ogunsakin01\VideoDemo\Tests;
 
 use Ogunsakin01\VideoDemo\Models\VideoStyle;
+use Ogunsakin01\VideoDemo\Studio\Examples;
 
 /**
  * Tests the studio's Examples page.
@@ -15,10 +16,14 @@ class ExamplesTest extends TestCase
 
         $this->get('/video-demo/studio/examples')
             ->assertOk()
-            ->assertSee('A product tour')
-            ->assertSee('https://cdn.jsdelivr.net/gh/ogunsakin01/laravel-video-demos@v0.6.0/docs/studio-tour.mp4', false)
-            ->assertSee('workbench/demo-assets/sample-tablet.mp4', false)
+            ->assertSee('Spotlight')
+            ->assertSee('https://cdn.jsdelivr.net/gh/ogunsakin01/laravel-video-demos@v0.7.0/docs/examples/example-spotlight.mp4', false)
+            ->assertSee('docs/examples/example-quick.mp4', false)
             ->assertSee('Make one like this');
+
+        // One desktop video for each built-in style.
+        $this->assertSame(['clean', 'quick', 'detailed', 'showcase', 'ad', 'spotlight'], array_column(Examples::all(), 'style_key'));
+        $this->assertSame([['desktop']], array_values(array_unique(array_map(fn ($e) => array_keys($e['versions']), Examples::all()), SORT_REGULAR)));
     }
 
     public function test_make_one_like_this_picks_the_examples_style(): void
@@ -33,7 +38,7 @@ class ExamplesTest extends TestCase
     public function test_the_page_can_be_turned_off_or_hosted_elsewhere(): void
     {
         config(['video-demo.ui.examples_url' => 'https://videos.example.com/demos/']);
-        $this->get('/video-demo/studio/examples')->assertSee('https://videos.example.com/demos/docs/studio-tour.mp4', false);
+        $this->get('/video-demo/studio/examples')->assertSee('https://videos.example.com/demos/docs/examples/example-clean.mp4', false);
 
         config(['video-demo.ui.examples' => false]);
         $this->get('/video-demo/studio/examples')->assertNotFound();

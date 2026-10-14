@@ -80,6 +80,21 @@
       .card { padding: 18px; border-radius: 12px; }
       .nav.open { display: flex; position: absolute; top: 60px; left: 0; right: 0; flex-direction: column; background: #fff; border-bottom: 1px solid var(--line); padding: 8px 12px 12px; }
     }
+  
+    /* Dark mode, following the device setting */
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #0e0e0d; --card: #171716; --ink: #e7e6e1; --strong: #fafaf8; --muted: #a3a199; --faint: #6f6d66; --line: #2a2926; --soft: #1c1b19; --ok: #5fd08f; --ok-bg: #16281d; color-scheme: dark; }
+      .top, .hero, .menu-btn, .btn-light, .vd-search button, input[type=text], input[type=search], select, textarea { background: var(--card); }
+      .nav.open { background: var(--card); }
+      .nav a, .lead, .field label, .label, .tips li { color: #c9c7c0; }
+      .nav a:hover, .nav a[aria-current], .pill, .tips b { background: #232220; color: var(--strong); }
+      .pill { color: #c9c7c0; }
+      .avatar { background: #2a2926; color: #e7e6e1; }
+      .logo span, .btn { color: #0e0e0d; }
+      input[type=text], input[type=search], select, textarea { border-color: #34332f; }
+      input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 3px rgb(250 250 248 / .12); }
+      .tips li { border-top-color: #232220; }
+    }
   </style>
 </head>
 <body>
