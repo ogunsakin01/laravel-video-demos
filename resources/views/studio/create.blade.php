@@ -12,7 +12,7 @@
   </section>
 
   @unless ($hasKey)
-    <div class="vd-flash vd-flash-error" role="alert">Set <code>ANTHROPIC_API_KEY</code> (or your provider's key, see the README) in your <code>.env</code> to generate videos.</div>
+    <div class="vd-flash vd-flash-error" role="alert">Set <code>ANTHROPIC_API_KEY</code> (or <a href="https://github.com/ogunsakin01/laravel-video-demos/wiki/AI-Providers-and-Costs#providers" target="_blank" rel="noopener">another provider's key</a>) in your <code>.env</code> to generate videos.</div>
   @endunless
 
   @if ($queueWarning)

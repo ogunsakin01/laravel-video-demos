@@ -28,12 +28,14 @@ Route::middleware(AuthorizeStudio::class)->group(function () {
     Route::delete('/styles/{style}', [StyleController::class, 'destroy'])->name('styles.destroy');
 
     Route::post('/bulk', [VideoController::class, 'bulk'])->name('bulk');
+    Route::get('/delete', [VideoController::class, 'confirmDelete'])->name('delete');
     Route::get('/{video}', [VideoController::class, 'show'])->name('show');
     Route::get('/{video}/status', [VideoController::class, 'status'])->name('status');
     Route::get('/{video}/file/{device}/{kind}', [VideoController::class, 'file'])->whereIn('kind', ['video', 'poster'])->name('file');
     Route::patch('/{video}', [VideoController::class, 'update'])->name('update');
     Route::post('/{video}/regenerate', [VideoController::class, 'regenerate'])->name('regenerate');
     Route::post('/{video}/rerecord', [VideoController::class, 'rerecord'])->name('rerecord');
+    Route::post('/{video}/again', [VideoController::class, 'again'])->name('again');
     Route::post('/{video}/retry', [VideoController::class, 'retry'])->name('retry');
     Route::post('/{video}/stop', [VideoController::class, 'stop'])->name('stop');
     Route::post('/{video}/publish', [VideoController::class, 'publish'])->name('publish');

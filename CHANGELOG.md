@@ -2,6 +2,17 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/). While the version is 0.x, minor releases may include breaking changes; they will be listed here.
 
+## v0.10.0 - 2026-10-14
+
+### Added
+
+- **Delete with a warning.** Deleting a video, from its page or several at once from All videos, first shows where each is used: published in the library, and every page in your code that shows it (a player tag or its file address), by file and line. `VideoDemo::delete()` and `VideoDemo::embeds()` do the same from code.
+
+### Changed
+
+- **Make it again is one form**, laid out like the New video form, with one button. An **Ask the AI for a new plan** toggle chooses between recording the same plan again for free (with your new style, versions, speed and limit) and a new plan; it turns on by itself when you change something only a new plan can use. Before, a style chosen there was ignored when you pressed "Record the same plan again".
+- **Documentation moved to the [wiki](https://github.com/ogunsakin01/laravel-video-demos/wiki)**, with a setup checklist and a troubleshooting page. The README is now a short overview with a quick start. The README opens with the dark-mode promo video.
+
 ## v0.9.1 - 2026-10-14
 
 ### Changed

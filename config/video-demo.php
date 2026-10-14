@@ -249,7 +249,7 @@ return [
         'npm' => env('VIDEO_DEMO_NPM', 'npm'),
 
         // A full path when ffmpeg isn't on the PATH, or a wrapper script for a
-        // bundled copy that needs its own library folder (see the README).
+        // bundled copy that needs its own library folder: https://github.com/ogunsakin01/laravel-video-demos/wiki/Installation
         'ffmpeg' => env('VIDEO_DEMO_FFMPEG', 'ffmpeg'),
 
         // Where video-demo:install puts Playwright. The app's own node_modules

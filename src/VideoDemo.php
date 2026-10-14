@@ -3,6 +3,7 @@
 namespace Ogunsakin01\VideoDemo;
 
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Storage;
 use InvalidArgumentException;
 use Ogunsakin01\VideoDemo\Ai\CodeTools;
 use Ogunsakin01\VideoDemo\Ai\CostEstimator;
@@ -18,6 +19,7 @@ use Ogunsakin01\VideoDemo\Models\VideoStyle;
 use Ogunsakin01\VideoDemo\Recording\Devices;
 use Ogunsakin01\VideoDemo\Recording\RecordAs;
 use Ogunsakin01\VideoDemo\Recording\Recorder;
+use Ogunsakin01\VideoDemo\Studio\Embeds;
 use Ogunsakin01\VideoDemo\Studio\Pages;
 use RuntimeException;
 
@@ -241,6 +243,33 @@ class VideoDemo
         $this->publisher->unpublish($video);
 
         return $video->fresh() ?? $video;
+    }
+
+    /**
+     * Delete a video: its recordings, and its published files if it is in
+     * the library. Pages that embed it then show nothing; see embeds().
+     */
+    public function delete(Video $video): void
+    {
+        if ($video->status->isWorking()) {
+            throw new RuntimeException('This video is still being made. Stop it first.');
+        }
+
+        if ($video->isPublished()) {
+            $this->publisher->unpublish($video);
+        }
+        Storage::disk(config('video-demo.storage.work_disk'))->deleteDirectory($video->workPath());
+        $video->delete();
+    }
+
+    /**
+     * Find where the app's code shows a video, by file and line.
+     *
+     * @return list<array{file: string, line: int, text: string}>
+     */
+    public function embeds(Video $video): array
+    {
+        return Embeds::find([$video->slug])[$video->slug] ?? [];
     }
 
     /**

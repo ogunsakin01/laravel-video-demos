@@ -68,7 +68,8 @@ Library pages: `/help/videos` (public) and `/admin/videos` (private videos too).
 
 ## Docs
 
-- [README](https://github.com/ogunsakin01/laravel-video-demos/blob/main/README.md): full documentation
+- [Wiki](https://github.com/ogunsakin01/laravel-video-demos/wiki): full documentation (setup checklist, studio, sample data, command line, library, facade, providers and costs, configuration, troubleshooting)
+- [README](https://github.com/ogunsakin01/laravel-video-demos/blob/main/README.md): overview and quick start
 - [Configuration file](https://github.com/ogunsakin01/laravel-video-demos/blob/main/config/video-demo.php): every setting, with comments
 - [Changelog](https://github.com/ogunsakin01/laravel-video-demos/blob/main/CHANGELOG.md)
 - [Packagist](https://packagist.org/packages/ogunsakin01/laravel-video-demos)

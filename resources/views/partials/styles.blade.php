@@ -105,6 +105,8 @@
   .vd-btn-sm { min-height: 30px; padding: 0 10px; font-size: 13px; }
   .vd-btn-block { width: 100%; }
   .vd-btn-danger { color: var(--vd-bad); }
+  .vd-btn-danger-solid { background: var(--vd-bad); border-color: var(--vd-bad); color: #fff; }
+  .vd-btn-danger-solid:hover { background: color-mix(in srgb, var(--vd-bad) 88%, #000); border-color: transparent; }
   .vd-btn[disabled] { opacity: .5; cursor: not-allowed; }
   .vd-btn svg { width: 16px; height: 16px; flex: none; }
   .vd-actions { display: flex; flex-wrap: wrap; gap: 8px; }

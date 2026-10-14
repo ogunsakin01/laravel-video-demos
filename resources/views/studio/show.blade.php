@@ -179,34 +179,50 @@
       </form>
 
       @unless ($video->status->isWorking())
-      <div class="vd-card vd-stack">
-        <h2 style="margin:0">Make it again</h2>
-        @if (! empty($video->plan['steps']))
-          <form method="post" action="{{ route('video-demo.studio.rerecord', $video) }}" class="vd-stack-sm">@csrf
-            <span class="vd-label" id="vd-rerecord-devices">Versions</span>
-            @include('video-demo::studio.partials.devices', ['devices' => $devices, 'selected' => $video->deviceList(), 'labelledBy' => 'vd-rerecord-devices'])
-            <div>
-              <label for="rr-speed">Playback speed</label>
-              <select name="speed" id="rr-speed">
-                @foreach (['1' => '1× real time', '1.25' => '1.25×', '1.5' => '1.5×', '2' => '2×', '3' => '3×'] as $value => $label)
-                  <option value="{{ $value }}" @selected(abs($video->playbackSpeed() - $value) < 0.01)>{{ $label }}</option>
-                @endforeach
-              </select>
-            </div>
-            <button class="vd-btn vd-btn-block">Record the same plan again</button>
-            <span class="vd-hint">Free. Use it after the app's look changes, to add a version, or to change the speed.</span>
-          </form>
-          <hr class="vd-divider" style="margin:0">
-        @endif
-        <form method="post" action="{{ route('video-demo.studio.regenerate', $video) }}" class="vd-stack">@csrf
+        @php($hasPlan = ! empty($video->plan['steps']))
+        @php($currentStyle = $styles->first(fn ($s) => $s->key === ($video->style['key'] ?? null)) ?? $styles->first(fn ($s) => $s->name === ($video->style['name'] ?? null)))
+        <form method="post" action="{{ route('video-demo.studio.again', $video) }}" class="vd-card vd-stack" id="vd-again">@csrf
           <div>
-            <label for="r-prompt">Description</label>
-            <textarea id="r-prompt" name="prompt" required maxlength="4000">{{ $video->prompt }}</textarea>
+            <h2 style="margin:0">Make it again</h2>
+            <p class="vd-small vd-muted" style="margin:4px 0 0">Change anything, then make it again. The same plan is recorded again for free; a new plan is made by the AI.</p>
           </div>
+
+          <div>
+            <label for="a-prompt">What should the video show?</label>
+            <textarea id="a-prompt" name="prompt" required maxlength="4000" data-needs-plan>{{ old('prompt', $video->prompt) }}</textarea>
+          </div>
+
+          <div>
+            <span class="vd-label" id="a-length-label">Length</span>
+            <input type="hidden" name="target_seconds" id="a-seconds" value="{{ old('target_seconds', $video->target_seconds) }}" data-needs-plan>
+            <div class="vd-segments" role="group" aria-labelledby="a-length-label">
+              @foreach ([30 => '30 sec', 45 => '45 sec', 60 => '1 min', 90 => '1½ min', 120 => '2 min', 180 => '3 min'] as $seconds => $label)
+                @if ($seconds <= config('video-demo.limits.max_seconds', 300))
+                  <button type="button" class="vd-segment" data-target="a-seconds" data-value="{{ $seconds }}">{{ $label }}</button>
+                @endif
+              @endforeach
+            </div>
+          </div>
+
+          <div>
+            <span class="vd-label" id="a-speed-label">Playback speed</span>
+            <input type="hidden" name="speed" id="a-speed" value="{{ old('speed', rtrim(rtrim(number_format($video->playbackSpeed(), 2), '0'), '.')) }}">
+            <div class="vd-segments" role="group" aria-labelledby="a-speed-label">
+              @foreach (['1' => '1× real time', '1.25' => '1.25×', '1.5' => '1.5×', '2' => '2×', '3' => '3×'] as $value => $label)
+                <button type="button" class="vd-segment" data-target="a-speed" data-value="{{ $value }}">{{ $label }}</button>
+              @endforeach
+            </div>
+          </div>
+
+          <div>
+            <span class="vd-label" id="a-devices-label">Versions</span>
+            @include('video-demo::studio.partials.devices', ['devices' => $devices, 'selected' => old('devices', $video->deviceList()), 'labelledBy' => 'a-devices-label'])
+            @error('devices')<span class="vd-error">Choose at least one version.</span>@enderror
+          </div>
+
           <div>
             <label for="r-style">Style</label>
-            @php($currentStyle = $styles->first(fn ($s) => $s->key === ($video->style['key'] ?? null)) ?? $styles->first(fn ($s) => $s->name === ($video->style['name'] ?? null)))
-            <select id="r-style" name="style_id">
+            <select id="r-style" name="style_id" data-needs-plan>
               @unless ($currentStyle)
                 <option value="" selected>{{ $video->style['name'] ?? 'Its current style' }} (as it was)</option>
               @endunless
@@ -216,46 +232,73 @@
             </select>
             <span class="vd-hint" id="r-style-hint">{{ $currentStyle?->direction }}</span>
           </div>
+
           <div class="vd-row">
             <div>
-              <label for="r-seconds">Seconds</label>
-              <input type="number" id="r-seconds" name="target_seconds" min="10" max="{{ config('video-demo.limits.max_seconds', 300) }}" value="{{ $video->target_seconds }}">
+              <label for="a-record-as">Record as</label>
+              <select id="a-record-as" name="record_as" data-needs-plan>
+                @foreach ($recordAs as $value => $label)
+                  <option value="{{ $value }}" @selected((string) ($video->record_as ?? '') === (string) $value)>{{ $label }}</option>
+                @endforeach
+              </select>
             </div>
             <div>
-              <label for="r-effort">Effort</label>
-              <select id="r-effort" name="effort">
+              <label for="a-start">Start page <span class="vd-optional">optional</span></label>
+              <input type="text" id="a-start" name="start_path" value="{{ old('start_path', $video->start_path) }}" placeholder="/jobs" data-needs-plan>
+            </div>
+          </div>
+
+          <div class="vd-stack-sm">
+            <input type="hidden" name="sample_data" value="0">
+            <label class="vd-check-row"><input type="checkbox" name="sample_data" value="1" @checked($video->sample_data) data-needs-plan> Record on sample data</label>
+            <span class="vd-hint">A copy of your database where the AI adds what the pages need, instead of your own data.</span>
+          </div>
+
+          <div class="vd-row">
+            <div>
+              <label for="a-model">Model</label>
+              <select id="a-model" name="model" data-needs-plan>
+                @foreach ($models as $id => $label)
+                  <option value="{{ $id }}" @selected($video->model === $id)>{{ $label }}</option>
+                @endforeach
+              </select>
+            </div>
+            <div>
+              <label for="a-effort">Effort</label>
+              <select id="a-effort" name="effort" data-needs-plan>
                 @foreach ($efforts as $effort)
                   <option value="{{ $effort }}" @selected($video->effort === $effort)>{{ ucfirst($effort) }}</option>
                 @endforeach
               </select>
             </div>
           </div>
+
           <div class="vd-row">
             <div>
-              <label for="r-max-cost">Spending limit ($)</label>
-              <input type="number" id="r-max-cost" name="max_cost" step="0.01" min="0.01" max="100" value="{{ $video->spendLimit() }}">
+              <label for="a-max-cost">Spending limit <span class="vd-optional">US $</span></label>
+              <input type="number" id="a-max-cost" name="max_cost" step="0.01" min="0.01" max="100" inputmode="decimal" value="{{ old('max_cost', $video->spendLimit()) }}">
             </div>
             <div>
-              <label for="r-max-steps">Max steps</label>
-              <input type="number" id="r-max-steps" name="max_steps" min="3" max="250" value="{{ $video->max_steps }}" placeholder="No limit">
+              <label for="a-max-steps">Max steps <span class="vd-optional">optional</span></label>
+              <input type="number" id="a-max-steps" name="max_steps" min="3" max="250" inputmode="numeric" value="{{ old('max_steps', $video->max_steps) }}" placeholder="No limit" data-needs-plan>
             </div>
           </div>
-          <div>
-            <label for="r-speed">Playback speed</label>
-            <select name="speed" id="r-speed">
-                @foreach (['1' => '1× real time', '1.25' => '1.25×', '1.5' => '1.5×', '2' => '2×', '3' => '3×'] as $value => $label)
-                  <option value="{{ $value }}" @selected(abs($video->playbackSpeed() - $value) < 0.01)>{{ $label }}</option>
-                @endforeach
-              </select>
-          </div>
+
+          <hr class="vd-divider">
           <div class="vd-stack-sm">
-            <input type="hidden" name="sample_data" value="0">
-            <label class="vd-check-row"><input type="checkbox" name="sample_data" value="1" @checked($video->sample_data)> Record on sample data</label>
-            <span class="vd-hint">A copy of your database where the AI adds what the pages need, instead of your own data.</span>
+            <input type="hidden" name="new_plan" value="{{ $hasPlan ? 0 : 1 }}">
+            <label class="vd-check-row"><input type="checkbox" name="new_plan" value="1" id="a-new-plan" @checked(! $hasPlan) @disabled(! $hasPlan)> Ask the AI for a new plan</label>
+            <span class="vd-hint" id="a-new-plan-hint">
+              @if ($hasPlan)
+                Off: the same plan is recorded again, free, with your new versions, speed and look. Changing the description, length, user, start page, data or model turns it on.
+              @else
+                There is no plan yet, so the AI makes one.
+              @endif
+            </span>
           </div>
-          <button class="vd-btn vd-btn-block">Ask the AI for a new plan</button>
+          @if ($errors->any())<span class="vd-error">{{ $errors->first() }}</span>@endif
+          <button class="vd-btn vd-btn-primary vd-btn-block" id="a-submit">{{ $hasPlan ? 'Record it again (free)' : 'Make it again with a new plan' }}</button>
         </form>
-      </div>
       @endunless
     </div>
 
@@ -307,9 +350,8 @@
       </div>
 
       @unless ($video->status->isWorking())
-        <form method="post" action="{{ route('video-demo.studio.destroy', $video) }}" onsubmit="return confirm('Delete this video and its recording?')">@csrf @method('delete')
-          <button class="vd-btn vd-btn-ghost vd-btn-danger vd-btn-block">Delete video</button>
-        </form>
+        {{-- A page first says where the video is used: the library, and pages that embed it. --}}
+        <a class="vd-btn vd-btn-ghost vd-btn-danger vd-btn-block" href="{{ route('video-demo.studio.delete', ['videos' => [$video->id]]) }}">Delete video…</a>
       @endunless
     </aside>
   </div>
@@ -322,11 +364,32 @@
       v.poster = b.dataset.poster; v.src = b.dataset.src; v.style.aspectRatio = b.dataset.ratio;
       document.querySelectorAll('[data-src]').forEach(o => o.setAttribute('aria-pressed', String(o === b)));
     }));
-    // Show the chosen style's direction under the style picker in "Make it again".
-    const styleSelect = document.getElementById('r-style');
-    styleSelect?.addEventListener('change', () => {
-      document.getElementById('r-style-hint').textContent = styleSelect.selectedOptions[0]?.dataset.direction || '';
-    });
+    // "Make it again": the segment pickers, the style's direction, and the new-plan toggle.
+    (() => {
+      const form = document.getElementById('vd-again');
+      if (!form) return;
+      const toggle = document.getElementById('a-new-plan');
+      const submit = document.getElementById('a-submit');
+      const label = () => { submit.textContent = toggle.checked ? 'Make it again with a new plan' : 'Record it again (free)'; };
+      const needsPlan = () => { if (!toggle.disabled && !toggle.checked) { toggle.checked = true; label(); } };
+      toggle.addEventListener('change', label);
+      form.querySelectorAll('[data-needs-plan]').forEach(el => el.addEventListener(el.tagName === 'TEXTAREA' || el.type === 'text' || el.type === 'number' ? 'input' : 'change', needsPlan));
+
+      form.querySelectorAll('.vd-segments').forEach(group => {
+        const buttons = group.querySelectorAll('[data-target]');
+        const input = document.getElementById(buttons[0].dataset.target);
+        const mark = () => buttons.forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.value) === Number(input.value))));
+        buttons.forEach(b => b.addEventListener('click', () => {
+          input.value = b.dataset.value;
+          mark();
+          if (input.hasAttribute('data-needs-plan')) needsPlan();
+        }));
+        mark();
+      });
+
+      const style = document.getElementById('r-style');
+      style.addEventListener('change', () => { document.getElementById('r-style-hint').textContent = style.selectedOptions[0]?.dataset.direction || ''; });
+    })();
   </script>
 
   @if ($video->status->isWorking())

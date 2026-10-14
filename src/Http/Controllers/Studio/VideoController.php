@@ -28,8 +28,10 @@ use Ogunsakin01\VideoDemo\Models\VideoStyle;
 use Ogunsakin01\VideoDemo\Recording\Devices;
 use Ogunsakin01\VideoDemo\Recording\RecordAs;
 use Ogunsakin01\VideoDemo\Recording\Recorder;
+use Ogunsakin01\VideoDemo\Studio\Embeds;
 use Ogunsakin01\VideoDemo\Studio\Examples;
 use Ogunsakin01\VideoDemo\Studio\Pages;
+use Ogunsakin01\VideoDemo\VideoDemo;
 use Ogunsakin01\VideoDemo\VideoDemoServiceProvider;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Throwable;
@@ -192,6 +194,8 @@ class VideoController extends Controller
             'devices' => Devices::all(),
             'efforts' => self::EFFORTS,
             'styles' => VideoStyle::options(),
+            'recordAs' => RecordAs::options() + [$video->record_as ?? '' => $video->record_as_label ?: RecordAs::label($video->record_as)],
+            'models' => Pricing::options(),
             'queueWarning' => $video->status->isWorking() ? VideoDemoServiceProvider::queueWarning() : null,
         ]);
     }
@@ -267,6 +271,71 @@ class VideoController extends Controller
         ]);
         $video->addLog('Queued for a new plan');
         GenerateVideo::dispatch($video);
+
+        return redirect()->route('video-demo.studio.show', $video);
+    }
+
+    /**
+     * Make the given video again from the "Make it again" form: with a new
+     * plan from the AI, or by recording its plan again at no AI cost.
+     *
+     * A new plan is made when asked for, when there is none, and when the
+     * video's user or data changes, since the old plan was made for them.
+     */
+    public function again(Request $request, Video $video, CostEstimator $estimator, CodeTools $code): RedirectResponse
+    {
+        abort_if($video->status->isWorking(), 409, 'This video is still being made.');
+
+        $data = $request->validate([
+            'prompt' => ['required', 'string', 'max:4000'],
+            'target_seconds' => ['required', 'integer', 'min:10', 'max:'.config('video-demo.limits.max_seconds', 300)],
+            'speed' => ['nullable', 'numeric', 'min:0.25', 'max:4'],
+            'devices' => ['required', 'array', 'min:1'],
+            'devices.*' => ['string', Rule::in(Devices::keys())],
+            'style_id' => ['nullable', 'integer', Rule::exists(VideoStyle::class, 'id')],
+            'record_as' => ['nullable', 'string', Rule::in(array_keys(RecordAs::options() + [$video->record_as ?? '' => '']))],
+            'start_path' => ['nullable', 'string', 'max:255', 'starts_with:/'],
+            'sample_data' => ['nullable', 'boolean'],
+            'model' => ['required', Rule::in(array_keys(config('video-demo.ai.models')))],
+            'effort' => ['required', Rule::in(self::EFFORTS)],
+            'max_cost' => ['nullable', 'numeric', 'min:0.01', 'max:100'],
+            'max_steps' => ['nullable', 'integer', 'min:3', 'max:250'],
+            'new_plan' => ['nullable', 'boolean'],
+        ], ['devices.required' => 'Choose at least one version.']);
+
+        $recordAs = ($data['record_as'] ?? '') === '' ? null : $data['record_as'];
+        $sampleData = $request->boolean('sample_data');
+        $forced = $recordAs !== $video->record_as || $sampleData !== $video->sample_data;
+        $replan = $request->boolean('new_plan') || $forced || empty($video->plan['steps']);
+        $style = isset($data['style_id']) ? VideoStyle::find($data['style_id']) : null;
+        $estimate = $replan ? $estimator->estimate($data['model'], $data['effort'], (int) $data['target_seconds'], $code->routeCount()) : null;
+
+        $video->update([
+            'prompt' => $data['prompt'],
+            'target_seconds' => (int) $data['target_seconds'],
+            'speed' => $data['speed'] ?? $video->speed,
+            'devices' => array_values(array_intersect(Devices::keys(), $data['devices'])),
+            'record_as' => $recordAs,
+            'record_as_label' => RecordAs::label($recordAs),
+            'start_path' => $data['start_path'] ?? null,
+            'sample_data' => $sampleData,
+            'model' => $data['model'],
+            'effort' => $data['effort'],
+            'max_cost' => $data['max_cost'] ?? null,
+            'max_steps' => $data['max_steps'] ?? null,
+            ...($style ? ['style' => $style->snapshot()] : []),
+            ...($estimate ? ['estimate_low' => $estimate['low'], 'estimate_high' => $estimate['high']] : []),
+            'status' => VideoStatus::Queued,
+            'error' => null,
+            'issues' => null,
+            'stop_requested' => false,
+        ]);
+        $video->addLog(match (true) {
+            ! $replan => 'Queued to record the same plan again',
+            $forced && ! $request->boolean('new_plan') => 'Queued for a new plan: the user or the data changed, so the old plan may not fit',
+            default => 'Queued for a new plan',
+        });
+        GenerateVideo::dispatch($video, replan: $replan);
 
         return redirect()->route('video-demo.studio.show', $video);
     }
@@ -360,10 +429,25 @@ class VideoController extends Controller
     public function bulk(Request $request, Publisher $publisher, Manifest $manifest): RedirectResponse
     {
         $data = $request->validate([
-            'action' => ['required', Rule::in(['publish', 'unpublish'])],
+            'action' => ['required', Rule::in(['publish', 'unpublish', 'delete'])],
             'videos' => ['required', 'array', 'min:1'],
             'videos.*' => ['integer'],
         ], ['videos.required' => 'Tick at least one video.']);
+
+        if ($data['action'] === 'delete') {
+            $deleted = 0;
+            foreach (Video::whereKey($data['videos'])->get() as $video) {
+                if (! $video->status->isWorking()) {
+                    app(VideoDemo::class)->delete($video);
+                    $deleted++;
+                }
+            }
+            $kept = count($data['videos']) - $deleted;
+
+            return redirect()->route('video-demo.studio.index')->with('status', trim(
+                ($deleted === 1 ? 'Deleted 1 video.' : "Deleted $deleted videos.").($kept ? " $kept still being made ".($kept === 1 ? 'was' : 'were').' kept; stop them first.' : '')
+            ));
+        }
 
         $done = $skipped = 0;
         $failed = [];
@@ -417,15 +501,31 @@ class VideoController extends Controller
     /**
      * Remove the given video and its working files.
      */
-    public function destroy(Video $video, Publisher $publisher): RedirectResponse
+    public function destroy(Video $video): RedirectResponse
     {
-        if ($video->isPublished()) {
-            $publisher->unpublish($video);
-        }
-        Storage::disk(config('video-demo.storage.work_disk'))->deleteDirectory($video->workPath());
-        $video->delete();
+        abort_if($video->status->isWorking(), 409, 'This video is still being made. Stop it first.');
+        app(VideoDemo::class)->delete($video);
 
         return redirect()->route('video-demo.studio.index')->with('status', 'Video deleted.');
+    }
+
+    /**
+     * Show what deleting the given videos would affect, before deleting them:
+     * whether each is in the library, and the pages in the app's code that
+     * show it.
+     */
+    public function confirmDelete(Request $request): View|RedirectResponse
+    {
+        $ids = array_filter(array_map('intval', (array) $request->query('videos', [])));
+        $videos = Video::whereKey($ids)->get();
+        if ($videos->isEmpty()) {
+            return redirect()->route('video-demo.studio.index')->with('error', 'Tick at least one video.');
+        }
+
+        return view('video-demo::studio.delete', [
+            'videos' => $videos,
+            'embeds' => Embeds::find($videos->pluck('slug')->all()),
+        ]);
     }
 
     /**

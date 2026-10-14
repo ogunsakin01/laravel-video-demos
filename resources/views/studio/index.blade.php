@@ -36,6 +36,8 @@
           <span class="vd-small" id="vd-bulk-count" aria-live="polite" style="flex:1;min-width:0">0 selected</span>
           <button class="vd-btn vd-btn-sm" name="action" value="unpublish">Unpublish</button>
           <button class="vd-btn vd-btn-sm vd-btn-primary" name="action" value="publish">Publish</button>
+          {{-- Opens a page that says where the videos are used before anything is deleted. --}}
+          <button class="vd-btn vd-btn-sm vd-btn-ghost vd-btn-danger" formaction="{{ route('video-demo.studio.delete') }}" formmethod="get" id="vd-bulk-delete">Delete…</button>
         </div>
         <table class="vd-table">
           <thead><tr>
@@ -88,6 +90,12 @@
         const bar = document.getElementById('vd-bulk');
         const count = document.getElementById('vd-bulk-count');
         const [unpublish, publish] = bar.querySelectorAll('button');
+        // Open the delete page with only the ticked videos in the address, not the form's token.
+        document.getElementById('vd-bulk-delete').addEventListener('click', e => {
+          e.preventDefault();
+          const ids = rows.filter(r => r.checked).map(r => 'videos[]=' + encodeURIComponent(r.value));
+          location.href = e.currentTarget.formAction + '?' + ids.join('&');
+        });
         const sync = () => {
           const ticked = rows.filter(r => r.checked);
           const ready = ticked.filter(r => r.dataset.ready === '1').length;
