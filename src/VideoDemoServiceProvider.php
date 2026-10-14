@@ -6,7 +6,10 @@ use Anthropic\Client;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Ogunsakin01\VideoDemo\Ai\Claude;
+use Ogunsakin01\VideoDemo\Console\GenerateCommand;
 use Ogunsakin01\VideoDemo\Console\InstallCommand;
+use Ogunsakin01\VideoDemo\Console\ListCommand;
+use Ogunsakin01\VideoDemo\Console\PublishCommand;
 use Ogunsakin01\VideoDemo\Console\RefreshCommand;
 use Ogunsakin01\VideoDemo\Library\Manifest;
 
@@ -37,7 +40,13 @@ class VideoDemoServiceProvider extends ServiceProvider
             $this->publishes([__DIR__.'/../resources/views' => resource_path('views/vendor/video-demo')], 'video-demo-views');
             $this->publishes([__DIR__.'/../database/migrations' => database_path('migrations')], 'video-demo-migrations');
 
-            $this->commands([InstallCommand::class, RefreshCommand::class]);
+            $this->commands([
+                InstallCommand::class,
+                GenerateCommand::class,
+                ListCommand::class,
+                PublishCommand::class,
+                RefreshCommand::class,
+            ]);
         }
     }
 

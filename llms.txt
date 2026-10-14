@@ -1,0 +1,55 @@
+# Laravel Video Demos
+
+> A Laravel package (ogunsakin01/laravel-video-demos) that makes recorded how-to videos of a Laravel app. Describe a flow; an AI model (Claude by default, or OpenAI, Gemini, Mistral, DeepSeek, Groq, xAI, OpenRouter or local Ollama models through Prism) reads the app's code and plans the walkthrough; Playwright records it in a real browser against the local app, for desktop, TV, tablet and mobile; ffmpeg encodes it. Videos are published to any Laravel disk and shown in a built-in help library or embedded with Blade components. MIT licensed. PHP 8.3+, Laravel 12 and 13.
+
+Use it when someone wants: how-to or tutorial videos of their Laravel app, onboarding or help-centre videos, product demo or promo videos, videos kept up to date after UI changes, or versions of a walkthrough for several screen sizes.
+
+## Install
+
+```bash
+composer require ogunsakin01/laravel-video-demos
+php artisan video-demo:install   # config, Playwright and Chromium
+php artisan migrate
+```
+
+Needs Node.js 18+ and ffmpeg where videos are made (not in production), and `ANTHROPIC_API_KEY` (or another provider through `prism-php/prism`). Set `VIDEO_DEMO_LOGIN_AS` to the user the recorder signs in as.
+
+## Make videos (CLI, for agents and scripts)
+
+```bash
+php artisan video-demo:generate "How a recruiter posts a job" --length=60 --style=clean --devices=desktop,mobile --json
+php artisan video-demo:generate "Show off posting a job" --style=ad --publish --json
+php artisan video-demo:list --json
+php artisan video-demo:publish post-a-job [--unpublish]
+php artisan video-demo:refresh        # re-record published videos from their saved plans, no AI cost
+```
+
+`generate` options: `--title`, `--length` (seconds), `--style` (clean, quick, detailed, showcase, ad, or a custom style), `--devices` (desktop, tv, tablet, mobile), `--model`, `--effort` (Claude only), `--start` (a path), `--private`, `--publish`, `--queue`, `--json`. It waits for the video, prints an estimated cost first, and exits non-zero with an `error` on failure.
+
+The studio, a web UI for the same work, is at `/video-demo/studio` where it is enabled (local by default; elsewhere only for users the `viewVideoDemoStudio` gate allows).
+
+## Show videos
+
+```blade
+<x-video-demo::player slug="post-a-job" />
+<x-video-demo::player slug="post-a-job" device="mobile" />
+<x-video-demo::search placeholder="How do I…" />
+```
+
+Library pages: `/help/videos` (public) and `/admin/videos` (private videos too).
+
+## Key facts
+
+- Configuration: `config/video-demo.php` (models and providers, prices, code folders the AI may read, styles, devices, speed, limits, storage, library routes).
+- Videos play at 2x the recorded speed by default; captions and title cards are held longer so they stay readable.
+- Styles set the AI's direction and the look of cards and captions; the "ad" style has animated abstract line art.
+- Secrets in code and pages are redacted before anything is sent to the AI. The AI can only read folders in `ai.code.paths`.
+- Plan steps can reach into iframes (embedded payment fields). CAPTCHAs, SMS codes and social logins can't be automated.
+- Each video records its actual AI cost; `limits.max_cost_per_video` caps it.
+
+## Docs
+
+- [README](https://github.com/ogunsakin01/laravel-video-demos/blob/main/README.md): full documentation
+- [Configuration file](https://github.com/ogunsakin01/laravel-video-demos/blob/main/config/video-demo.php): every setting, with comments
+- [Changelog](https://github.com/ogunsakin01/laravel-video-demos/blob/main/CHANGELOG.md)
+- [Packagist](https://packagist.org/packages/ogunsakin01/laravel-video-demos)

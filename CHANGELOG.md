@@ -4,6 +4,13 @@ All notable changes to this package are listed here. The format follows [Keep a 
 
 ## Unreleased
 
+### Added
+
+- `video-demo:generate`, `video-demo:list` and `video-demo:publish` commands, with `--json` output, so scripts and AI agents can make and publish videos without the studio's page.
+- Laravel Boost guidelines, so coding agents in apps that install the package know how to use it.
+- `llms.txt`, a summary of the package for AI models, and `AGENTS.md` for agents working on the package.
+- The install command near the top of the README, and how to install ffmpeg.
+
 ## v0.1.0 - 2026-10-14
 
 The first release.

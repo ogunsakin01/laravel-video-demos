@@ -11,6 +11,14 @@ Describe a flow in your Laravel app and get a recorded how-to video of it. An AI
 
 Videos are made on your machine and published to any Laravel disk. Your production app shows them in a ready-made help library, or inside your own pages with a Blade component.
 
+```bash
+composer require ogunsakin01/laravel-video-demos
+php artisan video-demo:install
+php artisan migrate
+```
+
+See [Installation](#installation) for the `.env` settings and the queue worker.
+
 ## See it
 
 These tours were recorded by the package itself, from the demo app in [`workbench/`](workbench), in the "Promo ad" style. GitHub doesn't play videos stored in a repository, so the previews below are GIFs of the same videos; the links under them are the full MP4s.
@@ -45,7 +53,7 @@ The plan is stored with the video. After your app's look changes, `php artisan v
 ## Requirements
 
 - PHP 8.3+ and Laravel 12 or 13
-- Node.js 18+ and ffmpeg on the machine where you make videos (not in production)
+- Node.js 18+ and ffmpeg on the machine where you make videos, not in production (`brew install ffmpeg` on a Mac, `apt install ffmpeg` on Ubuntu)
 - An [Anthropic API key](https://console.anthropic.com/), or another provider through [Prism](#ai-providers)
 
 ## Installation
@@ -86,6 +94,25 @@ On a developer's machine the studio is open. Anywhere else it is enabled (a stag
 Gate::define('viewVideoDemoStudio', fn ($user) => $user->isAdmin());
 ```
 - **Requested by users**: searches in your library that found nothing. Click one to start a video.
+
+## From the command line
+
+Everything the studio does is also a command, so scripts and AI agents can make videos too. Add `--json` for output a program can read.
+
+```bash
+# Waits for the video, printing an estimated cost first; exits non-zero if it fails
+php artisan video-demo:generate "How a recruiter posts a job, from the jobs page to a live listing" \
+    --length=60 --style=clean --devices=desktop,mobile
+
+# An ad-style video, published to the library when it's ready
+php artisan video-demo:generate "Show off posting a job" --style=ad --publish
+
+php artisan video-demo:list
+php artisan video-demo:publish post-a-job          # or --unpublish
+php artisan video-demo:refresh                     # re-record published videos after UI changes, no AI cost
+```
+
+`video-demo:generate` also takes `--title`, `--model`, `--effort`, `--start=/path`, `--private` and `--queue` (queue it and return straight away).
 
 ## The library
 
@@ -214,6 +241,13 @@ The planner reads code and calls tools many times per video, so weaker models wr
 - **Your API key** stays in your local `.env` and is never needed in production.
 
 Please report security problems privately; see [SECURITY.md](SECURITY.md).
+
+## For AI agents
+
+- **[Laravel Boost](https://laravel.com/docs/boost):** the package ships Boost guidelines, so coding agents in your app know how to make, publish and embed videos. Run `php artisan boost:install` after installing the package and choose it from the list.
+- **Commands with JSON output:** an agent can run `video-demo:generate … --json`, read the result, fix what failed and run it again.
+- **[llms.txt](llms.txt):** a short summary of the package for AI models.
+- **[AGENTS.md](AGENTS.md):** instructions for agents working on the package itself.
 
 ## Developing the package
 

@@ -37,14 +37,18 @@ class VideoStyle extends Model
 
     protected $guarded = ['id'];
 
-    /** All styles, copying the defaults from config the first time */
+    /**
+     * All styles, copying the defaults from config the first time
+     *
+     * @return Collection<int, VideoStyle>
+     */
     public static function options(): Collection
     {
         if (! static::query()->exists()) {
             static::seedFromConfig();
         }
 
-        return static::query()->orderBy('position')->orderBy('id')->get();
+        return self::query()->orderBy('position')->orderBy('id')->get();
     }
 
     public static function seedFromConfig(): void
