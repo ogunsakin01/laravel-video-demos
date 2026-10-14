@@ -4,6 +4,7 @@
 @endphp
 <x-video-demo::layout title="Styles" badge="Studio · local" :home="route('video-demo.studio.index')">
   <x-slot:nav>
+    @if (\Ogunsakin01\VideoDemo\Studio\Examples::enabled())<a class="vd-btn vd-btn-ghost" href="{{ route('video-demo.studio.examples') }}">Examples</a>@endif
     <a class="vd-btn" href="{{ route('video-demo.studio.index') }}">All videos</a>
     <a class="vd-btn vd-btn-primary" href="{{ route('video-demo.studio.create') }}">New video</a>
   </x-slot:nav>

@@ -4,6 +4,21 @@ All notable changes to this package are listed here. The format follows [Keep a 
 
 ## Unreleased
 
+## v0.3.0 - 2026-10-14
+
+### Fixed
+
+- Generating a video failed with "Schemas contains too many parameters with union types": the plan's tool schema had 17 nullable fields, one over Anthropic's limit of 16. The schemas now have none; unused fields are empty instead.
+- On phones, the studio's header no longer overflows the screen.
+
+### Added
+
+- "Try again" on a failed video, at the top of its page and in the error box: a new plan with the same settings, or the same plan recorded again when recording failed.
+- Ideas: the AI suggests the videos worth making first, from the app's routes, styles and videos already made. "Make this video" opens the new-video form filled in. Also `video-demo:suggest --json`.
+- The new-video form can be filled in from the address: `prompt`, `title`, `start_path`, `target_seconds` and `style`.
+- Docs for `VIDEO_DEMO_FFMPEG`: using an ffmpeg that isn't on the PATH, including a wrapper script for bundled copies such as Remotion's.
+- An Examples page in the studio, with sample videos made by the package in each style and screen size, and a "Make one like this" button that opens the new-video form with that style.
+
 ## v0.2.0 - 2026-10-14
 
 ### Added

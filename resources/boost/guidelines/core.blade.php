@@ -8,6 +8,7 @@ This app makes recorded how-to videos of itself. An AI model reads the app's cod
 - Use the commands, not the studio's web page. Add `--json` to read the result.
 @verbatim
 <code-snippet name="Make, list and publish videos" lang="bash">
+php artisan video-demo:suggest --json   # the videos worth making first, from the app's routes
 php artisan video-demo:generate "How a recruiter posts a job, from the jobs page to a live listing" --length=60 --style=clean --devices=desktop,mobile --json
 php artisan video-demo:generate "Show off posting a job" --style=ad --publish --json
 php artisan video-demo:list --json

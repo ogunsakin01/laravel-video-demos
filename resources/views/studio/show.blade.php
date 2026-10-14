@@ -17,6 +17,21 @@
         @endif
       </p>
     </div>
+    @if ($video->status === \Ogunsakin01\VideoDemo\Enums\VideoStatus::Failed)
+        @php($hasPlan = ! empty($video->plan['steps']))
+        <div class="vd-actions">
+          <form method="post" action="{{ route('video-demo.studio.retry', $video) }}">@csrf
+            <input type="hidden" name="mode" value="plan">
+            <button class="vd-btn vd-btn-primary">{{ $hasPlan ? 'Try again with a new plan' : 'Try again' }}</button>
+          </form>
+          @if ($hasPlan)
+            <form method="post" action="{{ route('video-demo.studio.retry', $video) }}">@csrf
+              <input type="hidden" name="mode" value="record">
+              <button class="vd-btn">Record the same plan again</button>
+            </form>
+          @endif
+        </div>
+    @endif
     @if ($video->status === \Ogunsakin01\VideoDemo\Enums\VideoStatus::Ready)
       <div class="vd-actions">
         @if ($video->isPublished())
@@ -62,9 +77,25 @@
       @endif
 
       @if ($video->error)
-        <div class="vd-card" style="border-color:transparent;background:var(--vd-bad-bg)">
-          <h2 style="color:var(--vd-bad);margin-bottom:6px">What went wrong</h2>
-          <p style="margin:0;color:var(--vd-bad)">{{ $video->error }}</p>
+        <div class="vd-card vd-stack-sm" style="border-color:transparent;background:var(--vd-bad-bg)">
+          <h2 style="color:var(--vd-bad);margin:0">What went wrong</h2>
+          <p style="margin:0;color:var(--vd-bad);overflow-wrap:anywhere">{{ $video->error }}</p>
+          @if ($video->status === \Ogunsakin01\VideoDemo\Enums\VideoStatus::Failed)
+            <p class="vd-small" style="margin:0;color:var(--vd-bad)">Trying again uses the same description, style, versions and model. To change any of them, use "Make it again" below.</p>
+            @php($hasPlan = ! empty($video->plan['steps']))
+        <div class="vd-actions">
+          <form method="post" action="{{ route('video-demo.studio.retry', $video) }}">@csrf
+            <input type="hidden" name="mode" value="plan">
+            <button class="vd-btn vd-btn-primary">{{ $hasPlan ? 'Try again with a new plan' : 'Try again' }}</button>
+          </form>
+          @if ($hasPlan)
+            <form method="post" action="{{ route('video-demo.studio.retry', $video) }}">@csrf
+              <input type="hidden" name="mode" value="record">
+              <button class="vd-btn">Record the same plan again</button>
+            </form>
+          @endif
+        </div>
+          @endif
         </div>
       @endif
 

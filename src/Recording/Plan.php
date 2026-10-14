@@ -27,9 +27,40 @@ final class Plan
         public array $steps,
     ) {}
 
+    public const TARGET_FIELDS = ['role', 'name', 'label', 'placeholder', 'text', 'selector', 'frame'];
+
     public static function fromArray(array $data): self
     {
-        return new self((string) ($data['title'] ?? ''), (string) ($data['summary'] ?? ''), array_values($data['steps'] ?? []));
+        return new self(
+            (string) ($data['title'] ?? ''),
+            (string) ($data['summary'] ?? ''),
+            array_values(array_map(fn ($step) => self::normalise((array) $step), $data['steps'] ?? [])),
+        );
+    }
+
+    /**
+     * Empty values from the model ("", 0, []) mean "not set": the schema has
+     * no nullable fields, to stay within Anthropic's limit on union types
+     */
+    protected static function normalise(array $step): array
+    {
+        foreach (['url', 'value', 'title', 'text', 'chapter'] as $field) {
+            if (($step[$field] ?? null) === '') {
+                $step[$field] = null;
+            }
+        }
+        if (empty($step['ms'])) {
+            $step['ms'] = null;
+        }
+        if (empty($step['only_on'])) {
+            $step['only_on'] = null;
+        }
+        if (is_array($step['target'] ?? null)) {
+            $target = array_map(fn ($v) => $v === '' ? null : $v, $step['target']);
+            $step['target'] = array_filter($target, fn ($v) => $v !== null) === [] ? null : $target;
+        }
+
+        return $step;
     }
 
     public function toArray(): array
@@ -127,10 +158,16 @@ final class Plan
         return (int) ($ms / max($speed, 0.1)) + (int) ($step['ms'] ?? 0);
     }
 
-    /** JSON schema for the submit_plan tool, strict-mode compatible */
+    /**
+     * JSON schema for the submit_plan tool, strict-mode compatible.
+     *
+     * No field is "something or null": Anthropic limits strict tool schemas
+     * to 16 fields with union types, so an unused field is empty instead
+     * ("", 0 or []) and fromArray() turns it back into null.
+     */
     public static function schema(): array
     {
-        $nullableString = fn (string $description) => ['type' => ['string', 'null'], 'description' => $description];
+        $string = fn (string $description) => ['type' => 'string', 'description' => $description];
 
         return [
             'type' => 'object',
@@ -144,36 +181,31 @@ final class Plan
                         'properties' => [
                             'action' => ['type' => 'string', 'enum' => self::ACTIONS],
                             'why' => ['type' => 'string', 'description' => 'What this step is for, in a few words. Not shown in the video.'],
-                            'url' => $nullableString('goto: a path such as /jobs/create'),
+                            'url' => $string('goto: a path such as /jobs/create. Empty for other actions.'),
                             'target' => [
-                                'anyOf' => [
-                                    [
-                                        'type' => 'object',
-                                        'description' => 'The element to act on. Give one way to find it, the way a user would see it.',
-                                        'properties' => [
-                                            'role' => $nullableString('ARIA role: button, link, textbox, combobox, checkbox, tab, menuitem, heading…'),
-                                            'name' => $nullableString('Accessible name, used with role: the visible label or text'),
-                                            'label' => $nullableString('Form field label text'),
-                                            'placeholder' => $nullableString('Input placeholder text'),
-                                            'text' => $nullableString('Visible text of the element'),
-                                            'selector' => $nullableString('CSS selector, only when nothing above identifies it'),
-                                            'frame' => $nullableString('CSS selector of the iframe the element is inside, such as iframe[title="Secure card number input frame"]. Null when it is on the page itself.'),
-                                        ],
-                                        'required' => ['role', 'name', 'label', 'placeholder', 'text', 'selector', 'frame'],
-                                        'additionalProperties' => false,
-                                    ],
-                                    ['type' => 'null'],
+                                'type' => 'object',
+                                'description' => 'The element to act on. Fill in one way to find it, the way a user would see it, and leave the rest empty. All empty for actions without an element.',
+                                'properties' => [
+                                    'role' => $string('ARIA role: button, link, textbox, combobox, checkbox, tab, menuitem, heading…'),
+                                    'name' => $string('Accessible name, used with role: the visible label or text'),
+                                    'label' => $string('Form field label text'),
+                                    'placeholder' => $string('Input placeholder text'),
+                                    'text' => $string('Visible text of the element'),
+                                    'selector' => $string('CSS selector, only when nothing above identifies it'),
+                                    'frame' => $string('CSS selector of the iframe the element is inside, such as iframe[title="Secure card number input frame"]. Empty when it is on the page itself.'),
                                 ],
+                                'required' => self::TARGET_FIELDS,
+                                'additionalProperties' => false,
                             ],
-                            'value' => $nullableString('type: the text; select: the option label; press: the key, such as Enter'),
-                            'title' => $nullableString('caption or card: the heading'),
-                            'text' => $nullableString('caption or card: one short sentence under the heading'),
-                            'ms' => ['type' => ['integer', 'null'], 'description' => 'caption, card, pause: how long it shows. Other actions: extra pause afterwards.'],
-                            'chapter' => $nullableString('Starts a chapter with this name at this step'),
+                            'value' => $string('type: the text; select: the option label; press: the key, such as Enter. Empty otherwise.'),
+                            'title' => $string('caption or card: the heading. Empty otherwise.'),
+                            'text' => $string('caption or card: one short sentence under the heading. Empty otherwise.'),
+                            'ms' => ['type' => 'integer', 'description' => 'caption, card, pause: how long it shows, in milliseconds. Other actions: an extra pause afterwards. 0 for the default.'],
+                            'chapter' => $string('Starts a chapter with this name at this step. Empty otherwise.'),
                             'only_on' => [
-                                'type' => ['array', 'null'],
+                                'type' => 'array',
                                 'items' => ['type' => 'string', 'enum' => Devices::keys()],
-                                'description' => 'Run this step only on these versions, for example ["mobile"] to open the menu that small screens hide navigation behind. Null runs it on every version.',
+                                'description' => 'Run this step only on these versions, for example ["mobile"] to open the menu that small screens hide navigation behind. Empty runs it on every version.',
                             ],
                         ],
                         'required' => ['action', 'why', 'url', 'target', 'value', 'title', 'text', 'ms', 'chapter', 'only_on'],

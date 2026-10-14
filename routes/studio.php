@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Ogunsakin01\VideoDemo\Http\Controllers\Studio\RecorderLoginController;
 use Ogunsakin01\VideoDemo\Http\Controllers\Studio\StyleController;
+use Ogunsakin01\VideoDemo\Http\Controllers\Studio\SuggestionController;
 use Ogunsakin01\VideoDemo\Http\Controllers\Studio\VideoController;
 use Ogunsakin01\VideoDemo\Http\Middleware\AuthorizeStudio;
 
@@ -14,6 +15,9 @@ Route::middleware(AuthorizeStudio::class)->group(function () {
     Route::post('/estimate', [VideoController::class, 'estimate'])->name('estimate');
     Route::post('/complete', [VideoController::class, 'complete'])->name('complete');
     Route::get('/requests', [VideoController::class, 'requests'])->name('requests');
+    Route::get('/examples', [VideoController::class, 'examples'])->name('examples');
+    Route::get('/ideas', [SuggestionController::class, 'index'])->name('suggestions.index');
+    Route::post('/ideas', [SuggestionController::class, 'store'])->name('suggestions.store');
 
     Route::get('/styles', [StyleController::class, 'index'])->name('styles.index');
     Route::post('/styles', [StyleController::class, 'store'])->name('styles.store');
@@ -26,6 +30,7 @@ Route::middleware(AuthorizeStudio::class)->group(function () {
     Route::patch('/{video}', [VideoController::class, 'update'])->name('update');
     Route::post('/{video}/regenerate', [VideoController::class, 'regenerate'])->name('regenerate');
     Route::post('/{video}/rerecord', [VideoController::class, 'rerecord'])->name('rerecord');
+    Route::post('/{video}/retry', [VideoController::class, 'retry'])->name('retry');
     Route::post('/{video}/publish', [VideoController::class, 'publish'])->name('publish');
     Route::post('/{video}/unpublish', [VideoController::class, 'unpublish'])->name('unpublish');
     Route::delete('/{video}', [VideoController::class, 'destroy'])->name('destroy');

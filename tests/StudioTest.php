@@ -109,4 +109,29 @@ class StudioTest extends TestCase
         $this->assertSame(['desktop', 'tv', 'tablet'], $video->fresh()->devices);
         Queue::assertPushed(GenerateVideo::class, fn ($job) => ! $job->replan);
     }
+
+    public function test_a_failed_video_can_be_tried_again(): void
+    {
+        Queue::fake();
+        $failed = Video::create([
+            'prompt' => 'x', 'target_seconds' => 60, 'model' => 'claude-opus-5-5', 'effort' => 'high',
+            'status' => VideoStatus::Failed, 'error' => 'Anthropic Bad Request Exception',
+        ]);
+
+        // No plan yet: one button, which asks for a plan again
+        $this->get("/video-demo/studio/{$failed->id}")->assertSee('Try again')->assertDontSee('Record the same plan again</button>', false);
+        $this->post("/video-demo/studio/{$failed->id}/retry", ['mode' => 'plan'])->assertRedirect();
+        $this->assertSame(VideoStatus::Queued, $failed->fresh()->status);
+        $this->assertNull($failed->fresh()->error);
+        Queue::assertPushed(GenerateVideo::class, fn ($job) => $job->video->is($failed) && $job->replan);
+
+        // With a plan: it can be recorded again as it is, at no AI cost
+        $planned = Video::create([
+            'prompt' => 'y', 'target_seconds' => 60, 'model' => 'claude-opus-5-5', 'effort' => 'high',
+            'status' => VideoStatus::Failed, 'error' => 'Step 3 failed', 'plan' => ['title' => 'y', 'summary' => '', 'steps' => [['action' => 'pause']]],
+        ]);
+        $this->get("/video-demo/studio/{$planned->id}")->assertSee('Try again with a new plan')->assertSee('Record the same plan again');
+        $this->post("/video-demo/studio/{$planned->id}/retry", ['mode' => 'record'])->assertRedirect();
+        Queue::assertPushed(GenerateVideo::class, fn ($job) => $job->video->is($planned) && ! $job->replan);
+    }
 }

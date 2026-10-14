@@ -47,7 +47,7 @@ class InstallCommand extends Command
             $hasFfmpeg = false;
         }
         if (! $hasFfmpeg) {
-            $this->components->warn('ffmpeg was not found. Install it (brew install ffmpeg, apt install ffmpeg) or set VIDEO_DEMO_FFMPEG.');
+            $this->components->warn('ffmpeg could not be run. Install it (brew install ffmpeg, apt install ffmpeg), or set VIDEO_DEMO_FFMPEG to the full path of a copy, or of a wrapper script for a bundled copy (see the README).');
         }
 
         $this->newLine();

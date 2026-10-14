@@ -51,7 +51,7 @@ class CodeTools
                     'type' => 'object',
                     'properties' => [
                         'path' => ['type' => 'string'],
-                        'from_line' => ['type' => ['integer', 'null'], 'description' => 'First line to return, starting at 1'],
+                        'from_line' => ['type' => 'integer', 'description' => 'First line to return; 1 for the start of the file'],
                     ],
                     'required' => ['path', 'from_line'],
                     'additionalProperties' => false,
@@ -64,7 +64,7 @@ class CodeTools
                     'type' => 'object',
                     'properties' => [
                         'pattern' => ['type' => 'string'],
-                        'path' => ['type' => ['string', 'null'], 'description' => 'Limit the search to this folder'],
+                        'path' => ['type' => 'string', 'description' => 'Limit the search to this folder; empty to search every readable folder'],
                     ],
                     'required' => ['pattern', 'path'],
                     'additionalProperties' => false,
@@ -84,7 +84,7 @@ class CodeTools
         return $this->redactor->redact(match ($tool) {
             'list_files' => $this->listFiles((string) $input['path']),
             'read_file' => $this->readFile((string) $input['path'], (int) ($input['from_line'] ?? 1)),
-            'search_code' => $this->search((string) $input['pattern'], $input['path'] ?? null),
+            'search_code' => $this->search((string) $input['pattern'], ($input['path'] ?? '') !== '' ? $input['path'] : null),
             default => throw new RuntimeException("Unknown tool $tool"),
         });
     }

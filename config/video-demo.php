@@ -1,5 +1,7 @@
 <?php
 
+use Ogunsakin01\VideoDemo\Studio\Examples;
+
 return [
 
     /*
@@ -191,6 +193,8 @@ return [
 
         'node' => env('VIDEO_DEMO_NODE', 'node'),
         'npm' => env('VIDEO_DEMO_NPM', 'npm'),
+        // A full path when ffmpeg isn't on the PATH, or a wrapper script for a
+        // bundled copy that needs its own library folder (see the README)
         'ffmpeg' => env('VIDEO_DEMO_FFMPEG', 'ffmpeg'),
 
         // Where video-demo:install puts Playwright. The app's own node_modules
@@ -255,6 +259,11 @@ return [
         'accent' => '#171717',
         // Geist, from Bunny Fonts (no tracking). Set to null to use system fonts only.
         'font_url' => 'https://fonts.bunny.net/css?family=geist:400,500,600|geist-mono:400,500&display=swap',
+        // The studio's Examples page: sample videos made with this package,
+        // streamed from its GitHub repository through jsDelivr. Set to false
+        // to hide the page, or point examples_url at your own copy.
+        'examples' => env('VIDEO_DEMO_EXAMPLES', true),
+        'examples_url' => env('VIDEO_DEMO_EXAMPLES_URL', Examples::DEFAULT_URL),
     ],
 
     /*

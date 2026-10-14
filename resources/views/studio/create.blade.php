@@ -1,5 +1,7 @@
 <x-video-demo::layout title="New video" badge="Studio · local" :home="route('video-demo.studio.index')">
   <x-slot:nav>
+    @if (\Ogunsakin01\VideoDemo\Studio\Examples::enabled())<a class="vd-btn vd-btn-ghost" href="{{ route('video-demo.studio.examples') }}">Examples</a>@endif
+    <a class="vd-btn vd-btn-ghost" href="{{ route('video-demo.studio.suggestions.index') }}">Ideas</a>
     <a class="vd-btn" href="{{ route('video-demo.studio.index') }}">All videos</a>
   </x-slot:nav>
 
@@ -58,7 +60,7 @@
         </div>
         <select id="style_id" name="style_id">
           @foreach ($styles as $style)
-            <option value="{{ $style->id }}" data-direction="{{ $style->direction }}" @selected((int) old('style_id', $styles->first()->id) === $style->id)>{{ $style->name }}</option>
+            <option value="{{ $style->id }}" data-direction="{{ $style->direction }}" @selected((int) old('style_id', $styles->firstWhere('key', $defaults['style'])?->id ?? $styles->first()->id) === $style->id)>{{ $style->name }}</option>
           @endforeach
         </select>
         <span class="vd-hint" id="vd-style-hint"></span>
@@ -68,11 +70,11 @@
       <div class="vd-row">
         <div>
           <label for="title">Title <span class="vd-optional">optional</span></label>
-          <input type="text" id="title" name="title" value="{{ old('title') }}" maxlength="160" placeholder="The AI suggests one">
+          <input type="text" id="title" name="title" value="{{ old('title', $defaults['title']) }}" maxlength="160" placeholder="The AI suggests one">
         </div>
         <div>
           <label for="start_path">Start page <span class="vd-optional">optional</span></label>
-          <input type="text" id="start_path" name="start_path" value="{{ old('start_path') }}" placeholder="/dashboard">
+          <input type="text" id="start_path" name="start_path" value="{{ old('start_path', $defaults['start_path']) }}" placeholder="/dashboard">
         </div>
       </div>
 
@@ -130,14 +132,14 @@
         let seq = 0;
 
         const mark = () => segments.forEach(s => s.setAttribute('aria-pressed', String(s.dataset.seconds === seconds.value)));
-        const setSeconds = value => {
+        function setSeconds(value) {
           // Snap to the nearest length on offer
           const options = [...segments].map(s => Number(s.dataset.seconds));
           seconds.value = String(options.reduce((a, b) => Math.abs(b - value) < Math.abs(a - value) ? b : a));
           mark();
-        };
+        }
         segments.forEach(s => s.addEventListener('click', () => { seconds.value = s.dataset.seconds; mark(); estimate(); }));
-        mark();
+        setSeconds(Number(seconds.value));
 
         const post = (url, data) => {
           const body = new FormData();

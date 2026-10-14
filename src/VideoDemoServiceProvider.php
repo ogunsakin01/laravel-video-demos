@@ -11,6 +11,7 @@ use Ogunsakin01\VideoDemo\Console\InstallCommand;
 use Ogunsakin01\VideoDemo\Console\ListCommand;
 use Ogunsakin01\VideoDemo\Console\PublishCommand;
 use Ogunsakin01\VideoDemo\Console\RefreshCommand;
+use Ogunsakin01\VideoDemo\Console\SuggestCommand;
 use Ogunsakin01\VideoDemo\Library\Manifest;
 
 class VideoDemoServiceProvider extends ServiceProvider
@@ -46,6 +47,7 @@ class VideoDemoServiceProvider extends ServiceProvider
                 ListCommand::class,
                 PublishCommand::class,
                 RefreshCommand::class,
+                SuggestCommand::class,
             ]);
         }
     }

@@ -17,6 +17,7 @@ Needs Node.js 18+ and ffmpeg where videos are made (not in production), and `ANT
 ## Make videos (CLI, for agents and scripts)
 
 ```bash
+php artisan video-demo:suggest --json   # the videos worth making first, from the app's routes
 php artisan video-demo:generate "How a recruiter posts a job" --length=60 --style=clean --devices=desktop,mobile --json
 php artisan video-demo:generate "Show off posting a job" --style=ad --publish --json
 php artisan video-demo:list --json

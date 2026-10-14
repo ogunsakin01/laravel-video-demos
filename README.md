@@ -53,7 +53,7 @@ The plan is stored with the video. After your app's look changes, `php artisan v
 ## Requirements
 
 - PHP 8.3+ and Laravel 12 or 13
-- Node.js 18+ and ffmpeg on the machine where you make videos, not in production (`brew install ffmpeg` on a Mac, `apt install ffmpeg` on Ubuntu)
+- Node.js 18+ and ffmpeg on the machine where you make videos, not in production (`brew install ffmpeg` on a Mac, `apt install ffmpeg` on Ubuntu); or [use another copy](#using-an-ffmpeg-that-isnt-on-your-path) with `VIDEO_DEMO_FFMPEG`
 - An [Anthropic API key](https://console.anthropic.com/), or another provider through [Prism](#ai-providers)
 
 ## Installation
@@ -80,6 +80,29 @@ Start a queue worker and open the studio at `/video-demo/studio`:
 php artisan queue:work --timeout=1800
 ```
 
+### Using an ffmpeg that isn't on your PATH
+
+The recorder runs `ffmpeg` by default. If it isn't installed system-wide, or you'd rather use a copy that came with another tool (Remotion bundles one, for example), point the package at it:
+
+```dotenv
+VIDEO_DEMO_FFMPEG=/full/path/to/ffmpeg
+```
+
+Some bundled builds also need their own library folder to start. Remotion's macOS ffmpeg, for instance, fails with "signal 6" unless `DYLD_LIBRARY_PATH` points at its folder. Wrap it in a small script and point `VIDEO_DEMO_FFMPEG` at the script:
+
+```bash
+# ~/.local/bin/ffmpeg-remotion  (then: chmod +x ~/.local/bin/ffmpeg-remotion)
+#!/bin/sh
+FF=/path/to/your-app/node_modules/@remotion/compositor-darwin-arm64   # -x64 on Intel Macs
+DYLD_LIBRARY_PATH="$FF" exec "$FF/ffmpeg" "$@"
+```
+
+```dotenv
+VIDEO_DEMO_FFMPEG=/Users/you/.local/bin/ffmpeg-remotion
+```
+
+`php artisan video-demo:install` warns if it can't run ffmpeg.
+
 ## The studio
 
 The studio is where videos are made. It is only registered when `APP_ENV` is `local` (or `VIDEO_DEMO_STUDIO=true`), and never in production unless you set `studio.allow_in_production`. Its routes, including the signed sign-in link the recorder uses, do not exist when it is off.
@@ -93,6 +116,8 @@ On a developer's machine the studio is open. Anywhere else it is enabled (a stag
 ```php
 Gate::define('viewVideoDemoStudio', fn ($user) => $user->isAdmin());
 ```
+- **Ideas**: not sure what to make first? The AI reads your routes and suggests the videos your users most need, each with a description, length, start page and style. **Make this video** opens it in the form, filled in. It costs about a cent or two.
+- **Examples**: sample videos made with this package, in each style and screen size, with **Make one like this**.
 - **Requested by users**: searches in your library that found nothing. Click one to start a video.
 
 ## From the command line
@@ -107,6 +132,7 @@ php artisan video-demo:generate "How a recruiter posts a job, from the jobs page
 # An ad-style video, published to the library when it's ready
 php artisan video-demo:generate "Show off posting a job" --style=ad --publish
 
+php artisan video-demo:suggest                     # ideas for the videos worth making first
 php artisan video-demo:list
 php artisan video-demo:publish post-a-job          # or --unpublish
 php artisan video-demo:refresh                     # re-record published videos after UI changes, no AI cost

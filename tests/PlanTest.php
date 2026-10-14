@@ -116,4 +116,49 @@ class PlanTest extends TestCase
         // Fitting to a length at 2x leaves more room for captions and cards
         $this->assertGreaterThan($plan->fitTo(12)->steps[0]['ms'], $plan->fitTo(12, 2)->steps[0]['ms']);
     }
+
+    /**
+     * Anthropic refuses a request whose strict tool schemas have more than 16
+     * fields with type arrays or anyOf ("Schemas contains too many parameters
+     * with union types"). Every tool the planner sends counts.
+     */
+    public function test_tool_schemas_stay_within_the_union_type_limit(): void
+    {
+        $unions = function (array $schema, string $path) use (&$unions): array {
+            $found = isset($schema['anyOf']) || is_array($schema['type'] ?? null) ? [$path] : [];
+            foreach ($schema['properties'] ?? [] as $name => $property) {
+                $found = [...$found, ...$unions($property, $path.'.'.$name)];
+            }
+            if (isset($schema['items'])) {
+                $found = [...$found, ...$unions($schema['items'], $path.'[]')];
+            }
+            foreach ($schema['anyOf'] ?? [] as $option) {
+                $found = [...$found, ...$unions($option, $path)];
+            }
+
+            return $found;
+        };
+
+        $tools = [...(new CodeTools)->definitions(), ['name' => 'submit_plan', 'schema' => Plan::schema()]];
+        $found = array_merge(...array_map(fn ($t) => $unions($t['schema'], $t['name']), $tools));
+
+        $this->assertLessThanOrEqual(16, count($found), 'Union-typed fields: '.implode(', ', $found));
+    }
+
+    public function test_empty_values_from_the_model_mean_not_set(): void
+    {
+        $plan = Plan::fromArray(['title' => 'x', 'summary' => 'y', 'steps' => [
+            ['action' => 'goto', 'why' => '', 'url' => '/jobs', 'target' => array_fill_keys(Plan::TARGET_FIELDS, ''),
+                'value' => '', 'title' => '', 'text' => '', 'ms' => 0, 'chapter' => '', 'only_on' => []],
+            ['action' => 'type', 'why' => '', 'url' => '', 'target' => [...array_fill_keys(Plan::TARGET_FIELDS, ''), 'label' => 'Card number', 'frame' => 'iframe'],
+                'value' => '4242', 'title' => '', 'text' => '', 'ms' => 400, 'chapter' => 'Pay', 'only_on' => ['mobile']],
+        ]]);
+
+        [$goto, $type] = $plan->steps;
+        $this->assertNull($goto['target']);
+        $this->assertSame([null, null, null, null], [$goto['value'], $goto['ms'], $goto['chapter'], $goto['only_on']]);
+        $this->assertSame(['Card number', 'iframe', null], [$type['target']['label'], $type['target']['frame'], $type['target']['role']]);
+        $this->assertSame([400, 'Pay', ['mobile']], [$type['ms'], $type['chapter'], $type['only_on']]);
+        $this->assertSame([], (new Planner(new Drivers, new CodeTools))->problems($plan));
+    }
 }

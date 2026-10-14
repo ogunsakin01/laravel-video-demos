@@ -1,5 +1,7 @@
 <x-video-demo::layout title="Studio" badge="Studio · local" :home="route('video-demo.studio.index')">
   <x-slot:nav>
+    @if (\Ogunsakin01\VideoDemo\Studio\Examples::enabled())<a class="vd-btn vd-btn-ghost" href="{{ route('video-demo.studio.examples') }}">Examples</a>@endif
+    <a class="vd-btn vd-btn-ghost" href="{{ route('video-demo.studio.suggestions.index') }}">Ideas</a>
     <a class="vd-btn vd-btn-ghost" href="{{ route('video-demo.studio.styles.index') }}">Styles</a>
     @if (config('video-demo.library.public.enabled'))
       <a class="vd-btn" href="{{ route('video-demo.public.index') }}">View library</a>
@@ -28,7 +30,13 @@
         <div class="vd-empty">
           <strong>No videos yet</strong>
           <p style="margin:0 0 16px">Describe a flow and the AI will plan and record it.</p>
-          <a class="vd-btn vd-btn-primary" href="{{ route('video-demo.studio.create') }}">Make the first one</a>
+          <div class="vd-actions" style="justify-content:center">
+            <a class="vd-btn vd-btn-primary" href="{{ route('video-demo.studio.create') }}">Make the first one</a>
+            <a class="vd-btn" href="{{ route('video-demo.studio.suggestions.index') }}">Suggest videos to make</a>
+            @if (\Ogunsakin01\VideoDemo\Studio\Examples::enabled())
+              <a class="vd-btn" href="{{ route('video-demo.studio.examples') }}">See examples</a>
+            @endif
+          </div>
         </div>
       @else
         <table class="vd-table">

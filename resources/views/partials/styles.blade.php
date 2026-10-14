@@ -52,6 +52,17 @@
   .vd-tag { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .06em; padding: 3px 8px; border-radius: 99px; border: 1px solid var(--vd-border); color: var(--vd-muted-ink); }
   .vd-spacer { flex: 1; }
   .vd-nav { display: flex; gap: 8px; }
+  .vd-brand { white-space: nowrap; min-width: 0; }
+  .vd-tag { white-space: nowrap; }
+  /* Phones: the name and the menu share the bar, the menu scrolls if it must */
+  @media (max-width: 640px) {
+    .vd-top .vd-wrap { gap: 10px; }
+    .vd-tag { display: none; }
+    .vd-brand { font-size: 14px; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
+    .vd-spacer { display: none; }
+    .vd-nav { margin-left: auto; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+    .vd-nav .vd-btn { min-height: 32px; padding: 0 10px; font-size: 13px; }
+  }
 
   /* Page heading strip, with a dot texture on the right (an SVG pattern, no gradients) */
   .vd-main { padding: 24px 0 72px; }

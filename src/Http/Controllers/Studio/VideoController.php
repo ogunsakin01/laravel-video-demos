@@ -22,6 +22,7 @@ use Ogunsakin01\VideoDemo\Models\Video;
 use Ogunsakin01\VideoDemo\Models\VideoRequest;
 use Ogunsakin01\VideoDemo\Models\VideoStyle;
 use Ogunsakin01\VideoDemo\Recording\Devices;
+use Ogunsakin01\VideoDemo\Studio\Examples;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Throwable;
 
@@ -46,12 +47,26 @@ class VideoController extends Controller
             'efforts' => self::EFFORTS,
             'defaults' => [
                 'prompt' => $request->query('prompt', ''),
+                'title' => $request->query('title', ''),
+                'start_path' => $request->query('start_path', ''),
+                'style' => $request->query('style'),
                 'model' => config('video-demo.ai.model'),
                 'effort' => config('video-demo.ai.effort'),
-                'target_seconds' => 60,
+                'target_seconds' => (int) $request->query('target_seconds', 60),
                 'devices' => Devices::defaults(),
             ],
             'hasKey' => filled(config('video-demo.ai.api_key')),
+        ]);
+    }
+
+    /** Sample videos made with this package, to show what yours will look like */
+    public function examples(): View
+    {
+        abort_unless(Examples::enabled(), 404);
+
+        return view('video-demo::studio.examples', [
+            'examples' => Examples::all(),
+            'devices' => Devices::all(),
         ]);
     }
 
@@ -178,6 +193,23 @@ class VideoController extends Controller
         ]);
         $video->addLog('Queued to record the same plan again');
         GenerateVideo::dispatch($video, replan: false);
+
+        return redirect()->route('video-demo.studio.show', $video);
+    }
+
+    /**
+     * Tries a failed video again with the same settings: a fresh plan, or,
+     * when recording failed, the same plan recorded again (free)
+     */
+    public function retry(Request $request, Video $video): RedirectResponse
+    {
+        abort_if($video->status->isWorking(), 409, 'This video is still being made.');
+
+        $replan = $request->input('mode') !== 'record' || empty($video->plan['steps']);
+
+        $video->update(['status' => VideoStatus::Queued, 'error' => null]);
+        $video->addLog($replan ? 'Trying again with a new plan' : 'Trying again: recording the same plan');
+        GenerateVideo::dispatch($video, replan: $replan);
 
         return redirect()->route('video-demo.studio.show', $video);
     }
