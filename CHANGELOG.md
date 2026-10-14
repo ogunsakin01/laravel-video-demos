@@ -2,7 +2,40 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/). While the version is 0.x, minor releases may include breaking changes; they will be listed here.
 
-## Unreleased
+## v0.4.0 - 2026-10-14
+
+Run `php artisan migrate` after updating (a new migration), and start a worker for the package's queue: `php artisan queue:work video-demo`.
+
+### Added
+
+- **Spending limit per video**, in the form and as `generate --max-cost`. The AI is told its budget, sees how many requests it has left, and stops before a request that would pass the limit. The form warns when the lowest estimate is already above it.
+- **Max steps per video** (`--max-steps`): plans with more steps are sent back to the AI to shorten.
+- **Stop** a video while it is being made: at once if queued, otherwise before the next AI request or by closing the browser mid-recording. Stopped videos can be tried again.
+- **Record as** any user, a guest, or the default user. Apps using spatie/laravel-permission get users listed by role. Also `generate --as=guest|<id or email>`.
+- **Page checks before any AI is spent.** The start page is opened before planning and every page in the plan before recording, as the chosen user. Pages that return an error, redirect to sign-in, throw a JavaScript error or don't load stop the video, and are listed at the top of its page with Laravel's error message. An error from the app during recording also stops it, instead of paying for repairs that can't help.
+- **Embed code** on a published video's page and in the staff library: the Blade component and a plain HTML `<video>` tag, each with a Copy button.
+- **Ideas are saved** in a new `video_demo_ideas` table. "Suggest more" adds new ideas without repeating existing ones, "Replace all" starts over, ideas can be deleted, and ideas made into videos link to them. Also `video-demo:suggest --replace`.
+- **The package's own queue connection**, `video-demo`: your default connection with a two-hour `retry_after`, on its own queue, so long videos aren't started a second time (and paid for twice) when they pass your queue's `retry_after`. The studio warns when the queue is `sync` or a chosen connection's `retry_after` is too short.
+- `VIDEO_DEMO_NAME` for the name on the studio and library pages (it was always "APP_NAME videos").
+- The one-hour prompt cache for long recordings, so repairs after a long recording still read the cache.
+- README: `.env` examples for OpenAI, Gemini and Ollama with prices, "Lowering your AI costs", the price table, and an "Upgrading" section.
+- The same menu on every studio page, with the current page marked. "View library" opens in a new tab.
+- The package description on Packagist and GitHub names every supported provider, not only Claude.
+
+### Changed
+
+- **The default model is now the cheapest reliable one** whose provider has a key: Claude Sonnet 5.5 (was Opus). Haiku is offered but not picked by default. `VIDEO_DEMO_MODEL` sets your own.
+- Videos are queued on the `video-demo` queue: run `php artisan queue:work video-demo`. Set `VIDEO_DEMO_QUEUE_CONNECTION` to use a connection of your own.
+- The studio only offers models whose provider has a key, and no longer asks for `ANTHROPIC_API_KEY` when another provider is set up.
+- Library video addresses on local disks are paths (`/storage/video-demo/…`), so videos play even when `APP_URL` differs from the address the app is opened at.
+- Cost estimates allow for the extra requests less reliable models need.
+
+### Fixed
+
+- Claude Sonnet 5.5's cache-read price was $0.20 per million tokens; it is $0.10. Costs recorded with Sonnet were slightly too high.
+- Claude Haiku 5.5 requests with prompts over 100K tokens are charged at five times the base price, as Anthropic bills them.
+- Models whose names contain dots, such as `gpt-6.1-sol`, weren't found in `ai.models`.
+- On phones, the studio menu sits on its own row and scrolls sideways instead of overflowing the screen.
 
 ## v0.3.0 - 2026-10-14
 

@@ -4,6 +4,7 @@ namespace Ogunsakin01\VideoDemo\Tests;
 
 use Illuminate\Support\Facades\Artisan;
 use Ogunsakin01\VideoDemo\Models\Video;
+use Ogunsakin01\VideoDemo\Models\VideoIdea;
 use Ogunsakin01\VideoDemo\Tests\Concerns\FakesAnthropic;
 
 /** "Ideas": the AI suggests which videos to make first */
@@ -67,5 +68,35 @@ class SuggestionsTest extends TestCase
         $this->assertSame('Invite a teammate', $result['suggestions'][0]['title']);
         $this->assertTrue($result['cost_known']);
         $this->assertGreaterThan(0, $result['cost']);
+    }
+
+    public function test_ideas_are_saved_added_to_and_replaced(): void
+    {
+        $invite = ['title' => 'Invite a teammate', 'prompt' => 'How an admin invites a colleague.', 'why' => 'Teams grow.', 'start_path' => '/team', 'target_seconds' => 45, 'style' => 'quick'];
+        $payroll = ['title' => 'Run payroll', 'prompt' => 'How to run payroll.', 'why' => 'Monthly.', 'start_path' => '', 'target_seconds' => 60, 'style' => 'quick'];
+        $this->suggestions(1, [$invite]);
+        $this->suggestions(2, [['title' => 'invite a teammate ', ...array_diff_key($invite, ['title' => 1])], $payroll]);
+        $this->suggestions(3, [$payroll]);
+
+        $this->post('/video-demo/studio/ideas');
+        $this->assertSame(['Invite a teammate'], VideoIdea::pluck('title')->all());
+        $this->assertGreaterThan(0, VideoIdea::first()->cost);
+
+        // "Suggest more" tells the AI what is already there and drops repeats
+        $this->post('/video-demo/studio/ideas', ['replace' => '0']);
+        $this->assertStringContainsString("<ideas_already_suggested>\n- Invite a teammate", $this->request(2)['body']['messages'][0]['content']);
+        $this->assertSame(['Invite a teammate', 'Run payroll'], VideoIdea::orderBy('id')->pluck('title')->all());
+
+        // Ideas made into videos survive "Replace all"; the rest go
+        $video = Video::create(['prompt' => 'x', 'target_seconds' => 60, 'model' => 'claude-sonnet-5-5', 'effort' => 'high', 'status' => 'ready']);
+        VideoIdea::firstWhere('title', 'Invite a teammate')->update(['video_id' => $video->id]);
+        $this->post('/video-demo/studio/ideas', ['replace' => '1']);
+        $this->assertSame(['Invite a teammate', 'Run payroll'], VideoIdea::orderBy('id')->pluck('title')->all());
+        $this->assertSame(1, VideoIdea::whereNull('video_id')->count());
+
+        $this->get('/video-demo/studio/ideas')->assertSee('Made into a video')->assertSee('Open the video')->assertSee('Suggest more')->assertSee('Replace all');
+
+        $this->delete('/video-demo/studio/ideas/'.VideoIdea::firstWhere('title', 'Run payroll')->id)->assertRedirect();
+        $this->assertSame(1, VideoIdea::count());
     }
 }

@@ -100,7 +100,9 @@ return [
 
     'ai' => [
         'api_key' => env('ANTHROPIC_API_KEY'),
-        'model' => env('VIDEO_DEMO_MODEL', 'claude-opus-5-5'),
+        // The model new videos start with. Left empty, the form picks the
+        // cheapest model marked "reliable" below (Claude Sonnet 5.5).
+        'model' => env('VIDEO_DEMO_MODEL'),
         // How hard Claude thinks (low to max). Other providers ignore it.
         'effort' => env('VIDEO_DEMO_EFFORT', 'high'),
 
@@ -116,20 +118,27 @@ return [
         // through Prism (composer require prism-php/prism), with its key in
         // config/prism.php. Leave prices out and the cost shows as unknown.
         'models' => [
-            'claude-opus-5-5' => ['label' => 'Claude Opus 5.5', 'provider' => 'anthropic', 'input' => 4.00, 'output' => 20.00, 'cache_read' => 0.20],
-            'claude-sonnet-5-5' => ['label' => 'Claude Sonnet 5.5', 'provider' => 'anthropic', 'input' => 2.00, 'output' => 10.00, 'cache_read' => 0.20],
-            // Haiku's rates for prompts of up to 100K tokens; longer prompts cost 5 times as much
-            'claude-haiku-5-5' => ['label' => 'Claude Haiku 5.5', 'provider' => 'anthropic', 'input' => 0.10, 'output' => 0.50, 'cache_read' => 0.01],
+            'claude-opus-5-5' => ['label' => 'Claude Opus 5.5', 'provider' => 'anthropic', 'reliable' => true, 'input' => 4.00, 'output' => 20.00, 'cache_read' => 0.20],
+            'claude-sonnet-5-5' => ['label' => 'Claude Sonnet 5.5', 'provider' => 'anthropic', 'reliable' => true, 'input' => 2.00, 'output' => 10.00, 'cache_read' => 0.10],
+            // Haiku costs 5 times as much for a request whose prompt (cached
+            // tokens included) is over 100K tokens. Cheap, but plans less
+            // reliably, so it isn't picked by default.
+            'claude-haiku-5-5' => ['label' => 'Claude Haiku 5.5', 'provider' => 'anthropic', 'reliable' => false, 'input' => 0.10, 'output' => 0.50, 'cache_read' => 0.01,
+                'long_context' => ['above' => 100_000, 'multiplier' => 5]],
 
-            // Other providers, through Prism. Use the model names your provider
-            // lists, and copy prices from its pricing page:
-            // 'your-openai-model' => ['label' => 'OpenAI model', 'provider' => 'openai', 'input' => null, 'output' => null],
-            // 'your-gemini-model' => ['label' => 'Gemini model', 'provider' => 'gemini', 'input' => null, 'output' => null],
-            // 'qwen3-coder' => ['label' => 'Qwen3 Coder (local)', 'provider' => 'ollama', 'input' => 0, 'output' => 0],
+            // Other providers, through Prism, with their keys in config/prism.php
+            // (OPENAI_API_KEY, GEMINI_API_KEY…). Prices as listed in October
+            // 2026; check your provider's pricing page. Mark a model reliable
+            // only once it has planned a few videos well.
+            // 'gpt-6.1-sol' => ['label' => 'GPT-6.1 Sol', 'provider' => 'openai', 'reliable' => true, 'input' => 2.00, 'output' => 10.00, 'cache_read' => 0.10],
+            // 'gemini-3.8-flash' => ['label' => 'Gemini 3.8 Flash', 'provider' => 'gemini', 'reliable' => false, 'input' => 0.75, 'output' => 3.75, 'cache_read' => 0.075],
+            // 'qwen3-coder' => ['label' => 'Qwen3 Coder (local)', 'provider' => 'ollama', 'reliable' => false, 'input' => 0, 'output' => 0],
         ],
 
         // Writing to the 5-minute prompt cache costs this many times the input price
         'cache_write_multiplier' => 1.25,
+        // ...and to the 1-hour cache this many times, used while long recordings run
+        'cache_write_1h_multiplier' => 2.0,
 
         // Folders Claude may read, relative to the app's root. Files matching
         // "deny" are never read, wherever they are.
@@ -201,7 +210,13 @@ return [
         // is searched too, so an app that already has Playwright needs nothing.
         'node_modules' => env('VIDEO_DEMO_NODE_MODULES', storage_path('video-demo/recorder/node_modules')),
 
+        // The least time each recording may take; long videos get more
         'timeout' => 600,
+
+        // Open the start page before planning, and every page in the plan
+        // before recording, as the user the video is recorded as. A broken
+        // page stops the video before any AI is spent on it.
+        'check_pages' => true,
 
         // Videos play this many times faster than they were recorded, which
         // makes clicks and typing snappy. Captions, title cards and pauses
@@ -237,13 +252,20 @@ return [
     |--------------------------------------------------------------------------
     |
     | Generation runs as a queued job. Run a worker while using the studio:
-    | php artisan queue:work --timeout=900
+    | php artisan queue:work video-demo
     |
     */
 
     'queue' => [
+        // Leave empty to use the package's own "video-demo" connection: your
+        // default connection, with retry_after long enough for long videos
+        // (otherwise a job running past retry_after is started a second
+        // time, and paid for twice), on its own queue. Run a worker for it:
+        //   php artisan queue:work video-demo
+        // Name a connection to use it instead.
         'connection' => env('VIDEO_DEMO_QUEUE_CONNECTION'),
-        'name' => env('VIDEO_DEMO_QUEUE', 'default'),
+        'name' => env('VIDEO_DEMO_QUEUE', 'video-demo'),
+        'retry_after' => 7200,
     ],
 
     /*
@@ -253,7 +275,8 @@ return [
     */
 
     'ui' => [
-        'name' => env('APP_NAME', 'Laravel').' videos',
+        // Shown in the studio and library headers
+        'name' => env('VIDEO_DEMO_NAME', env('APP_NAME', 'Laravel').' videos'),
         'logo' => null,
         // Buttons and highlights. The default near-black turns light in dark mode.
         'accent' => '#171717',

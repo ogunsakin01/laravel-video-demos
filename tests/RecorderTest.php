@@ -143,6 +143,58 @@ class RecorderTest extends TestCase
         $this->assertStringContainsString('textbox "Card number"', $result->snapshot);
     }
 
+    public function test_checks_pages_before_any_ai_is_spent(): void
+    {
+        $port = $this->freePort();
+        $server = Process::path(__DIR__.'/fixtures')->start(['php', '-S', "127.0.0.1:$port", 'check-router.php']);
+
+        try {
+            $this->waitForServer($port);
+            config(['video-demo.recorder.base_url' => "http://127.0.0.1:$port"]);
+
+            $problems = collect((new Recorder)->checkPages(['/', '/reports', '/settings', '/chart', '/missing', 'not-a-path'], 'guest'))->keyBy('path');
+
+            $this->assertSame(['/reports', '/settings', '/chart', '/missing'], $problems->keys()->all());
+            $this->assertSame('The page returned HTTP 500', $problems['/reports']['problem']);
+            $this->assertSame('Undefined variable $total', $problems['/reports']['detail']);
+            $this->assertStringContainsString('recorded as a guest', $problems['/settings']['problem']);
+            $this->assertSame('The page threw a JavaScript error', $problems['/chart']['problem']);
+            $this->assertStringContainsString("reading 'render'", $problems['/chart']['detail']);
+            $this->assertSame(404, $problems['/missing']['status']);
+
+            // During recording, an error from the app stops the job instead of asking the AI to repair the plan
+            $result = (new Recorder)->record(new Plan('x', 'x', [
+                $this->step('goto', ['url' => '/server-recording']),
+                $this->step('click', ['target' => ['role' => 'button', 'name' => 'Save']]),
+            ]), $this->out, [], 'desktop', 'guest');
+            $this->assertFalse($result->ok);
+            $this->assertFalse($result->canRepair());
+            $this->assertSame('/server-recording', $result->issue()['path']);
+        } finally {
+            $server->stop();
+        }
+    }
+
+    protected function freePort(): int
+    {
+        $socket = stream_socket_server('tcp://127.0.0.1:0');
+        $port = (int) substr(strrchr(stream_socket_get_name($socket, false), ':'), 1);
+        fclose($socket);
+
+        return $port;
+    }
+
+    protected function waitForServer(int $port): void
+    {
+        for ($i = 0; $i < 50; $i++) {
+            if (@fsockopen('127.0.0.1', $port)) {
+                return;
+            }
+            usleep(100_000);
+        }
+        $this->fail('The fixture server did not start.');
+    }
+
     protected function duration(string $file): float
     {
         $out = Process::run([config('video-demo.recorder.ffmpeg'), '-i', $file])->errorOutput();

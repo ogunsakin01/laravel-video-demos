@@ -2,29 +2,35 @@
 
 namespace Ogunsakin01\VideoDemo\Ai;
 
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 use Ogunsakin01\VideoDemo\Ai\Drivers\Drivers;
 use Ogunsakin01\VideoDemo\Ai\Drivers\Turn;
 use Ogunsakin01\VideoDemo\Models\Video;
+use Ogunsakin01\VideoDemo\Models\VideoIdea;
 use Ogunsakin01\VideoDemo\Models\VideoStyle;
 
 /**
  * Suggests which videos to make first, from the app's routes: the flows new
  * users most need, each ready to open in the new-video form. One short
- * request, kept until the next time suggestions are asked for.
+ * request; the ideas are saved, and asking again adds new ones (or, with
+ * $replace, starts over) so earlier ideas aren't paid for twice.
  */
 class Suggester
 {
-    protected const CACHE_KEY = 'video-demo.suggestions';
-
     public function __construct(protected Drivers $drivers, protected CodeTools $code) {}
 
     /**
-     * @return array{suggestions: list<array{title: string, prompt: string, why: string, start_path: ?string, target_seconds: int, style: string}>, cost: float, cost_known: bool, model: string, at: string}
+     * @return array{suggestions: list<array{id: int, title: string, prompt: string, why: string, start_path: ?string, target_seconds: int, style: string}>, cost: float, cost_known: bool, model: string, at: string}
      */
-    public function suggest(?string $model = null): array
+    public function suggest(?string $model = null, bool $replace = false): array
     {
-        $model ??= config('video-demo.ai.model');
+        if ($replace) {
+            // Ideas already made into videos stay, as a record
+            VideoIdea::whereNull('video_id')->delete();
+        }
+        $kept = VideoIdea::query()->pluck('title');
+
+        $model ??= Pricing::defaultModel();
         $maxSeconds = (int) config('video-demo.limits.max_seconds', 300);
         $styles = VideoStyle::options();
         $notes = trim((string) config('video-demo.ai.notes'));
@@ -36,6 +42,7 @@ class Suggester
                 'Suggest up to 8 videos, most useful first.',
                 "<styles>\n".$styles->map(fn (VideoStyle $s) => "- {$s->key}: {$s->name}. {$s->direction}")->implode("\n")."\n</styles>\nPick the style that suits each video, by its key.",
                 $made !== '' ? "<videos_already_made>\n$made\n</videos_already_made>\nDon't suggest these again." : null,
+                $kept->isNotEmpty() ? "<ideas_already_suggested>\n".$kept->map(fn ($t) => "- $t")->implode("\n")."\n</ideas_already_suggested>\nSuggest different videos from these." : null,
                 $notes !== '' ? "<notes_from_the_developer>\n$notes\n</notes_from_the_developer>" : null,
                 "<routes>\n".$this->code->routeList()."\n</routes>",
             ])),
@@ -81,26 +88,31 @@ class Suggester
             'style' => $styles->contains('key', $s['style'] ?? null) ? $s['style'] : $styles->first()?->key,
         ], $answer['data']['suggestions'] ?? []), fn ($s) => $s['prompt'] !== ''));
 
+        // Ideas with the same title as one already kept are dropped
+        $seen = $kept->map(fn ($t) => Str::lower(trim($t)))->all();
+        $suggestions = array_values(array_filter(array_slice($suggestions, 0, 8), function ($s) use (&$seen) {
+            $key = Str::lower(trim($s['title']));
+            if (in_array($key, $seen, true)) {
+                return false;
+            }
+            $seen[] = $key;
+
+            return true;
+        }));
+
         if ($suggestions === []) {
-            throw new PlanningFailed('The model did not suggest any videos. Try again.');
+            throw new PlanningFailed('The model did not suggest any new videos. Try again, or replace all the ideas.');
         }
 
-        $result = [
-            'suggestions' => array_slice($suggestions, 0, 8),
+        $share = $turn->usage->cost / count($suggestions);
+        $saved = array_map(fn ($s) => VideoIdea::create([...$s, 'model' => $turn->model, 'cost' => $share])->only(['id', ...array_keys($s)]), $suggestions);
+
+        return [
+            'suggestions' => $saved,
             'cost' => $turn->usage->cost,
             'cost_known' => Pricing::known($turn->model),
             'model' => $turn->model,
             'at' => now()->toIso8601String(),
         ];
-
-        Cache::forever(self::CACHE_KEY, $result);
-
-        return $result;
-    }
-
-    /** The last suggestions, if any */
-    public function latest(): ?array
-    {
-        return Cache::get(self::CACHE_KEY);
     }
 }

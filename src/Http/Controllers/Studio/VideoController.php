@@ -12,6 +12,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Ogunsakin01\VideoDemo\Ai\CodeTools;
 use Ogunsakin01\VideoDemo\Ai\CostEstimator;
+use Ogunsakin01\VideoDemo\Ai\Drivers\Drivers;
 use Ogunsakin01\VideoDemo\Ai\FormAssistant;
 use Ogunsakin01\VideoDemo\Ai\PlanningFailed;
 use Ogunsakin01\VideoDemo\Ai\Pricing;
@@ -19,10 +20,13 @@ use Ogunsakin01\VideoDemo\Enums\VideoStatus;
 use Ogunsakin01\VideoDemo\Jobs\GenerateVideo;
 use Ogunsakin01\VideoDemo\Library\Publisher;
 use Ogunsakin01\VideoDemo\Models\Video;
+use Ogunsakin01\VideoDemo\Models\VideoIdea;
 use Ogunsakin01\VideoDemo\Models\VideoRequest;
 use Ogunsakin01\VideoDemo\Models\VideoStyle;
 use Ogunsakin01\VideoDemo\Recording\Devices;
+use Ogunsakin01\VideoDemo\Recording\RecordAs;
 use Ogunsakin01\VideoDemo\Studio\Examples;
+use Ogunsakin01\VideoDemo\VideoDemoServiceProvider;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Throwable;
 
@@ -35,6 +39,7 @@ class VideoController extends Controller
         return view('video-demo::studio.index', [
             'videos' => Video::latest()->get(),
             'totalCost' => Video::sum('cost'),
+            'queueWarning' => VideoDemoServiceProvider::queueWarning(),
         ]);
     }
 
@@ -50,12 +55,19 @@ class VideoController extends Controller
                 'title' => $request->query('title', ''),
                 'start_path' => $request->query('start_path', ''),
                 'style' => $request->query('style'),
-                'model' => config('video-demo.ai.model'),
+                'model' => Pricing::defaultModel(),
                 'effort' => config('video-demo.ai.effort'),
                 'target_seconds' => (int) $request->query('target_seconds', 60),
                 'devices' => Devices::defaults(),
+                'max_cost' => (float) config('video-demo.limits.max_cost_per_video', 2.0),
+                'max_steps' => $request->query('max_steps'),
+                'record_as' => $request->query('record_as', config('video-demo.recorder.login_as') ? '' : RecordAs::GUEST),
+                'idea' => $request->query('idea'),
             ],
-            'hasKey' => filled(config('video-demo.ai.api_key')),
+            'recordAs' => RecordAs::options(),
+            'modelNotes' => collect(config('video-demo.ai.models'))->map(fn ($p) => ($p['reliable'] ?? true) ? '' : 'cheapest, but plans less reliably, so it may need more repairs')->all(),
+            'queueWarning' => VideoDemoServiceProvider::queueWarning(),
+            'hasKey' => Drivers::anyKey(),
         ]);
     }
 
@@ -90,7 +102,7 @@ class VideoController extends Controller
         } catch (Throwable $e) {
             report($e);
 
-            return response()->json(['error' => $e instanceof PlanningFailed ? $e->getMessage() : 'Claude could not be reached. Check ANTHROPIC_API_KEY and try again.'], 502);
+            return response()->json(['error' => $e instanceof PlanningFailed ? $e->getMessage() : 'The AI provider could not be reached. Check your API key and try again.'], 502);
         }
     }
 
@@ -99,17 +111,23 @@ class VideoController extends Controller
         $data = $request->validate($this->rules());
         $estimate = $estimator->estimate($data['model'], $data['effort'], (int) $data['target_seconds'], $code->routeCount());
         $style = VideoStyle::findOrFail($data['style_id']);
-        unset($data['style_id']);
+        $ideaId = $data['idea'] ?? null;
+        unset($data['style_id'], $data['idea']);
         $data['devices'] = array_values(array_intersect(Devices::keys(), $data['devices']));
+        $data['record_as'] = ($data['record_as'] ?? '') === '' ? null : $data['record_as'];
 
         $video = Video::create([
             ...$data,
+            'record_as_label' => RecordAs::label($data['record_as']),
             'style' => $style->snapshot(),
             'status' => VideoStatus::Queued,
             'estimate_low' => $estimate['low'],
             'estimate_high' => $estimate['high'],
         ]);
         $video->addLog('Queued');
+        if ($ideaId) {
+            VideoIdea::whereKey($ideaId)->update(['video_id' => $video->id]);
+        }
 
         GenerateVideo::dispatch($video);
 
@@ -122,6 +140,7 @@ class VideoController extends Controller
             'video' => $video,
             'devices' => Devices::all(),
             'efforts' => self::EFFORTS,
+            'queueWarning' => $video->status->isWorking() ? VideoDemoServiceProvider::queueWarning() : null,
         ]);
     }
 
@@ -134,6 +153,8 @@ class VideoController extends Controller
             'cost' => $video->cost,
             'log' => array_slice($video->log ?? [], -40),
             'error' => $video->error,
+            'issues' => $video->issues ?? [],
+            'stopping' => $video->stop_requested,
         ]);
     }
 
@@ -166,9 +187,12 @@ class VideoController extends Controller
                 'prompt' => ['required', 'string', 'max:4000'],
                 'target_seconds' => ['required', 'integer', 'min:10', 'max:'.config('video-demo.limits.max_seconds', 300)],
                 'effort' => ['required', Rule::in(self::EFFORTS)],
+                'max_cost' => ['nullable', 'numeric', 'min:0.01', 'max:100'],
+                'max_steps' => ['nullable', 'integer', 'min:3', 'max:250'],
             ]),
             'status' => VideoStatus::Queued,
             'error' => null,
+            'stop_requested' => false,
         ]);
         $video->addLog('Queued for a new plan');
         GenerateVideo::dispatch($video);
@@ -189,6 +213,7 @@ class VideoController extends Controller
         $video->update([
             'status' => VideoStatus::Queued,
             'error' => null,
+            'stop_requested' => false,
             'devices' => array_values(array_intersect(Devices::keys(), $chosen)),
         ]);
         $video->addLog('Queued to record the same plan again');
@@ -207,11 +232,28 @@ class VideoController extends Controller
 
         $replan = $request->input('mode') !== 'record' || empty($video->plan['steps']);
 
-        $video->update(['status' => VideoStatus::Queued, 'error' => null]);
+        $video->update(['status' => VideoStatus::Queued, 'error' => null, 'stop_requested' => false]);
         $video->addLog($replan ? 'Trying again with a new plan' : 'Trying again: recording the same plan');
         GenerateVideo::dispatch($video, replan: $replan);
 
         return redirect()->route('video-demo.studio.show', $video);
+    }
+
+    /**
+     * Stops a video being made. A queued video stops at once; a running one
+     * at its next safe point (between AI requests, or by closing the browser)
+     */
+    public function stop(Video $video): RedirectResponse
+    {
+        if ($video->status === VideoStatus::Queued) {
+            $video->update(['stop_requested' => true]);
+            $video->moveTo(VideoStatus::Stopped, 'Stopped by you before it started.');
+        } elseif ($video->status->isWorking()) {
+            $video->update(['stop_requested' => true]);
+            $video->addLog('Stopping…');
+        }
+
+        return back();
     }
 
     public function publish(Video $video, Publisher $publisher): RedirectResponse
@@ -278,6 +320,10 @@ class VideoController extends Controller
             'prompt' => ['required', 'string', 'max:4000'],
             'start_path' => ['nullable', 'string', 'max:255', 'starts_with:/'],
             'visibility' => ['required', Rule::in(['public', 'private'])],
+            'max_cost' => ['nullable', 'numeric', 'min:0.01', 'max:100'],
+            'max_steps' => ['nullable', 'integer', 'min:3', 'max:250'],
+            'record_as' => ['nullable', 'string', Rule::in(array_keys(RecordAs::options()))],
+            'idea' => ['nullable', 'integer'],
             'devices' => ['required', 'array', 'min:1'],
             'devices.*' => ['string', Rule::in(Devices::keys())],
             'style_id' => ['required', 'integer', Rule::exists(VideoStyle::class, 'id')],

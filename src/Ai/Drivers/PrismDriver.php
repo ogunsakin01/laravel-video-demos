@@ -38,7 +38,7 @@ class PrismDriver implements Driver
         $messages[] = new UserMessage($text);
     }
 
-    public function send(array &$messages, string $system, array $tools, string $model, string $effort): Turn
+    public function send(array &$messages, string $system, array $tools, string $model, string $effort, bool $longCache = false): Turn
     {
         $response = Prism::text()
             ->using($this->provider, $model)

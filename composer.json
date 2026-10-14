@@ -1,10 +1,14 @@
 {
     "name": "ogunsakin01/laravel-video-demos",
-    "description": "Generate how-to videos of your Laravel app with Claude. Describe a flow, set a length, see the cost, and get a recorded walkthrough.",
+    "description": "AI-made how-to videos of your Laravel app. Describe a flow, and Claude, OpenAI, Gemini or a local model plans it, a real browser records it, and you set the length, screens and spending limit.",
     "keywords": [
         "ai",
         "anthropic",
         "claude",
+        "gemini",
+        "ollama",
+        "openai",
+        "prism",
         "demo",
         "documentation",
         "how-to",

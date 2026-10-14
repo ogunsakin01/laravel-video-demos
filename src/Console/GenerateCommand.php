@@ -6,12 +6,14 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 use Ogunsakin01\VideoDemo\Ai\CodeTools;
 use Ogunsakin01\VideoDemo\Ai\CostEstimator;
+use Ogunsakin01\VideoDemo\Ai\Pricing;
 use Ogunsakin01\VideoDemo\Enums\VideoStatus;
 use Ogunsakin01\VideoDemo\Jobs\GenerateVideo;
 use Ogunsakin01\VideoDemo\Library\Publisher;
 use Ogunsakin01\VideoDemo\Models\Video;
 use Ogunsakin01\VideoDemo\Models\VideoStyle;
 use Ogunsakin01\VideoDemo\Recording\Devices;
+use Ogunsakin01\VideoDemo\Recording\RecordAs;
 use Ogunsakin01\VideoDemo\VideoDemoServiceProvider;
 use Throwable;
 
@@ -28,9 +30,12 @@ class GenerateCommand extends Command
         {--length=60 : Target length in seconds}
         {--style= : A style key or name, such as "ad" or "Quick tip" (the first style when left out)}
         {--devices= : Versions to record, comma separated: desktop, tv, tablet, mobile}
-        {--model= : The AI model (video-demo.ai.model when left out)}
+        {--model= : The AI model (the cheapest reliable one when left out)}
         {--effort= : low, medium, high, xhigh or max (Claude only)}
         {--start= : The path the video starts on, such as /dashboard}
+        {--max-cost= : Spending limit in US dollars; the AI plans within it and stops before passing it}
+        {--max-steps= : The most steps the plan may have}
+        {--as= : Record as this user (id or email), or "guest" for signed out}
         {--private : List it in the private library only}
         {--publish : Publish it to the library when it is ready}
         {--queue : Queue it and return straight away, instead of waiting}
@@ -77,8 +82,8 @@ class GenerateCommand extends Command
 
     protected function createVideo(CostEstimator $estimator, CodeTools $code): Video
     {
-        $model = $this->option('model') ?: config('video-demo.ai.model');
-        if (! config("video-demo.ai.models.$model")) {
+        $model = $this->option('model') ?: Pricing::defaultModel();
+        if (! Pricing::model($model)) {
             throw new \InvalidArgumentException("Unknown model [$model]. Choose one of: ".implode(', ', array_keys(config('video-demo.ai.models'))).'.');
         }
 
@@ -106,6 +111,25 @@ class GenerateCommand extends Command
             throw new \InvalidArgumentException('The start page must be a path, such as /dashboard.');
         }
 
+        $maxCost = $this->option('max-cost');
+        if ($maxCost !== null && (! is_numeric($maxCost) || $maxCost <= 0)) {
+            throw new \InvalidArgumentException('The spending limit must be a number of dollars above 0, such as 0.50.');
+        }
+
+        $maxSteps = $this->option('max-steps');
+        if ($maxSteps !== null && (! ctype_digit((string) $maxSteps) || $maxSteps < 3)) {
+            throw new \InvalidArgumentException('Max steps must be a whole number of at least 3.');
+        }
+
+        $recordAs = $this->option('as') ?: null;
+        if ($recordAs !== null && $recordAs !== RecordAs::GUEST) {
+            try {
+                $recordAs = (string) RecordAs::find($recordAs)->getAuthIdentifier();
+            } catch (\RuntimeException $e) {
+                throw new \InvalidArgumentException($e->getMessage());
+            }
+        }
+
         $estimate = $estimator->estimate($model, $effort, $seconds, $code->routeCount());
 
         $video = Video::create([
@@ -118,6 +142,10 @@ class GenerateCommand extends Command
             'visibility' => $this->option('private') ? 'private' : 'public',
             'style' => $style->snapshot(),
             'devices' => array_values(array_intersect(Devices::keys(), $devices)),
+            'max_cost' => $maxCost !== null ? (float) $maxCost : null,
+            'max_steps' => $maxSteps !== null ? (int) $maxSteps : null,
+            'record_as' => $recordAs,
+            'record_as_label' => RecordAs::label($recordAs),
             'status' => VideoStatus::Queued,
             'estimate_low' => $estimate['low'],
             'estimate_high' => $estimate['high'],
@@ -128,6 +156,8 @@ class GenerateCommand extends Command
             $this->components->twoColumnDetail('Estimated AI cost', $estimate['known']
                 ? sprintf('$%.2f – $%.2f', $estimate['low'], $estimate['high'])
                 : 'unknown (no prices for this model)');
+            $this->components->twoColumnDetail('Spending limit', sprintf('$%.2f', $video->spendLimit()));
+            $this->components->twoColumnDetail('Recorded as', $video->record_as_label);
         }
 
         return $video;
@@ -155,6 +185,7 @@ class GenerateCommand extends Command
             'title' => $video->title,
             'status' => $video->status->value,
             'error' => $video->error,
+            'issues' => $video->issues ?? [],
             'versions' => $video->recordedDevices() ?: $video->deviceList(),
             'seconds' => $video->duration_seconds,
             'cost' => round($video->cost, 4),
@@ -177,7 +208,10 @@ class GenerateCommand extends Command
         $this->newLine();
 
         if (! $ok) {
-            $this->components->error($video->error ?? 'The video could not be made.');
+            $this->components->error($video->error ?? ($video->status === VideoStatus::Stopped ? 'Stopped.' : 'The video could not be made.'));
+            foreach ($video->issues ?? [] as $issue) {
+                $this->components->twoColumnDetail($issue['path'], $issue['problem'].($issue['detail'] ? ': '.$issue['detail'] : ''));
+            }
         } else {
             $this->components->info($message ?? sprintf('"%s" is ready: %s seconds, $%.4f.', $video->title, $video->duration_seconds, $video->cost));
         }

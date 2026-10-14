@@ -1,8 +1,6 @@
 <x-video-demo::layout title="New video" badge="Studio · local" :home="route('video-demo.studio.index')">
   <x-slot:nav>
-    @if (\Ogunsakin01\VideoDemo\Studio\Examples::enabled())<a class="vd-btn vd-btn-ghost" href="{{ route('video-demo.studio.examples') }}">Examples</a>@endif
-    <a class="vd-btn vd-btn-ghost" href="{{ route('video-demo.studio.suggestions.index') }}">Ideas</a>
-    <a class="vd-btn" href="{{ route('video-demo.studio.index') }}">All videos</a>
+    @include('video-demo::studio.partials.nav', ['active' => 'create'])
   </x-slot:nav>
 
   <section class="vd-hero">
@@ -14,11 +12,16 @@
   </section>
 
   @unless ($hasKey)
-    <div class="vd-flash vd-flash-error" role="alert">Set <code>ANTHROPIC_API_KEY</code> in your <code>.env</code> to generate videos.</div>
+    <div class="vd-flash vd-flash-error" role="alert">Set <code>ANTHROPIC_API_KEY</code> (or your provider's key, see the README) in your <code>.env</code> to generate videos.</div>
   @endunless
+
+  @if ($queueWarning)
+    <div class="vd-flash vd-flash-warn" role="status">{{ $queueWarning }}</div>
+  @endif
 
   <form method="post" action="{{ route('video-demo.studio.store') }}" class="vd-split" id="vd-form">
     @csrf
+    @if ($defaults['idea'])<input type="hidden" name="idea" value="{{ $defaults['idea'] }}">@endif
     <div class="vd-card vd-stack">
       <div>
         <div class="vd-field-head">
@@ -78,6 +81,17 @@
         </div>
       </div>
 
+      <div>
+        <label for="record_as">Record as</label>
+        <select id="record_as" name="record_as">
+          @foreach ($recordAs as $value => $label)
+            <option value="{{ $value }}" @selected((string) old('record_as', $defaults['record_as']) === (string) $value)>{{ $label }}</option>
+          @endforeach
+        </select>
+        <span class="vd-hint">The video shows what this user sees. Each role sees different menus and pages.</span>
+        @error('record_as')<span class="vd-error">{{ $message }}</span>@enderror
+      </div>
+
       <hr class="vd-divider">
 
       <div class="vd-row">
@@ -85,9 +99,10 @@
           <label for="model">Model</label>
           <select id="model" name="model">
             @foreach ($models as $id => $label)
-              <option value="{{ $id }}" data-effort="{{ \Ogunsakin01\VideoDemo\Ai\Drivers\Drivers::supportsEffort($id) ? '1' : '0' }}" @selected(old('model', $defaults['model']) === $id)>{{ $label }}</option>
+              <option value="{{ $id }}" data-note="{{ $modelNotes[$id] ?? '' }}" data-effort="{{ \Ogunsakin01\VideoDemo\Ai\Drivers\Drivers::supportsEffort($id) ? '1' : '0' }}" @selected(old('model', $defaults['model']) === $id)>{{ $label }}</option>
             @endforeach
           </select>
+          <span class="vd-hint" id="vd-model-note"></span>
         </div>
         <div>
           <label for="effort">Effort</label>
@@ -105,6 +120,21 @@
           </select>
         </div>
       </div>
+
+      <div class="vd-row">
+        <div>
+          <label for="max_cost">Spending limit <span class="vd-optional">US $</span></label>
+          <input type="number" id="max_cost" name="max_cost" step="0.01" min="0.01" max="100" inputmode="decimal" value="{{ old('max_cost', $defaults['max_cost']) }}">
+          <span class="vd-hint">The AI plans within it and stops before going over.</span>
+          @error('max_cost')<span class="vd-error">{{ $message }}</span>@enderror
+        </div>
+        <div>
+          <label for="max_steps">Max steps <span class="vd-optional">optional</span></label>
+          <input type="number" id="max_steps" name="max_steps" min="3" max="250" inputmode="numeric" value="{{ old('max_steps', $defaults['max_steps']) }}" placeholder="No limit">
+          <span class="vd-hint">Fewer steps make a shorter, cheaper plan.</span>
+          @error('max_steps')<span class="vd-error">{{ $message }}</span>@enderror
+        </div>
+      </div>
     </div>
 
     <aside class="vd-card vd-stack" aria-live="polite">
@@ -113,9 +143,10 @@
         <div class="vd-figure" id="vd-estimate">—</div>
         <div class="vd-small vd-muted" id="vd-estimate-note">&nbsp;</div>
       </div>
-      <p class="vd-small vd-muted" style="margin:0">Charged to your Anthropic API key. Recording and encoding run on this machine and cost nothing. Generation stops if it passes ${{ number_format(config('video-demo.limits.max_cost_per_video'), 2) }}.</p>
+      <div class="vd-small vd-error" id="vd-limit-warn" hidden></div>
+      <p class="vd-small vd-muted" style="margin:0">Charged to your AI provider's key. Pages are checked for errors before any AI is used. Recording and encoding run on this machine and cost nothing. You can stop a video at any time.</p>
       <button class="vd-btn vd-btn-primary vd-btn-block" type="submit" @disabled(! $hasKey)>Generate video</button>
-      <p class="vd-small vd-muted" style="margin:0">Needs a queue worker:<br><code>php artisan queue:work --timeout=1800</code></p>
+      <p class="vd-small vd-muted" style="margin:0">Needs a queue worker:<br><code>php artisan queue:work {{ config('video-demo.queue.connection') ?: 'video-demo' }}{{ config('video-demo.queue.connection') ? ' --queue='.config('video-demo.queue.name') : '' }}</code></p>
     </aside>
   </form>
 
@@ -130,6 +161,17 @@
         const note = document.getElementById('vd-estimate-note');
         const money = n => '$' + (n < 0.1 ? n.toFixed(3) : n.toFixed(2));
         let seq = 0;
+        let last = null;
+
+        // Warn when even a cheap run would pass the spending limit
+        const limit = form.elements.max_cost;
+        const warn = document.getElementById('vd-limit-warn');
+        function checkLimit() {
+          const max = Number(limit.value);
+          warn.hidden = !(last && last.known && max > 0 && last.low > max);
+          if (!warn.hidden) warn.textContent = 'The limit of ' + money(max) + ' is below the lowest estimate, so the AI will likely stop before the plan is done. Raise it, pick a cheaper model or a shorter length.';
+        }
+        limit.addEventListener('input', checkLimit);
 
         const mark = () => segments.forEach(s => s.setAttribute('aria-pressed', String(s.dataset.seconds === seconds.value)));
         function setSeconds(value) {
@@ -161,6 +203,8 @@
             }
             out.textContent = money(e.low) + ' – ' + money(e.high);
             note.textContent = 'Most likely about ' + money(e.expected) + ', over roughly ' + e.turns + ' requests.';
+            last = e;
+            checkLimit();
           } catch {
             out.textContent = '—';
           }
@@ -169,7 +213,12 @@
 
         // Effort is a Claude setting; other providers ignore it
         const effort = form.elements.effort;
-        const syncEffort = () => { effort.disabled = form.elements.model.selectedOptions[0]?.dataset.effort === '0'; };
+        const modelNote = document.getElementById('vd-model-note');
+        const syncEffort = () => {
+          const option = form.elements.model.selectedOptions[0];
+          effort.disabled = option?.dataset.effort === '0';
+          modelNote.textContent = option?.dataset.note ? 'This model is the ' + option.dataset.note + '.' : '';
+        };
         form.elements.model.addEventListener('change', syncEffort);
         syncEffort();
         form.addEventListener('submit', () => { effort.disabled = false; });

@@ -67,18 +67,26 @@ php artisan migrate
 Add to `.env` on your machine:
 
 ```dotenv
-ANTHROPIC_API_KEY=sk-ant-...
-# The user the recorder signs in as, by id or email
+ANTHROPIC_API_KEY=sk-ant-...      # or another provider's key, see "AI providers"
+# The user the recorder signs in as by default, by id or email (each video can pick another)
 VIDEO_DEMO_LOGIN_AS=demo@example.com
 # Where your local app is served, if not APP_URL
 VIDEO_DEMO_BASE_URL=https://myapp.test
+# The name on the studio and library pages (default: "APP_NAME videos")
+VIDEO_DEMO_NAME="Acme help videos"
 ```
 
-Start a queue worker and open the studio at `/video-demo/studio`:
+Make sure `APP_URL` is the address you open the app at (`https://myapp.test`, not `http://localhost`): the recorder and the library's links use it.
+
+Start a worker for the package's queue and open the studio at `/video-demo/studio`:
 
 ```bash
-php artisan queue:work --timeout=1800
+php artisan queue:work video-demo
 ```
+
+Videos run on their own queue connection, `video-demo`: a copy of your default connection whose `retry_after` is two hours. Without it, a video taking longer than your queue's `retry_after` (90 seconds in a new Laravel app) would be started a second time and paid for twice. Your other workers don't pick these jobs up. To use a connection of your own instead, set `VIDEO_DEMO_QUEUE_CONNECTION` and give it a `retry_after` of at least 1800; the studio warns you if it is shorter, or if the queue is `sync`.
+
+The worker loads the package's code when it starts, so restart it after updating the package (see [Upgrading](#upgrading)).
 
 ### Using an ffmpeg that isn't on your PATH
 
@@ -103,12 +111,41 @@ VIDEO_DEMO_FFMPEG=/Users/you/.local/bin/ffmpeg-remotion
 
 `php artisan video-demo:install` warns if it can't run ffmpeg.
 
+## Upgrading
+
+1. **Move to the new version.** While the package is below 1.0, each minor version (0.2, 0.3…) may include breaking changes, so Composer's `^` keeps you on the one you installed: `composer update` won't move `^0.2` to 0.3. Ask for the new one by name:
+
+   ```bash
+   composer require ogunsakin01/laravel-video-demos:^0.4
+   ```
+
+   Patch releases (0.4.0 to 0.4.1) arrive with a normal `composer update`.
+2. **Restart your queue workers.** A running `php artisan queue:work` keeps the code it loaded when it started, so without a restart videos are still made by the old version, even though the studio pages show the new one:
+
+   ```bash
+   php artisan queue:restart     # running workers stop after their current job
+   php artisan queue:work video-demo
+   ```
+
+   From 0.4, videos run on the package's own `video-demo` queue, so start a worker for it as above; a plain `queue:work` no longer picks them up.
+
+   With Horizon, run `php artisan horizon:terminate`; with Supervisor, it starts the workers again for you. Do the same in production after a deploy.
+3. **Run new migrations, if any:** `php artisan migrate`.
+4. **Check the [changelog](CHANGELOG.md)** for what changed. If you published the config or views, compare them with the new versions: new settings work without being in your published config, but changes to the published views won't reach you.
+5. **If your app caches its config or views,** clear them: `php artisan optimize:clear`.
+
 ## The studio
 
 The studio is where videos are made. It is only registered when `APP_ENV` is `local` (or `VIDEO_DEMO_STUDIO=true`), and never in production unless you set `studio.allow_in_production`. Its routes, including the signed sign-in link the recorder uses, do not exist when it is off.
 
 - **New video**: describe the flow, or use **Complete with AI**. Choose the length (a target: captions and pauses stretch or shrink to fit), the versions to record, a style, the model and the effort. The estimated cost updates as you change them.
+  - **Record as**: who the video shows the app as: the default user, a guest (signed out), or any user. Apps using [spatie/laravel-permission](https://github.com/spatie/laravel-permission) get a few users of each role to pick from, so you can make the admin's video and the member's video of the same flow.
+  - **Spending limit**: the most this video may cost ($2 unless you change it, or `limits.max_cost_per_video`). The AI is told its budget, sees how many requests it has left, and stops before a request that would go over. The form warns you if even the lowest estimate is above the limit.
+  - **Max steps**: the most steps the plan may have. Fewer steps make a shorter, cheaper plan.
 - **Video page**: watch each version, read the plan, see the actual cost and progress, publish or unpublish, record the same plan again (free), or ask the AI for a new plan.
+  - **Stop** a video while it is being made: at once if it is still queued, otherwise before the next AI request or by closing the browser mid-recording. You pay only for what was used so far. **Try again** starts it over.
+  - **Pages are checked first.** Before planning, the start page is opened as the chosen user; before recording, every page in the plan is. A page that returns an error, sends the user to sign in, throws a JavaScript error or doesn't load stops the video there, with the problem listed at the top of the page (including Laravel's error message), so no AI is spent on a page that can't work. An error from your app during recording also stops it, instead of asking the AI to "repair" a plan that was right.
+  - **Embed**: once published, copy the code to show it anywhere: the Blade component for your own pages, or a plain HTML `<video>` tag.
 - **Styles**: how the AI writes each video (its "direction") and how cards and captions look: light or dark, accent colour, captions at the top or bottom, pace, and **art**. With abstract art, title cards get line art that draws itself on and drifts, and the words rise into place, like an ad. The defaults are Clean walkthrough, Quick tip, Detailed tutorial, Product showcase and **Promo ad**; they come from `config/video-demo.php` and are copied into the database the first time. Add and edit your own on this page.
 
 On a developer's machine the studio is open. Anywhere else it is enabled (a staging server, say), only users your `viewVideoDemoStudio` gate allows can use it, and without that gate it is closed:
@@ -116,7 +153,7 @@ On a developer's machine the studio is open. Anywhere else it is enabled (a stag
 ```php
 Gate::define('viewVideoDemoStudio', fn ($user) => $user->isAdmin());
 ```
-- **Ideas**: not sure what to make first? The AI reads your routes and suggests the videos your users most need, each with a description, length, start page and style. **Make this video** opens it in the form, filled in. It costs about a cent or two.
+- **Ideas**: not sure what to make first? The AI reads your routes and suggests the videos your users most need, each with a description, length, start page and style. **Make this video** opens it in the form, filled in. Ideas are saved: **Suggest more** adds new ones without repeating those you have, **Replace all** starts over, and ideas made into videos are marked with a link to the video. It costs about a cent or two.
 - **Examples**: sample videos made with this package, in each style and screen size, with **Make one like this**.
 - **Requested by users**: searches in your library that found nothing. Click one to start a video.
 
@@ -138,7 +175,7 @@ php artisan video-demo:publish post-a-job          # or --unpublish
 php artisan video-demo:refresh                     # re-record published videos after UI changes, no AI cost
 ```
 
-`video-demo:generate` also takes `--title`, `--model`, `--effort`, `--start=/path`, `--private` and `--queue` (queue it and return straight away).
+`video-demo:generate` also takes `--title`, `--model`, `--effort`, `--start=/path`, `--private`, `--max-cost=0.50` (the spending limit in dollars), `--max-steps=20`, `--as=` (a user id or email, or `guest`) and `--queue` (queue it and return straight away). With `--json`, broken pages found before recording are listed under `issues`. `video-demo:suggest --replace` starts the ideas over.
 
 ## The library
 
@@ -158,6 +195,10 @@ When a search finds nothing, users can ask for a video. Requests are stored in p
 {{-- A search box that opens the library --}}
 <x-video-demo::search placeholder="How do I…" />
 ```
+
+Each published video's page in the studio (and in the staff library) has this code ready to copy, plus a plain HTML `<video>` tag for pages outside your app.
+
+Videos on a local disk (such as `public`) are linked by path, `/storage/video-demo/…`, so they play at whatever address the app is opened at, even if `APP_URL` is out of date. Disks on another host, such as S3 or a CDN, keep their full address.
 
 To restyle the library pages, publish the views:
 
@@ -201,11 +242,38 @@ The studio shows an estimate before you generate, and each video records what it
 | Model, effort | 30 seconds | 1 minute | 2 minutes |
 | --- | --- | --- | --- |
 | Claude Opus 5.5, high | ~$0.54 | ~$0.63 | ~$0.90 |
-| Claude Opus 5.5, medium | ~$0.38 | ~$0.45 | ~$0.66 |
-| Claude Sonnet 5.5, high | ~$0.28 | ~$0.33 | ~$0.47 |
-| Claude Haiku 5.5, high | ~$0.01 | ~$0.02 | ~$0.02 |
+| Claude Opus 5.5, medium | ~$0.37 | ~$0.45 | ~$0.66 |
+| Claude Sonnet 5.5, high (the default) | ~$0.27 | ~$0.32 | ~$0.45 |
+| Claude Sonnet 5.5, medium | ~$0.19 | ~$0.23 | ~$0.33 |
+| Claude Haiku 5.5, high | ~$0.02 | ~$0.02 | ~$0.03 |
 
-These are estimates, not measurements yet: compare them with the actual costs your videos show. "Complete with AI" costs about a cent. Generation stops if a video passes `limits.max_cost_per_video` ($2 by default). Prices are in the config; update them if your provider's change. A model without prices still works, but shows its cost as unknown.
+Real videos land close to these: a 30-second Haiku video cost $0.015 and a 90-second Opus video with two versions cost $0.67, both including two repairs. "Complete with AI" costs about a cent.
+
+Each video's cost is worked out from the token counts the API returns and the prices in the config, which match [Anthropic's price list](https://platform.claude.com/docs/en/about-claude/pricing) (per million tokens):
+
+| Model | Input | Cache write (5 min / 1 hour) | Cache read | Output |
+| --- | --- | --- | --- | --- |
+| Claude Opus 5.5 | $4 | $5 / $8 | $0.20 | $20 |
+| Claude Sonnet 5.5 | $2 | $2.50 / $4 | $0.10 | $10 |
+| Claude Haiku 5.5 | $0.10 | $0.125 / $0.20 | $0.01 | $0.50 |
+
+Haiku charges five times these prices for a request whose prompt (cached tokens included) is over 100K tokens, and the package counts that. Thinking is billed as output. Update the prices in the config if your provider's change. A model without prices still works, but shows its cost as unknown.
+
+**The default model** is the cheapest one marked `reliable` in `ai.models` whose provider has a key: Claude Sonnet 5.5 out of the box. Haiku is cheaper but plans less reliably, so it is offered but not picked for you. Set `VIDEO_DEMO_MODEL` to choose your own default.
+
+### Lowering your AI costs
+
+- **Set a spending limit** on each video, or lower `limits.max_cost_per_video`. The AI plans within it and stops before going over.
+- **Use Sonnet, or medium effort.** Sonnet at medium costs about a third of Opus at high, and plans most flows well. Try Haiku for short, simple videos.
+- **Keep videos short** and **cap the steps**. Length and steps drive the number of requests.
+- **Give a start page** and a precise description. The AI reads less code to find its way.
+- **Narrow `ai.code.paths`** to the folders that matter, and put facts the code doesn't show in `ai.notes` so the AI doesn't search for them.
+- **Fix broken pages first.** Pages are checked for free before any AI is used; a failed check costs nothing.
+- **Re-record instead of re-planning.** After a design change, "Record the same plan again" and `video-demo:refresh` cost nothing.
+- **Add versions, not videos.** Desktop, tablet and mobile share one plan, so extra versions add no AI cost.
+- **Stop** a video the moment it is going wrong.
+
+The package already keeps requests cheap: the conversation is cached (later requests pay the cache price for it), long recordings use the one-hour cache so repairs still hit it, and a failed step sends the AI only the part of the page around it.
 
 ## Configuration
 
@@ -218,12 +286,15 @@ Everything is in [`config/video-demo.php`](config/video-demo.php), with comments
 | `ai.code.paths`, `ai.code.deny` | What the AI may read |
 | `ai.code.redact`, `ai.code.redact_patterns` | Hiding secrets before code is sent |
 | `ai.notes` | Anything the AI should know that the code doesn't say, such as your sample data or test card numbers |
-| `recorder.login_as` | The user the recorder signs in as |
+| `recorder.login_as` | The user the recorder signs in as by default |
+| `recorder.check_pages` | Check pages for errors before planning and recording (on by default) |
+| `queue.connection`, `queue.retry_after` | The queue videos run on; leave the connection empty to use the package's own |
+| `ui.name` (`VIDEO_DEMO_NAME`) | The name on the studio and library pages |
 | `styles` | The styles offered at first |
 | `devices`, `default_devices` | Screen sizes, and which are switched on |
 | `recorder.speed` | How much faster videos play than they were recorded |
 | `studio.gate` | Who may use the studio outside local |
-| `limits` | Cost, request and repair limits per video |
+| `limits` | The default spending limit, and request and repair limits per video |
 | `ui.accent`, `ui.logo`, `ui.font_url` | The look of the studio and library |
 
 ## AI providers
@@ -237,17 +308,36 @@ composer require prism-php/prism:^0.100
 php artisan vendor:publish --tag=prism-config   # then set your provider's key in config/prism.php
 ```
 
-Then add the model to `ai.models` in `config/video-demo.php`, with its provider and, for cost estimates, its prices:
+Set the provider's key in `.env`, as Prism reads it:
+
+```dotenv
+# OpenAI
+OPENAI_API_KEY=sk-...
+VIDEO_DEMO_MODEL=gpt-6.1-sol
+
+# Google Gemini
+GEMINI_API_KEY=...
+VIDEO_DEMO_MODEL=gemini-3.8-flash
+
+# Ollama, on your machine: no key, no cost
+OLLAMA_URL=http://localhost:11434
+VIDEO_DEMO_MODEL=qwen3-coder
+```
+
+Then add the model to `ai.models` in `config/video-demo.php` (publish it with `php artisan vendor:publish --tag=video-demo-config`), with its provider and, for cost estimates, its prices in US dollars per million tokens. These are the listed prices in October 2026; check your provider's pricing page:
 
 ```php
 'models' => [
     // ...the Claude models
-    'your-model-name' => ['label' => 'My model', 'provider' => 'openai', 'input' => 1.25, 'output' => 10.00],
-    'qwen3-coder' => ['label' => 'Qwen3 Coder (local)', 'provider' => 'ollama', 'input' => 0, 'output' => 0],
+    'gpt-6.1-sol' => ['label' => 'GPT-6.1 Sol', 'provider' => 'openai', 'reliable' => true, 'input' => 2.00, 'output' => 10.00, 'cache_read' => 0.10],
+    'gemini-3.8-flash' => ['label' => 'Gemini 3.8 Flash', 'provider' => 'gemini', 'reliable' => false, 'input' => 0.75, 'output' => 3.75, 'cache_read' => 0.075],
+    'qwen3-coder' => ['label' => 'Qwen3 Coder (local)', 'provider' => 'ollama', 'reliable' => false, 'input' => 0, 'output' => 0],
 ],
 ```
 
-The planner reads code and calls tools many times per video, so weaker models write plans that fail more often and need more repairs. Effort only applies to Claude.
+The studio offers every model whose provider has a key. Without `VIDEO_DEMO_MODEL`, new videos start on the cheapest model marked `reliable` that has a key.
+
+The planner reads code and calls tools many times per video, so weaker models write plans that fail more often and need more repairs. Mark a model `reliable` once it has made a few videos well. Effort and prompt caching settings only apply to Claude; other providers cache in their own way.
 
 ## Payments and third-party services
 

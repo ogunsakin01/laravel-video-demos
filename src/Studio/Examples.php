@@ -10,7 +10,7 @@ namespace Ogunsakin01\VideoDemo\Studio;
  */
 class Examples
 {
-    public const DEFAULT_URL = 'https://cdn.jsdelivr.net/gh/ogunsakin01/laravel-video-demos@v0.2.0';
+    public const DEFAULT_URL = 'https://cdn.jsdelivr.net/gh/ogunsakin01/laravel-video-demos@v0.4.0';
 
     public static function enabled(): bool
     {

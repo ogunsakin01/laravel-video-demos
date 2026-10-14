@@ -1,7 +1,6 @@
 <x-video-demo::layout title="Examples" badge="Studio · local" :home="route('video-demo.studio.index')">
   <x-slot:nav>
-    <a class="vd-btn" href="{{ route('video-demo.studio.index') }}">All videos</a>
-    <a class="vd-btn vd-btn-primary" href="{{ route('video-demo.studio.create') }}">New video</a>
+    @include('video-demo::studio.partials.nav', ['active' => 'examples'])
   </x-slot:nav>
 
   <section class="vd-hero">

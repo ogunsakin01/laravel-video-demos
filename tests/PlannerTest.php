@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\File;
 use Ogunsakin01\VideoDemo\Ai\CodeTools;
 use Ogunsakin01\VideoDemo\Ai\Planner;
 use Ogunsakin01\VideoDemo\Ai\PlanningFailed;
+use Ogunsakin01\VideoDemo\Ai\VideoStopped;
 use Ogunsakin01\VideoDemo\Enums\VideoStatus;
 use Ogunsakin01\VideoDemo\Models\Video;
 use Ogunsakin01\VideoDemo\Recording\RecordingResult;
@@ -159,7 +160,7 @@ class PlannerTest extends TestCase
             app(Planner::class)->plan($this->video());
             $this->fail('Expected the cost limit to stop planning.');
         } catch (PlanningFailed $e) {
-            $this->assertStringContainsString('over the $0.01 limit', $e->getMessage());
+            $this->assertStringContainsString("over this video's \$0.01 limit", $e->getMessage());
         }
 
         config(['video-demo.limits.max_cost_per_video' => 2.0]);
@@ -167,5 +168,63 @@ class PlannerTest extends TestCase
         $this->expectException(PlanningFailed::class);
         $this->expectExceptionMessage('The model declined this request');
         app(Planner::class)->plan($this->video());
+    }
+
+    public function test_keeps_to_the_videos_step_limit_and_spending_limit(): void
+    {
+        $steps = fn (int $n) => array_map(fn ($i) => $this->step('wait', ['ms' => 500]), range(1, $n));
+        $this->respond(1, [$this->submit('tu_long', [$this->step('goto', ['url' => '/']), ...$steps(4)])]);
+        $this->respond(2, [$this->submit('tu_short', [$this->step('goto', ['url' => '/']), ...$steps(2)])]);
+
+        $video = $this->video();
+        $video->update(['max_steps' => 3, 'max_cost' => 1.5]);
+        $session = app(Planner::class)->plan($video);
+
+        // The brief named both limits
+        $brief = $this->request(1)['body']['messages'][0]['content'];
+        $this->assertStringContainsString('at most 3 steps', $brief);
+        $this->assertStringContainsString('at most $1.50 on AI requests', $brief);
+
+        // The 5-step plan was refused, with the budget left
+        $answer = end($this->request(2)['body']['messages'])['content'][0];
+        $this->assertTrue($answer['is_error']);
+        $this->assertStringContainsString('The plan has 5 steps; the limit is 3.', $answer['content']);
+        $this->assertStringContainsString('[Budget: about', $answer['content']);
+        $this->assertCount(3, $session->plan->steps);
+    }
+
+    public function test_stops_before_a_request_that_would_pass_the_videos_own_limit(): void
+    {
+        config(['video-demo.limits.max_cost_per_video' => 50.0]);
+        $read = fn ($id) => [['type' => 'tool_use', 'id' => $id, 'name' => 'list_files', 'input' => ['path' => 'resources/views']]];
+        $this->respond(1, $read('tu_1'));
+        $this->respond(2, $read('tu_2'));
+
+        // Each fake response costs about $0.049; the limit allows the first only
+        $video = $this->video();
+        $video->update(['max_cost' => 0.06]);
+
+        try {
+            app(Planner::class)->plan($video);
+            $this->fail('Expected the spending limit to stop planning.');
+        } catch (PlanningFailed $e) {
+            $this->assertStringContainsString('the next request would take this video past its $0.06 limit', $e->getMessage());
+        }
+        $this->assertFalse($this->sent(2));
+        $this->assertLessThan(0.06, $video->fresh()->cost);
+    }
+
+    public function test_stop_ends_planning_before_the_next_request(): void
+    {
+        $this->respond(1, [['type' => 'tool_use', 'id' => 'tu_1', 'name' => 'list_files', 'input' => ['path' => 'resources/views']]]);
+        $video = $this->video();
+        $video->update(['stop_requested' => true]);
+
+        $this->expectException(VideoStopped::class);
+        try {
+            app(Planner::class)->plan($video);
+        } finally {
+            $this->assertFalse($this->sent(1));
+        }
     }
 }

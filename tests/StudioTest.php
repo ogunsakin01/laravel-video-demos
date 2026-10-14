@@ -63,7 +63,7 @@ class StudioTest extends TestCase
         Queue::assertPushed(GenerateVideo::class, fn ($job) => $job->video->is($video) && $job->replan);
     }
 
-    public function test_recorder_login_link_signs_in_only_the_demo_user(): void
+    public function test_recorder_login_link_signs_in_the_user_a_video_is_recorded_as(): void
     {
         Schema::create('users', function ($table) {
             $table->id();
@@ -73,18 +73,19 @@ class StudioTest extends TestCase
             $table->timestamps();
         });
         config(['auth.providers.users.model' => User::class]);
-        $demo = User::forceCreate(['email' => 'demo@example.com', 'password' => 'x']);
-        $other = User::forceCreate(['email' => 'other@example.com', 'password' => 'x']);
-        config(['video-demo.recorder.login_as' => 'demo@example.com']);
+        User::forceCreate(['email' => 'demo@example.com', 'password' => 'x']);
+        $member = User::forceCreate(['email' => 'member@example.com', 'password' => 'x']);
 
-        $this->get('/video-demo/studio/_recorder/login/'.$demo->id)->assertForbidden();
+        // Without a valid signature nobody gets in
+        $this->get('/video-demo/studio/_recorder/login/'.$member->id)->assertForbidden();
 
-        $link = URL::temporarySignedRoute('video-demo.studio.recorder-login', now()->addMinutes(5), ['user' => $other->id], absolute: false);
-        $this->get($link)->assertForbidden();
-
-        $link = URL::temporarySignedRoute('video-demo.studio.recorder-login', now()->addMinutes(5), ['user' => $demo->id], absolute: false);
+        // Signed links work for any user, so videos can be recorded as anyone
+        $link = URL::temporarySignedRoute('video-demo.studio.recorder-login', now()->addMinutes(5), ['user' => $member->id], absolute: false);
         $this->get($link)->assertRedirect('/');
-        $this->assertAuthenticatedAs($demo);
+        $this->assertAuthenticatedAs($member);
+
+        $link = URL::temporarySignedRoute('video-demo.studio.recorder-login', now()->addMinutes(5), ['user' => 999], absolute: false);
+        $this->get($link)->assertNotFound();
     }
 
     public function test_a_video_needs_at_least_one_known_version(): void

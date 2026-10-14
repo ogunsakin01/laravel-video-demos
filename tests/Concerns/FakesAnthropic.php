@@ -26,6 +26,10 @@ trait FakesAnthropic
         $port = random_int(20000, 40000);
         $this->server = new Process([PHP_BINARY, '-S', "127.0.0.1:$port", __DIR__.'/../fixtures/fake-anthropic.php'], null, ['FAKE_DIR' => $this->dir]);
         $this->server->start();
+        // Stop the server even if a test dies with a fatal error, or the
+        // orphaned server keeps the whole test run waiting
+        $server = $this->server;
+        register_shutdown_function(fn () => $server->isRunning() && $server->stop(0));
         for ($i = 0; $i < 50 && ! @fsockopen('127.0.0.1', $port); $i++) {
             usleep(100_000);
         }
@@ -63,5 +67,11 @@ trait FakesAnthropic
     protected function request(int $n): array
     {
         return json_decode(File::get("$this->dir/request-$n.json"), true);
+    }
+
+    /** Whether the n-th request was sent at all */
+    protected function sent(int $n): bool
+    {
+        return File::exists("$this->dir/request-$n.json");
     }
 }

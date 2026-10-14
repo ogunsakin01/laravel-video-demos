@@ -3,6 +3,7 @@
 namespace Ogunsakin01\VideoDemo\Ai\Drivers;
 
 use Ogunsakin01\VideoDemo\Ai\Claude;
+use Ogunsakin01\VideoDemo\Ai\Pricing;
 use Ogunsakin01\VideoDemo\Ai\Usage;
 
 /**
@@ -22,7 +23,7 @@ class AnthropicDriver implements Driver
         $messages[] = ['role' => 'user', 'content' => $text];
     }
 
-    public function send(array &$messages, string $system, array $tools, string $model, string $effort): Turn
+    public function send(array &$messages, string $system, array $tools, string $model, string $effort, bool $longCache = false): Turn
     {
         $response = $this->claude->create([
             'model' => $model,
@@ -38,7 +39,7 @@ class AnthropicDriver implements Driver
             'outputConfig' => ['effort' => $effort],
             // Caches everything up to the latest message, so each request
             // pays the cheap cached price for the conversation so far
-            'cacheControl' => ['type' => 'ephemeral'],
+            'cacheControl' => $longCache ? ['type' => 'ephemeral', 'ttl' => '1h'] : ['type' => 'ephemeral'],
             'messages' => $messages,
         ]);
 
@@ -85,8 +86,11 @@ class AnthropicDriver implements Driver
             }
         }
 
+        // Writes to the 1-hour cache cost more than to the 5-minute one
+        $write1h = (int) ($response->usage->cacheCreation->ephemeral1hInputTokens ?? 0);
+
         // After a fallback the answering model may differ; price by it when known
-        $model = config("video-demo.ai.models.{$response->model}") ? $response->model : $requestedModel;
+        $model = Pricing::model($response->model) ? $response->model : $requestedModel;
 
         return new Turn(
             stop: match ($response->stopReason) {
@@ -99,9 +103,10 @@ class AnthropicDriver implements Driver
             usage: Usage::fromCounts(
                 $model,
                 (int) $response->usage->inputTokens,
-                (int) ($response->usage->cacheCreationInputTokens ?? 0),
+                (int) ($response->usage->cacheCreationInputTokens ?? 0) - $write1h,
                 (int) ($response->usage->cacheReadInputTokens ?? 0),
                 (int) $response->usage->outputTokens,
+                $write1h,
             ),
             model: $model,
             text: $text,

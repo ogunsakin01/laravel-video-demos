@@ -37,6 +37,12 @@ use Ogunsakin01\VideoDemo\Recording\Devices;
  * @property ?float $duration_seconds
  * @property int $version
  * @property ?Carbon $published_at
+ * @property ?float $max_cost
+ * @property ?int $max_steps
+ * @property ?string $record_as
+ * @property ?string $record_as_label
+ * @property ?list<array{path: string, problem: string, status: ?int, url: ?string, detail: ?string}> $issues
+ * @property bool $stop_requested
  */
 class Video extends Model
 {
@@ -60,6 +66,9 @@ class Video extends Model
             'estimate_high' => 'float',
             'duration_seconds' => 'float',
             'published_at' => 'datetime',
+            'max_cost' => 'float',
+            'issues' => 'array',
+            'stop_requested' => 'boolean',
         ];
     }
 
@@ -84,7 +93,9 @@ class Video extends Model
 
     public function addLog(string $message): void
     {
-        $this->log = [...($this->log ?? []), ['at' => now()->toIso8601String(), 'message' => $message]];
+        // The job and the studio both write to the log: start from what is saved
+        $saved = $this->exists ? static::whereKey($this->id)->first(['id', 'log'])?->log : null;
+        $this->log = [...($saved ?? $this->log ?? []), ['at' => now()->toIso8601String(), 'message' => $message]];
         $this->save();
     }
 
@@ -139,6 +150,18 @@ class Video extends Model
 
         return isset($this->recordings[$device])
             && Storage::disk(config('video-demo.storage.work_disk'))->exists($this->workFile($device));
+    }
+
+    /** The most this video may spend on AI: its own limit, else the config's */
+    public function spendLimit(): float
+    {
+        return (float) ($this->max_cost ?: config('video-demo.limits.max_cost_per_video', 2.0));
+    }
+
+    /** Whether someone pressed Stop; reads the database, as the job runs elsewhere */
+    public function stopRequested(): bool
+    {
+        return (bool) static::whereKey($this->id)->value('stop_requested');
     }
 
     public function isPublished(): bool

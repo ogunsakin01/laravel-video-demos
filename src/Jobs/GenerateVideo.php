@@ -10,18 +10,23 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 use Ogunsakin01\VideoDemo\Ai\Planner;
+use Ogunsakin01\VideoDemo\Ai\VideoStopped;
 use Ogunsakin01\VideoDemo\Enums\VideoStatus;
 use Ogunsakin01\VideoDemo\Models\Video;
 use Ogunsakin01\VideoDemo\Recording\Devices;
 use Ogunsakin01\VideoDemo\Recording\Encoder;
 use Ogunsakin01\VideoDemo\Recording\Plan;
 use Ogunsakin01\VideoDemo\Recording\Recorder;
+use Ogunsakin01\VideoDemo\VideoDemoServiceProvider;
+use RuntimeException;
 use Throwable;
 
 /**
- * Makes a video: Claude writes the plan, the recorder plays it, and a failed
- * step goes back to Claude to fix. With $replan false the stored plan is
- * recorded again without asking Claude, which costs nothing.
+ * Makes a video: the AI writes the plan, the recorder plays it, and a step
+ * that fails because the plan was wrong goes back to the AI to fix. Pages
+ * are checked first, and an error in the app itself stops the job with the
+ * problem listed, since no plan can fix it and repairs would only cost.
+ * With $replan false the stored plan is recorded again, at no AI cost.
  */
 class GenerateVideo implements ShouldQueue
 {
@@ -33,59 +38,94 @@ class GenerateVideo implements ShouldQueue
 
     public function __construct(public Video $video, public bool $replan = true)
     {
-        $this->onConnection(config('video-demo.queue.connection'));
+        $this->onConnection(config('video-demo.queue.connection') ?: VideoDemoServiceProvider::QUEUE_CONNECTION);
         $this->onQueue(config('video-demo.queue.name'));
+
+        // Planning, then each version recorded and encoded
+        $this->timeout = (int) max(1800, 900 + count($video->deviceList()) * max(600, $video->target_seconds * 12));
     }
 
     public function handle(Planner $planner, Recorder $recorder, Encoder $encoder): void
     {
         $video = $this->video;
+        $video->refresh();
+
+        // Stopped while it was waiting in the queue
+        if ($video->status === VideoStatus::Stopped || $video->stop_requested) {
+            $this->stopped($video);
+
+            return;
+        }
+        $video->update(['issues' => null]);
         $dir = Recorder::workDir($video->workPath());
         $maxRepairs = (int) config('video-demo.limits.max_repairs', 2);
+        $shouldStop = fn () => $video->stopRequested();
         $session = null;
 
-        if ($this->replan) {
-            $video->moveTo(VideoStatus::Planning, 'Claude is reading the code');
-            $session = $planner->plan($video);
-            $plan = $session->plan;
-            $video->addLog(sprintf('Plan ready: %d steps, about %d seconds', count($plan->steps), $plan->estimatedSeconds(Recorder::speed())));
-        } else {
-            $plan = Plan::fromArray($video->plan ?? []);
-        }
+        try {
+            if ($this->replan) {
+                // A broken start page would fail every plan: find out for free first
+                $this->checkPages($recorder, $video, [$video->start_path ?: '/'], 'Checking the start page');
 
-        $devices = $video->deviceList();
+                $video->moveTo(VideoStatus::Planning, 'The AI is reading the code');
+                $session = $planner->plan($video);
+                $plan = $session->plan;
+                $video->addLog(sprintf('Plan ready: %d steps, about %d seconds', count($plan->steps), $plan->estimatedSeconds(Recorder::speed())));
+            } else {
+                $plan = Plan::fromArray($video->plan ?? []);
+            }
 
-        // Every version plays the same plan. A failure on any of them goes back
-        // to Claude, and the corrected plan is recorded on all of them again.
-        while (true) {
-            $plan = $plan->fitTo(min($video->target_seconds, (int) config('video-demo.limits.max_seconds', 300)), Recorder::speed());
-            $video->update(['plan' => $plan->toArray()]);
+            $devices = $video->deviceList();
 
-            $results = [];
-            $failure = null;
-            foreach ($devices as $device) {
-                $video->moveTo(VideoStatus::Recording, 'Recording the '.Devices::get($device)['label'].' version');
-                $result = $recorder->record($plan, "$dir/$device", $video->style ?? [], $device);
-                $video->addLog($result->summary());
+            // Every version plays the same plan. A failure on any of them goes
+            // back to the AI, and the corrected plan is recorded on all again.
+            while (true) {
+                $plan = $plan->fitTo(min($video->target_seconds, (int) config('video-demo.limits.max_seconds', 300)), Recorder::speed());
+                $video->update(['plan' => $plan->toArray()]);
 
-                if (! $result->ok) {
-                    $failure = $result;
+                // Every page the plan opens, checked before recording
+                $this->checkPages($recorder, $video, $plan->paths(), 'Checking the pages in the plan');
+
+                $results = [];
+                $failure = null;
+                foreach ($devices as $device) {
+                    $this->stopIfAsked($video);
+                    $video->moveTo(VideoStatus::Recording, 'Recording the '.Devices::get($device)['label'].' version');
+                    $result = $recorder->record($plan, "$dir/$device", $video->style ?? [], $device, $video->record_as, $shouldStop);
+                    $video->addLog($result->summary());
+
+                    if (! $result->ok) {
+                        $failure = $result;
+                        break;
+                    }
+                    $results[$device] = $result;
+                }
+
+                if (! $failure) {
                     break;
                 }
-                $results[$device] = $result;
+
+                if ($issue = $failure->issue()) {
+                    $video->update(['issues' => [$issue]]);
+
+                    throw new RuntimeException("The app itself failed at {$issue['path']}: {$issue['problem']}. Fix it, then try again; asking the AI to repair the plan wouldn't help.");
+                }
+
+                if (! $session || ! $failure->canRepair() || $session->repairs >= $maxRepairs) {
+                    throw new RuntimeException($failure->summary().($session ? '' : '. Try again with a new plan to let the AI fix it.'));
+                }
+
+                $this->stopIfAsked($video);
+                $video->moveTo(VideoStatus::Planning, 'Asking the AI to fix the plan');
+                $planner->repair($session, $video, $failure);
+                $plan = $session->plan;
             }
 
-            if (! $failure) {
-                break;
-            }
+            $this->stopIfAsked($video);
+        } catch (VideoStopped $e) {
+            $this->stopped($video);
 
-            if (! $session || ! $failure->canRepair() || $session->repairs >= $maxRepairs) {
-                throw new \RuntimeException($failure->summary().($session ? '' : '. Regenerate to let Claude fix the plan.'));
-            }
-
-            $video->moveTo(VideoStatus::Planning, 'Asking Claude to fix the plan');
-            $planner->repair($session, $video, $failure);
-            $plan = $session->plan;
+            return;
         }
 
         $video->moveTo(VideoStatus::Encoding, count($results) > 1 ? 'Encoding '.count($results).' versions' : 'Encoding the video');
@@ -111,12 +151,50 @@ class GenerateVideo implements ShouldQueue
             'error' => null,
             'version' => $video->version + 1,
         ]);
-        $video->moveTo(VideoStatus::Ready, sprintf('Ready. Claude cost $%.4f in total.', $video->cost));
+        $video->moveTo(VideoStatus::Ready, sprintf('Ready. The AI cost $%.4f in total.', $video->cost));
+    }
+
+    /** Opens the pages before any AI is spent on them; broken ones stop the job */
+    protected function checkPages(Recorder $recorder, Video $video, array $paths, string $message): void
+    {
+        if (! config('video-demo.recorder.check_pages', true) || $paths === []) {
+            return;
+        }
+
+        $this->stopIfAsked($video);
+        $video->moveTo(VideoStatus::Checking, $message.' ('.count($paths).')');
+        $problems = $recorder->checkPages($paths, $video->record_as, $video->deviceList()[0], fn () => $video->stopRequested());
+
+        if ($problems !== []) {
+            $video->update(['issues' => $problems]);
+            $first = $problems[0];
+
+            throw new RuntimeException(count($problems) === 1
+                ? "A page isn't working, so nothing was recorded: {$first['path']}: {$first['problem']}."
+                : count($problems)." pages aren't working, so nothing was recorded. See the list at the top.");
+        }
+
+        $this->stopIfAsked($video);
+    }
+
+    protected function stopIfAsked(Video $video): void
+    {
+        if ($video->stopRequested()) {
+            throw new VideoStopped('Stopped by you.');
+        }
+    }
+
+    protected function stopped(Video $video): void
+    {
+        $video->refresh();
+        $video->update(['stop_requested' => false, 'error' => null]);
+        $video->moveTo(VideoStatus::Stopped, sprintf('Stopped by you. The AI cost $%.4f so far.', $video->cost));
     }
 
     public function failed(Throwable $e): void
     {
         $this->video->refresh();
+        $this->video->stop_requested = false;
         $this->video->error = $e->getMessage();
         $this->video->moveTo(VideoStatus::Failed, 'Failed: '.$e->getMessage());
     }

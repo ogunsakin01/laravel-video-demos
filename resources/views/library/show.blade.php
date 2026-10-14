@@ -36,6 +36,10 @@
         </div>
       @endif
 
+      @if ($area === 'private')
+        @include('video-demo::partials.embed', ['entry' => $video])
+      @endif
+
       @if ($more->isNotEmpty())
         <div class="vd-card">
           <h2>More videos</h2>

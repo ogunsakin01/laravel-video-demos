@@ -40,6 +40,9 @@ class CommandsTest extends TestCase
             '--devices' => 'mobile,desktop',
             '--start' => '/jobs',
             '--private' => true,
+            '--max-cost' => '0.40',
+            '--max-steps' => 20,
+            '--as' => 'guest',
             '--queue' => true,
         ]);
 
@@ -48,6 +51,9 @@ class CommandsTest extends TestCase
         $this->assertSame('ad', $video->style['key']);
         $this->assertSame(['desktop', 'mobile'], $video->devices);
         $this->assertSame([45, '/jobs', 'private'], [$video->target_seconds, $video->start_path, $video->visibility]);
+        $this->assertSame([0.4, 20, 'guest', 'Guest (signed out)'], [$video->spendLimit(), $video->max_steps, $video->record_as, $video->record_as_label]);
+        // Without --model, the cheapest reliable model
+        $this->assertSame('claude-sonnet-5-5', $video->model);
         $this->assertStringContainsString('/video-demo/studio/'.$video->id, $result['studio_url']);
         Queue::assertPushed(GenerateVideo::class);
     }
@@ -58,6 +64,8 @@ class CommandsTest extends TestCase
         $this->assertStringContainsString('Unknown versions: watch', $this->runJson('video-demo:generate', ['description' => 'x', '--devices' => 'desktop,watch'])['error']);
         $this->assertStringContainsString('between 10 and 300', $this->runJson('video-demo:generate', ['description' => 'x', '--length' => 2])['error']);
         $this->assertStringContainsString('Unknown model [gpt-nope]', $this->runJson('video-demo:generate', ['description' => 'x', '--model' => 'gpt-nope'])['error']);
+        $this->assertStringContainsString('spending limit must be a number', $this->runJson('video-demo:generate', ['description' => 'x', '--max-cost' => 'lots'])['error']);
+        $this->assertStringContainsString('at least 3', $this->runJson('video-demo:generate', ['description' => 'x', '--max-steps' => 1])['error']);
         $this->assertSame(0, Video::count());
 
         $this->artisan('video-demo:generate', ['description' => 'x', '--start' => 'jobs'])->assertFailed();
@@ -80,7 +88,7 @@ class CommandsTest extends TestCase
         // Stand-ins for the browser and ffmpeg, so this runs anywhere
         $this->app->instance(Recorder::class, new class extends Recorder
         {
-            public function record(Plan $plan, string $dir, array $style = [], string $device = 'desktop'): RecordingResult
+            public function record(Plan $plan, string $dir, array $style = [], string $device = 'desktop', ?string $recordAs = null, ?\Closure $shouldStop = null): RecordingResult
             {
                 File::ensureDirectoryExists($dir);
                 File::put("$dir/raw.webm", 'webm');

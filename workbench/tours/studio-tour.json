@@ -234,6 +234,56 @@
       "only_on": null
     },
     {
+      "action": "scroll",
+      "why": "",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": "Spending limit",
+        "placeholder": null,
+        "text": null,
+        "selector": null
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": "Set a budget",
+      "only_on": null
+    },
+    {
+      "action": "type",
+      "why": "",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": "Spending limit",
+        "placeholder": null,
+        "text": null,
+        "selector": null
+      },
+      "value": "0.50",
+      "title": null,
+      "text": null,
+      "ms": 400,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "caption",
+      "why": "",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "A spending limit for every video",
+      "text": "The AI plans within it, and you can stop it any time.",
+      "ms": 3800,
+      "chapter": null,
+      "only_on": null
+    },
+    {
       "action": "hover",
       "why": "Point at generate",
       "url": null,
@@ -285,6 +335,68 @@
       "title": "Make styles your own",
       "text": "Start from the config, add your own.",
       "ms": 3600,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "goto",
+      "why": "",
+      "url": "/video-demo/studio/ideas",
+      "target": null,
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": "Ideas",
+      "only_on": null
+    },
+    {
+      "action": "click",
+      "why": "",
+      "url": null,
+      "target": {
+        "role": "button",
+        "name": "Suggest videos",
+        "label": null,
+        "placeholder": null,
+        "text": null,
+        "selector": null
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "wait",
+      "why": "",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": null,
+        "placeholder": null,
+        "text": "Post your first job",
+        "selector": null
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": 600,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "caption",
+      "why": "",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "Not sure what to make first?",
+      "text": "The AI suggests the videos your users need.",
+      "ms": 3800,
       "chapter": null,
       "only_on": null
     },
@@ -377,6 +489,37 @@
       "value": null,
       "title": "Publish when it is right",
       "text": "Straight into your app’s help library.",
+      "ms": 3600,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "scroll",
+      "why": "",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": null,
+        "placeholder": null,
+        "text": "Blade, in this app",
+        "selector": null
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "caption",
+      "why": "",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "Embed it anywhere",
+      "text": "Copy the code for your own pages.",
       "ms": 3600,
       "chapter": null,
       "only_on": null

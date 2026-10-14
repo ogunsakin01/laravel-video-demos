@@ -108,7 +108,27 @@ class Manifest
             }
         }
 
-        return $disk->url($path);
+        return static::relative($disk->url($path), (string) config('video-demo.storage.disk'));
+    }
+
+    /**
+     * A local disk's address is built from APP_URL, so it breaks when the
+     * site is opened at another address (http://app.test vs https://app.test).
+     * Its path alone works at any of them.
+     */
+    public static function relative(string $url, string $disk): string
+    {
+        if (config("filesystems.disks.$disk.driver") !== 'local') {
+            return $url;
+        }
+
+        $app = rtrim((string) config('app.url'), '/');
+        if ($app !== '' && str_starts_with($url, $app.'/')) {
+            return substr($url, strlen($app));
+        }
+
+        // Disks with an address on another host, such as a CDN, are left alone
+        return $url;
     }
 
     public function put(array $video): void

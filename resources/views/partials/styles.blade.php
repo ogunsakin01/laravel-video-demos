@@ -54,14 +54,15 @@
   .vd-nav { display: flex; gap: 8px; }
   .vd-brand { white-space: nowrap; min-width: 0; }
   .vd-tag { white-space: nowrap; }
-  /* Phones: the name and the menu share the bar, the menu scrolls if it must */
+  /* Phones: the name on top, the menu on its own row below, scrolling sideways if it must */
   @media (max-width: 640px) {
-    .vd-top .vd-wrap { gap: 10px; }
+    .vd-top .vd-wrap { flex-wrap: wrap; gap: 0 10px; min-height: 0; padding-top: 10px; }
     .vd-tag { display: none; }
     .vd-brand { font-size: 14px; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
     .vd-spacer { display: none; }
-    .vd-nav { margin-left: auto; min-width: 0; overflow-x: auto; scrollbar-width: none; }
-    .vd-nav .vd-btn { min-height: 32px; padding: 0 10px; font-size: 13px; }
+    .vd-nav { flex: 1 0 100%; min-width: 0; overflow-x: auto; scrollbar-width: none; gap: 4px; padding: 8px 0 10px; margin: 0 -16px; padding-left: 16px; padding-right: 16px; }
+    .vd-nav::-webkit-scrollbar { display: none; }
+    .vd-nav .vd-btn { min-height: 32px; padding: 0 10px; font-size: 13px; flex: none; white-space: nowrap; }
   }
 
   /* Page heading strip, with a dot texture on the right (an SVG pattern, no gradients) */
@@ -97,6 +98,8 @@
   .vd-btn-primary { background: var(--vd-accent); border-color: var(--vd-accent); color: var(--vd-accent-ink); }
   .vd-btn-primary:hover { background: var(--vd-accent); border-color: var(--vd-accent); opacity: .88; }
   .vd-btn-ghost { background: transparent; border-color: transparent; box-shadow: none; }
+  .vd-nav .vd-btn-ghost[aria-current] { background: var(--vd-muted); color: var(--vd-strong); }
+  .vd-nav .vd-btn-primary[aria-current] { opacity: 1; }
   .vd-btn-sm { min-height: 30px; padding: 0 10px; font-size: 13px; }
   .vd-btn-block { width: 100%; }
   .vd-btn-danger { color: var(--vd-bad); }
@@ -159,6 +162,7 @@
   .vd-status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
   .vd-status-ready { background: var(--vd-ok-bg); color: var(--vd-ok); }
   .vd-status-failed { background: var(--vd-bad-bg); color: var(--vd-bad); }
+  .vd-status-stopped { background: var(--vd-muted); color: var(--vd-muted-ink); }
   .vd-status-working { background: var(--vd-warn-bg); color: var(--vd-warn); }
   .vd-status-working::before { animation: vd-pulse 1.2s infinite; }
   @keyframes vd-pulse { 50% { opacity: .25; } }
@@ -169,6 +173,11 @@
   .vd-small { font-size: 13px; }
   .vd-num { font-variant-numeric: tabular-nums; }
   .vd-mono { font-family: var(--vd-mono); }
+  .vd-code { margin: 6px 0 0; padding: 10px 12px; background: var(--vd-muted); border: 1px solid var(--vd-border); border-radius: 8px; font: 12.5px/1.5 var(--vd-mono); white-space: pre-wrap; overflow-wrap: anywhere; color: var(--vd-strong); }
+  .vd-code code { background: none; border: 0; padding: 0; font: inherit; color: inherit; }
+  .vd-issues { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .vd-issues li { display: grid; gap: 2px; }
+  .vd-issues .vd-detail { font: 12.5px/1.5 var(--vd-mono); overflow-wrap: anywhere; opacity: .9; }
   .vd-figure { font-size: 30px; font-weight: 600; letter-spacing: -.03em; color: var(--vd-strong); font-variant-numeric: tabular-nums; line-height: 1.15; }
   .vd code { font: 12px/1.4 var(--vd-mono); background: var(--vd-muted); border: 1px solid var(--vd-border); padding: 1px 5px; border-radius: 4px; }
   .vd-stat { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; padding: 7px 0; border-top: 1px solid var(--vd-border); }
@@ -179,6 +188,7 @@
   /* Notices */
   .vd-flash { padding: 12px 16px; border-radius: var(--vd-radius); margin-bottom: 16px; background: var(--vd-card); border: 1px solid var(--vd-border); box-shadow: var(--vd-shadow); }
   .vd-flash-error { background: var(--vd-bad-bg); border-color: transparent; color: var(--vd-bad); }
+  .vd-flash-warn { background: var(--vd-warn-bg); border-color: transparent; color: var(--vd-warn); }
 
   /* Lists */
   .vd-log { margin: 0; padding: 0; list-style: none; font-size: 13px; max-height: 340px; overflow: auto; }

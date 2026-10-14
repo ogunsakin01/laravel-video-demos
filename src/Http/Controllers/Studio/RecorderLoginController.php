@@ -5,22 +5,24 @@ namespace Ogunsakin01\VideoDemo\Http\Controllers\Studio;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Auth;
-use Ogunsakin01\VideoDemo\Recording\Recorder;
+use Ogunsakin01\VideoDemo\Recording\RecordAs;
 
 /**
- * Signs the recorder's browser in as the configured demo user. The link is
- * signed, expires after ten minutes, only accepts that one user, and only
- * exists while the studio is enabled.
+ * Signs the recorder's browser in as the user a video is recorded as. The
+ * link is signed and expires after ten minutes, so only the package can make
+ * one, and it only exists while the studio is enabled.
  */
 class RecorderLoginController extends Controller
 {
     public function __invoke(string $user): RedirectResponse
     {
-        $demoUser = Recorder::loginUser();
+        try {
+            $account = RecordAs::find($user);
+        } catch (\RuntimeException) {
+            abort(404);
+        }
 
-        abort_unless($demoUser && (string) $demoUser->getAuthIdentifier() === $user, 403);
-
-        Auth::guard(config('video-demo.recorder.guard'))->login($demoUser);
+        Auth::guard(config('video-demo.recorder.guard'))->login($account);
         request()->session()->regenerate();
 
         return redirect('/');

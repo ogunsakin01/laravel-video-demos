@@ -12,7 +12,9 @@ php artisan video-demo:install   # config, Playwright and Chromium
 php artisan migrate
 ```
 
-Needs Node.js 18+ and ffmpeg where videos are made (not in production), and `ANTHROPIC_API_KEY` (or another provider through `prism-php/prism`). Set `VIDEO_DEMO_LOGIN_AS` to the user the recorder signs in as.
+Needs Node.js 18+ and ffmpeg where videos are made (not in production), and `ANTHROPIC_API_KEY` (or `OPENAI_API_KEY`, `GEMINI_API_KEY` or local Ollama through `prism-php/prism`). Set `VIDEO_DEMO_LOGIN_AS` to the user the recorder signs in as by default, and `APP_URL` to the address the app is opened at. Run a worker for the package's own queue: `php artisan queue:work video-demo`.
+
+After updating the package, restart queue workers (`php artisan queue:restart`): a running worker keeps the old code. Below 1.0, a new minor version needs `composer require ogunsakin01/laravel-video-demos:^0.x`.
 
 ## Make videos (CLI, for agents and scripts)
 
@@ -25,7 +27,7 @@ php artisan video-demo:publish post-a-job [--unpublish]
 php artisan video-demo:refresh        # re-record published videos from their saved plans, no AI cost
 ```
 
-`generate` options: `--title`, `--length` (seconds), `--style` (clean, quick, detailed, showcase, ad, or a custom style), `--devices` (desktop, tv, tablet, mobile), `--model`, `--effort` (Claude only), `--start` (a path), `--private`, `--publish`, `--queue`, `--json`. It waits for the video, prints an estimated cost first, and exits non-zero with an `error` on failure.
+`generate` options: `--title`, `--length` (seconds), `--style` (clean, quick, detailed, showcase, ad, or a custom style), `--devices` (desktop, tv, tablet, mobile), `--model`, `--effort` (Claude only), `--start` (a path), `--private`, `--max-cost` (spending limit in dollars), `--max-steps`, `--as` (user id or email, or `guest`), `--publish`, `--queue`, `--json`. It waits for the video, prints an estimated cost first, and exits non-zero with an `error` on failure; broken pages found before recording are listed under `issues`.
 
 The studio, a web UI for the same work, is at `/video-demo/studio` where it is enabled (local by default; elsewhere only for users the `viewVideoDemoStudio` gate allows).
 
@@ -46,7 +48,11 @@ Library pages: `/help/videos` (public) and `/admin/videos` (private videos too).
 - Styles set the AI's direction and the look of cards and captions; the "ad" style has animated abstract line art.
 - Secrets in code and pages are redacted before anything is sent to the AI. The AI can only read folders in `ai.code.paths`.
 - Plan steps can reach into iframes (embedded payment fields). CAPTCHAs, SMS codes and social logins can't be automated.
-- Each video records its actual AI cost; `limits.max_cost_per_video` caps it.
+- Each video records its actual AI cost and has a spending limit (default `limits.max_cost_per_video`, $2): the AI is told its budget and stops before going over. A video can be stopped from the studio at any time.
+- The default model is the cheapest one marked `reliable` whose provider has a key (Claude Sonnet 5.5); `VIDEO_DEMO_MODEL` overrides it.
+- Pages are checked for errors (HTTP errors, sign-in redirects, JavaScript errors) before planning and recording, so no AI is spent on broken pages.
+- Videos can be recorded as any user or role (spatie/laravel-permission roles are listed), or as a guest.
+- Suggested ideas are saved in the database and can be added to or replaced.
 
 ## Docs
 

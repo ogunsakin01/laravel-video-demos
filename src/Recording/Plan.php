@@ -80,6 +80,20 @@ final class Plan
     }
 
     /**
+     * The pages the plan opens with goto, so they can be checked before
+     * recording
+     *
+     * @return list<string>
+     */
+    public function paths(): array
+    {
+        return array_values(array_unique(array_filter(array_map(
+            fn ($step) => ($step['action'] ?? null) === 'goto' ? ($step['url'] ?? null) : null,
+            $this->steps,
+        ))));
+    }
+
+    /**
      * Estimated length of the finished video, in seconds. At $speed above 1
      * the recording is played back faster: actions take less time, while
      * captions, cards and pauses are held longer while recording, so they

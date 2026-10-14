@@ -16,9 +16,13 @@ use Ogunsakin01\VideoDemo\Library\Manifest;
 
 class VideoDemoServiceProvider extends ServiceProvider
 {
+    /** The package's own queue connection, with a long retry_after */
+    public const QUEUE_CONNECTION = 'video-demo';
+
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../config/video-demo.php', 'video-demo');
+        $this->registerQueueConnection();
 
         $this->app->singleton(Manifest::class);
 
@@ -50,6 +54,45 @@ class VideoDemoServiceProvider extends ServiceProvider
                 SuggestCommand::class,
             ]);
         }
+    }
+
+    /**
+     * A copy of the app's default queue connection with retry_after long
+     * enough for a video. Generation runs for minutes; with Laravel's usual
+     * 90 seconds the queue would start the same job again while it runs.
+     */
+    protected function registerQueueConnection(): void
+    {
+        $default = config('queue.default');
+        $base = config("queue.connections.$default");
+
+        if (! is_array($base) || config('queue.connections.'.self::QUEUE_CONNECTION)) {
+            return;
+        }
+
+        config(['queue.connections.'.self::QUEUE_CONNECTION => [
+            ...$base,
+            'retry_after' => (int) config('video-demo.queue.retry_after', 7200),
+            // Its own queue, so the app's workers (with their shorter
+            // retry_after) never pick up a long video and start it again
+            'queue' => config('video-demo.queue.name') ?: 'video-demo',
+        ]]);
+    }
+
+    /** Problems with the queue setup that would break long videos, for the studio to show */
+    public static function queueWarning(): ?string
+    {
+        $connection = config('video-demo.queue.connection') ?: self::QUEUE_CONNECTION;
+        $settings = config("queue.connections.$connection", []);
+
+        if (($settings['driver'] ?? null) === 'sync') {
+            return 'Your queue runs jobs straight away (QUEUE_CONNECTION=sync), so making a video holds the page open for minutes. Use the database or redis queue and run php artisan queue:work video-demo.';
+        }
+        if (isset($settings['retry_after']) && $settings['retry_after'] < 1800) {
+            return "The [$connection] queue connection has retry_after={$settings['retry_after']}: a video taking longer than that is started a second time. Leave VIDEO_DEMO_QUEUE_CONNECTION empty to use the package's own connection, or raise retry_after.";
+        }
+
+        return null;
     }
 
     public static function studioEnabled(): bool

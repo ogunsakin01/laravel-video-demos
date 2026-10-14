@@ -18,6 +18,7 @@ Route::middleware(AuthorizeStudio::class)->group(function () {
     Route::get('/examples', [VideoController::class, 'examples'])->name('examples');
     Route::get('/ideas', [SuggestionController::class, 'index'])->name('suggestions.index');
     Route::post('/ideas', [SuggestionController::class, 'store'])->name('suggestions.store');
+    Route::delete('/ideas/{idea}', [SuggestionController::class, 'destroy'])->name('suggestions.destroy');
 
     Route::get('/styles', [StyleController::class, 'index'])->name('styles.index');
     Route::post('/styles', [StyleController::class, 'store'])->name('styles.store');
@@ -31,6 +32,7 @@ Route::middleware(AuthorizeStudio::class)->group(function () {
     Route::post('/{video}/regenerate', [VideoController::class, 'regenerate'])->name('regenerate');
     Route::post('/{video}/rerecord', [VideoController::class, 'rerecord'])->name('rerecord');
     Route::post('/{video}/retry', [VideoController::class, 'retry'])->name('retry');
+    Route::post('/{video}/stop', [VideoController::class, 'stop'])->name('stop');
     Route::post('/{video}/publish', [VideoController::class, 'publish'])->name('publish');
     Route::post('/{video}/unpublish', [VideoController::class, 'unpublish'])->name('unpublish');
     Route::delete('/{video}', [VideoController::class, 'destroy'])->name('destroy');

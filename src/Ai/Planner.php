@@ -9,6 +9,8 @@ use Ogunsakin01\VideoDemo\Ai\Drivers\Turn;
 use Ogunsakin01\VideoDemo\Models\Video;
 use Ogunsakin01\VideoDemo\Recording\Devices;
 use Ogunsakin01\VideoDemo\Recording\Plan;
+use Ogunsakin01\VideoDemo\Recording\RecordAs;
+use Ogunsakin01\VideoDemo\Recording\Recorder;
 use Ogunsakin01\VideoDemo\Recording\RecordingResult;
 use RuntimeException;
 
@@ -62,14 +64,26 @@ class Planner
     protected function run(PlanningSession $session, Video $video): void
     {
         $maxTurns = (int) config('video-demo.limits.max_turns', 30);
-        $maxCost = (float) config('video-demo.limits.max_cost_per_video', 2.0);
+        $maxCost = $video->spendLimit();
         $driver = $this->drivers->for($video->model);
         $tools = [...$this->code->definitions(), $this->submitTool()];
+        $lastCost = 0.0;
 
         while ($session->turns < $maxTurns) {
+            if ($video->stopRequested()) {
+                throw new VideoStopped('Stopped by you.');
+            }
+            // Each request costs a little more than the last as the conversation
+            // grows, so stop before one that would take the video over its limit
+            $nextCost = $lastCost * 1.2;
+            if ($lastCost > 0 && $video->cost + $nextCost > $maxCost) {
+                throw new PlanningFailed(sprintf('Stopped at $%.2f: the next request would take this video past its $%.2f limit. Raise the limit, or ask for a shorter video.', $video->cost, $maxCost));
+            }
+
             $session->turns++;
-            $turn = $driver->send($session->messages, $this->systemPrompt(), $tools, $video->model, $video->effort);
+            $turn = $driver->send($session->messages, $this->systemPrompt(), $tools, $video->model, $video->effort, $this->longCache($video));
             $video->addUsage($turn->usage);
+            $lastCost = $turn->usage->cost;
 
             if ($turn->stop === Turn::REFUSAL) {
                 throw new PlanningFailed('The model declined this request'.($turn->refusal ? ': '.$turn->refusal : '.'));
@@ -78,7 +92,7 @@ class Planner
                 throw new PlanningFailed('The plan was longer than one response allows. Ask for a shorter video or split the flow.');
             }
             if ($video->cost > $maxCost) {
-                throw new PlanningFailed(sprintf('Stopped at $%.2f, over the $%.2f limit per video.', $video->cost, $maxCost));
+                throw new PlanningFailed(sprintf('Stopped at $%.2f, over this video\'s $%.2f limit.', $video->cost, $maxCost));
             }
 
             if ($turn->stop !== Turn::TOOL_USE) {
@@ -92,7 +106,7 @@ class Planner
             foreach ($turn->toolCalls as $call) {
                 if ($call['name'] === 'submit_plan') {
                     $plan = Plan::fromArray($call['input']);
-                    $problems = $this->problems($plan);
+                    $problems = $this->problems($plan, $video->max_steps);
                     if ($problems === [] && $submitted === null) {
                         $submitted = [$call, $plan];
                     } else {
@@ -115,10 +129,43 @@ class Planner
                 return;
             }
 
-            $driver->addToolOutputs($session->messages, $results);
+            $driver->addToolOutputs($session->messages, $this->withBudget($results, $video, $lastCost, $maxCost));
         }
 
         throw new PlanningFailed("No plan after $maxTurns requests to the model. Try a narrower description, or raise video-demo.limits.max_turns.");
+    }
+
+    /**
+     * Tells the model how many more requests the video's budget allows, on
+     * the last result of the turn, so it wraps up in time. Appended, never
+     * edited in, so the cached conversation stays valid.
+     *
+     * @param  list<ToolOutput>  $results
+     * @return list<ToolOutput>
+     */
+    protected function withBudget(array $results, Video $video, float $lastCost, float $maxCost): array
+    {
+        if ($results === [] || $lastCost <= 0) {
+            return $results;
+        }
+
+        $left = max(0, (int) floor(($maxCost - $video->cost) / ($lastCost * 1.2)));
+        $note = $left <= 2
+            ? "\n\n[Budget: about $left more request(s) before this video's spending limit. Submit the plan now with what you know.]"
+            : "\n\n[Budget: about $left more requests before this video's spending limit.]";
+        $last = array_pop($results);
+
+        return [...$results, new ToolOutput($last->id, $last->name, $last->input, $last->content.$note, $last->isError)];
+    }
+
+    /**
+     * Whether to keep the conversation in the 1-hour cache instead of the
+     * 5-minute one: recording several versions can outlast 5 minutes, and a
+     * repair afterwards would pay to cache the whole conversation again
+     */
+    protected function longCache(Video $video): bool
+    {
+        return count($video->deviceList()) * $video->target_seconds * Recorder::speed() > 240;
     }
 
     /** @param array{id: string, name: string, input: array} $call */
@@ -146,14 +193,15 @@ class Planner
     }
 
     /** @return list<string> */
-    public function problems(Plan $plan): array
+    public function problems(Plan $plan, ?int $maxSteps = null): array
     {
         $problems = [];
+        $limit = $maxSteps ?: 250;
         if ($plan->steps === []) {
             $problems[] = 'The plan has no steps.';
         }
-        if (count($plan->steps) > 250) {
-            $problems[] = 'The plan has more than 250 steps.';
+        if (count($plan->steps) > $limit) {
+            $problems[] = 'The plan has '.count($plan->steps)." steps; the limit is $limit. Combine or drop steps to fit.";
         }
 
         foreach ($plan->steps as $i => $step) {
@@ -197,13 +245,16 @@ class Planner
     {
         $notes = trim((string) config('video-demo.ai.notes'));
         $devices = $video->deviceList();
-        $signedIn = config('video-demo.recorder.login_as')
-            ? 'The recorder is already signed in as the demo user when the video starts.'
-            : 'The recorder is signed out when the video starts.';
+        $user = RecordAs::describe($video);
+        $signedIn = $user === null
+            ? 'The recorder is signed out (a guest) when the video starts, so use only pages that don\'t need signing in.'
+            : "The recorder is already signed in as $user when the video starts; plan only what that user can see and do.";
 
         return implode("\n\n", array_filter([
             "<video_request>\n{$video->prompt}\n</video_request>",
             "Target length: about {$video->target_seconds} seconds.",
+            $video->max_steps ? "The plan may have at most {$video->max_steps} steps." : null,
+            sprintf('Budget: this video may spend at most $%.2f on AI requests, including any repairs. Read only the code you need.', $video->spendLimit()),
             ! empty($video->style['direction']) ? "<style name=\"{$video->style['name']}\">\n{$video->style['direction']}\n</style>\nFollow this style for the tone, the captions and cards you use, and how much you explain." : null,
             $video->start_path ? "Start at: {$video->start_path}" : null,
             count($devices) > 1

@@ -34,12 +34,12 @@ class StudioGateTest extends TestCase
     #[DefineEnvironment('onStaging')]
     public function test_the_recorders_signed_link_is_not_behind_the_gate(): void
     {
-        // No demo user is configured, so the link is refused by the
-        // controller (403), not hidden; what matters is the gate isn't asked
+        // User 1 doesn't exist, so the controller answers 404; what matters
+        // is that the gate is never asked
         Gate::define('viewVideoDemoStudio', fn () => throw new \LogicException('The gate should not be checked.'));
         $link = URL::temporarySignedRoute('video-demo.studio.recorder-login', now()->addMinutes(5), ['user' => 1], absolute: false);
 
-        $this->get($link)->assertForbidden();
+        $this->get($link)->assertNotFound();
     }
 
     protected function onStaging($app): void

@@ -43,7 +43,10 @@ class CostEstimator
 
         $thinking = self::THINKING[$effort] ?? self::THINKING['high'];
         $steps = (int) ceil($targetSeconds / self::SECONDS_PER_STEP);
-        $turns = min(4 + (int) ceil($targetSeconds / 20), (int) config('video-demo.limits.max_turns', 30));
+        // Models not marked reliable take more turns to reach the same plan:
+        // calibrated on real runs (Haiku read about 1.4 times as much code)
+        $factor = (Pricing::model($model)['reliable'] ?? true) ? 1.0 : 1.4;
+        $turns = min((int) ceil((4 + $targetSeconds / 20) * $factor), (int) config('video-demo.limits.max_turns', 30));
 
         $usage = new Usage;
         // The first request writes the instructions and route list to the cache

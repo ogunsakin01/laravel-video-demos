@@ -18,8 +18,9 @@ interface Driver
      * Sends the conversation and appends the model's reply to $messages.
      *
      * @param  list<array{name: string, description: string, schema: array}>  $tools
+     * @param  bool  $longCache  keep the conversation cached for an hour, where the provider allows
      */
-    public function send(array &$messages, string $system, array $tools, string $model, string $effort): Turn;
+    public function send(array &$messages, string $system, array $tools, string $model, string $effort, bool $longCache = false): Turn;
 
     /**
      * Appends results for the tool calls of the last turn.

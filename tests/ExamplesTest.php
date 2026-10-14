@@ -13,7 +13,7 @@ class ExamplesTest extends TestCase
         $this->get('/video-demo/studio/examples')
             ->assertOk()
             ->assertSee('A product tour')
-            ->assertSee('https://cdn.jsdelivr.net/gh/ogunsakin01/laravel-video-demos@v0.2.0/docs/studio-tour.mp4', false)
+            ->assertSee('https://cdn.jsdelivr.net/gh/ogunsakin01/laravel-video-demos@v0.4.0/docs/studio-tour.mp4', false)
             ->assertSee('workbench/demo-assets/sample-tablet.mp4', false)
             ->assertSee('Make one like this');
     }

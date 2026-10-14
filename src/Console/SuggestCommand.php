@@ -10,7 +10,8 @@ use Throwable;
 class SuggestCommand extends Command
 {
     protected $signature = 'video-demo:suggest
-        {--model= : The AI model (video-demo.ai.model when left out)}
+        {--model= : The AI model (the cheapest reliable one when left out)}
+        {--replace : Delete the ideas not yet made into videos and start over}
         {--json : Print the suggestions as JSON, for scripts and AI agents}';
 
     protected $description = 'Suggest the videos worth making first for this app';
@@ -18,7 +19,7 @@ class SuggestCommand extends Command
     public function handle(Suggester $suggester): int
     {
         try {
-            $result = $suggester->suggest($this->option('model') ?: null);
+            $result = $suggester->suggest($this->option('model') ?: null, (bool) $this->option('replace'));
         } catch (Throwable $e) {
             $this->option('json')
                 ? $this->line(json_encode(['status' => 'error', 'error' => $e->getMessage()]))
@@ -40,7 +41,7 @@ class SuggestCommand extends Command
             $this->line('   <fg=gray>'.$s['why'].'</>');
         }
         $this->newLine();
-        $this->components->info('Make one with: php artisan video-demo:generate "<description>" --style=<style> --length=<seconds>');
+        $this->components->info('Saved to the studio\'s Ideas page. Make one with: php artisan video-demo:generate "<description>" --style=<style> --length=<seconds>');
 
         return self::SUCCESS;
     }

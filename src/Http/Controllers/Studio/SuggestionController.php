@@ -7,33 +7,40 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use Ogunsakin01\VideoDemo\Ai\Drivers\Drivers;
 use Ogunsakin01\VideoDemo\Ai\Pricing;
 use Ogunsakin01\VideoDemo\Ai\Suggester;
+use Ogunsakin01\VideoDemo\Models\VideoIdea;
 use Ogunsakin01\VideoDemo\Models\VideoStyle;
 use Throwable;
 
 /** "Ideas": videos the AI suggests making first, from the app's routes */
 class SuggestionController extends Controller
 {
-    public function index(Suggester $suggester): View
+    public function index(): View
     {
+        $ideas = VideoIdea::with('video')->orderByRaw('video_id is not null')->latest('id')->get();
+
         return view('video-demo::studio.suggestions', [
-            'latest' => $suggester->latest(),
+            'ideas' => $ideas,
+            'spent' => (float) $ideas->sum('cost'),
+            'latestAt' => $ideas->max('created_at'),
             'styles' => VideoStyle::options()->keyBy('key'),
             'models' => Pricing::options(),
-            'model' => config('video-demo.ai.model'),
-            'hasKey' => filled(config('video-demo.ai.api_key')),
+            'model' => Pricing::defaultModel(),
+            'hasKey' => Drivers::anyKey(),
         ]);
     }
 
     public function store(Request $request, Suggester $suggester): RedirectResponse
     {
-        $model = $request->validate([
+        $data = $request->validate([
             'model' => ['nullable', Rule::in(array_keys(config('video-demo.ai.models')))],
-        ])['model'] ?? null;
+            'replace' => ['nullable', 'boolean'],
+        ]);
 
         try {
-            $suggester->suggest($model);
+            $suggester->suggest($data['model'] ?? null, (bool) ($data['replace'] ?? false));
         } catch (Throwable $e) {
             report($e);
 
@@ -41,5 +48,12 @@ class SuggestionController extends Controller
         }
 
         return redirect()->route('video-demo.studio.suggestions.index');
+    }
+
+    public function destroy(VideoIdea $idea): RedirectResponse
+    {
+        $idea->delete();
+
+        return back();
     }
 }

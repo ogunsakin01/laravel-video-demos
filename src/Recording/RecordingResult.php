@@ -16,6 +16,7 @@ final readonly class RecordingResult
         public ?string $title,
         public ?string $snapshot,
         public ?string $device = null,
+        public ?array $appError = null,
     ) {}
 
     public static function fromArray(array $r, ?string $device = null): self
@@ -32,13 +33,35 @@ final readonly class RecordingResult
             $r['title'] ?? null,
             $r['snapshot'] ?? null,
             $device,
+            $r['appError'] ?? null,
         );
     }
 
-    /** True when a step failed in the app, so a corrected plan may work */
+    /**
+     * True when a step failed in a way a corrected plan may fix. Not when the
+     * app itself broke (a server or JavaScript error): no plan fixes that
+     */
     public function canRepair(): bool
     {
-        return ! $this->ok && $this->failedStep !== null;
+        return ! $this->ok && $this->failedStep !== null && $this->appError === null;
+    }
+
+    /** The app's own error, as an issue to show the developer */
+    public function issue(): ?array
+    {
+        if (! $this->appError) {
+            return null;
+        }
+
+        return [
+            'path' => parse_url((string) ($this->appError['url'] ?? $this->url), PHP_URL_PATH) ?: (string) $this->url,
+            'problem' => $this->appError['kind'] === 'server'
+                ? "The app returned HTTP {$this->appError['status']} during step {$this->failedStep}"
+                : "The page threw a JavaScript error during step {$this->failedStep}",
+            'status' => $this->appError['status'] ?? null,
+            'url' => $this->appError['url'] ?? $this->url,
+            'detail' => $this->appError['detail'] ?? null,
+        ];
     }
 
     public function summary(): string

@@ -33,6 +33,8 @@ abstract class TestCase extends Orchestra
         $app['config']->set('video-demo.studio.enabled', true);
         $app['config']->set('video-demo.library.private.middleware', ['web']);
         $app['config']->set('video-demo.ai.api_key', 'test-key');
+        // Tests don't open real browsers unless they ask to (see RecorderTest)
+        $app['config']->set('video-demo.recorder.check_pages', false);
     }
 
     /** Lets the production tests migrate without asking for confirmation */

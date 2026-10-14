@@ -1,6 +1,6 @@
 <x-video-demo::layout :title="$video->title ?: 'Video'" badge="Studio · local" :home="route('video-demo.studio.index')">
   <x-slot:nav>
-    <a class="vd-btn" href="{{ route('video-demo.studio.index') }}">All videos</a>
+    @include('video-demo::studio.partials.nav', ['active' => null])
   </x-slot:nav>
 
   <section class="vd-hero">
@@ -17,7 +17,7 @@
         @endif
       </p>
     </div>
-    @if ($video->status === \Ogunsakin01\VideoDemo\Enums\VideoStatus::Failed)
+    @if (in_array($video->status, [\Ogunsakin01\VideoDemo\Enums\VideoStatus::Failed, \Ogunsakin01\VideoDemo\Enums\VideoStatus::Stopped], true))
         @php($hasPlan = ! empty($video->plan['steps']))
         <div class="vd-actions">
           <form method="post" action="{{ route('video-demo.studio.retry', $video) }}">@csrf
@@ -32,6 +32,11 @@
           @endif
         </div>
     @endif
+    @if ($video->status->isWorking())
+      <form method="post" action="{{ route('video-demo.studio.stop', $video) }}" class="vd-actions" id="vd-stop">@csrf
+        <button class="vd-btn vd-btn-danger" @disabled($video->stop_requested)>{{ $video->stop_requested ? 'Stopping…' : 'Stop' }}</button>
+      </form>
+    @endif
     @if ($video->status === \Ogunsakin01\VideoDemo\Enums\VideoStatus::Ready)
       <div class="vd-actions">
         @if ($video->isPublished())
@@ -45,6 +50,25 @@
       </div>
     @endif
   </section>
+
+  @if ($queueWarning)
+    <div class="vd-flash vd-flash-warn" role="status">{{ $queueWarning }}</div>
+  @endif
+
+  @if (! empty($video->issues))
+    <div class="vd-flash vd-flash-error vd-stack-sm" role="alert" id="vd-issues">
+      <strong>{{ count($video->issues) === 1 ? 'A page in your app has a problem' : count($video->issues).' pages in your app have problems' }}, so the video wasn't recorded</strong>
+      <ul class="vd-issues">
+        @foreach ($video->issues as $issue)
+          <li>
+            <span><span class="vd-mono">{{ $issue['path'] }}</span>: {{ $issue['problem'] }}</span>
+            @if (! empty($issue['detail']))<span class="vd-detail">{{ $issue['detail'] }}</span>@endif
+          </li>
+        @endforeach
+      </ul>
+      <span class="vd-small">Fix {{ count($video->issues) === 1 ? 'it' : 'them' }} in your app, then try again. No AI was spent on the broken {{ count($video->issues) === 1 ? 'page' : 'pages' }}.</span>
+    </div>
+  @endif
 
   <div class="vd-split">
     <div class="vd-stack">
@@ -161,16 +185,30 @@
             <div class="vd-stat"><dt>Style</dt><dd>{{ $video->style['name'] }}</dd></div>
           @endif
           <div class="vd-stat"><dt>Versions</dt><dd>{{ collect($video->deviceList())->map(fn ($d) => $devices[$d]['label'] ?? $d)->implode(', ') }}</dd></div>
-          <div class="vd-stat"><dt>Model</dt><dd>{{ config("video-demo.ai.models.{$video->model}.label", $video->model) }}, {{ $video->effort }}</dd></div>
+          <div class="vd-stat"><dt>Spending limit</dt><dd class="vd-num">${{ number_format($video->spendLimit(), 2) }}</dd></div>
+          @if ($video->max_steps)
+            <div class="vd-stat"><dt>Max steps</dt><dd class="vd-num">{{ $video->max_steps }}</dd></div>
+          @endif
+          <div class="vd-stat"><dt>Recorded as</dt><dd>{{ $video->record_as_label ?: \Ogunsakin01\VideoDemo\Recording\RecordAs::label($video->record_as) }}</dd></div>
+          <div class="vd-stat"><dt>Model</dt><dd>{{ \Ogunsakin01\VideoDemo\Ai\Pricing::model($video->model)['label'] ?? $video->model }}, {{ $video->effort }}</dd></div>
           <div class="vd-stat"><dt>Length</dt><dd class="vd-num">{{ $video->duration_seconds ? round($video->duration_seconds).'s of '.$video->target_seconds.'s target' : $video->target_seconds.'s target' }}</dd></div>
         </dl>
       </div>
+
+      @if ($video->isPublished() && ($entry = app(\Ogunsakin01\VideoDemo\Library\Manifest::class)->find($video->slug, 'private')))
+        @include('video-demo::partials.embed', ['entry' => $entry])
+      @elseif ($video->status === \Ogunsakin01\VideoDemo\Enums\VideoStatus::Ready)
+        <div class="vd-card">
+          <h2>Embed</h2>
+          <p class="vd-small vd-muted" style="margin:0">Publish the video to get code that shows it on any page.</p>
+        </div>
+      @endif
 
       <div class="vd-card">
         <h2>Progress</h2>
         <ul class="vd-log" id="vd-log">
           @foreach (array_slice($video->log ?? [], -40) as $entry)
-            <li><time>{{ \Illuminate\Support\Carbon::parse($entry['at'])->format('H:i:s') }}</time><span>{{ $entry['message'] }}</span></li>
+            <li><time datetime="{{ $entry['at'] }}">{{ \Illuminate\Support\Carbon::parse($entry['at'])->format('H:i:s') }}</time><span>{{ $entry['message'] }}</span></li>
           @endforeach
         </ul>
       </div>
@@ -206,6 +244,16 @@
                 </select>
               </div>
             </div>
+            <div class="vd-row">
+              <div>
+                <label for="r-max-cost">Spending limit ($)</label>
+                <input type="number" id="r-max-cost" name="max_cost" step="0.01" min="0.01" max="100" value="{{ $video->spendLimit() }}">
+              </div>
+              <div>
+                <label for="r-max-steps">Max steps</label>
+                <input type="number" id="r-max-steps" name="max_steps" min="3" max="250" value="{{ $video->max_steps }}" placeholder="No limit">
+              </div>
+            </div>
             <button class="vd-btn vd-btn-block">Ask the AI for a new plan</button>
           </form>
         </div>
@@ -218,6 +266,8 @@
   </div>
 
   <script>
+    // Log times in the viewer's own time zone, as the live updates show them
+    document.querySelectorAll('#vd-log time[datetime]').forEach(t => { t.textContent = new Date(t.dateTime).toTimeString().slice(0, 8); });
     document.querySelectorAll('[data-src]').forEach(b => b.addEventListener('click', () => {
       const v = document.getElementById('vd-preview');
       v.poster = b.dataset.poster; v.src = b.dataset.src; v.style.aspectRatio = b.dataset.ratio;
@@ -238,6 +288,8 @@
             try {
               const s = await (await fetch(url, { headers: { Accept: 'application/json' } })).json();
               status.textContent = s.label;
+              const stop = document.querySelector('#vd-stop button');
+              if (stop && s.stopping) { stop.disabled = true; stop.textContent = 'Stopping…'; }
               cost.textContent = '$' + Number(s.cost).toFixed(4);
               log.replaceChildren(...s.log.map(e => {
                 const li = document.createElement('li');

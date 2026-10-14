@@ -223,9 +223,18 @@ async function snapshot(page) {
     const started = Date.now();
     result.trimMs = started - recordingStarted;
 
+    // Errors from the app itself: a step that fails after one of these is a
+    // bug in the app, not something a better plan can fix
+    const appErrors = [];
+    page.on('response', r => {
+      if (r.status() >= 500 && r.request().isNavigationRequest()) appErrors.push({ kind: 'server', status: r.status(), url: r.url(), at: Date.now() });
+    });
+    page.on('pageerror', e => appErrors.push({ kind: 'javascript', message: String(e.message || e).split('\n')[0], url: page.url(), at: Date.now() }));
+
     for (let i = 0; i < plan.steps.length; i++) {
       const step = plan.steps[i];
       if (step.chapter) result.chapters.push({ title: step.chapter, at: (Date.now() - started) / 1000 });
+      const stepStarted = Date.now();
       try {
         await run(page, step, i === plan.steps.length - 1);
       } catch (e) {
@@ -234,6 +243,12 @@ async function snapshot(page) {
         result.url = page.url();
         result.title = await page.title().catch(() => '');
         result.snapshot = await snapshot(page);
+        // A server error or JavaScript error during this step means the app is broken here
+        const appError = appErrors.filter(a => a.at >= stepStarted - 2000).pop();
+        if (appError) {
+          const detail = await page.evaluate(() => (document.querySelector('.exception-message')?.textContent || document.querySelector('h1')?.textContent || document.title || '').trim()).catch(() => '');
+          result.appError = { ...appError, detail: (appError.message || detail || '').slice(0, 400) };
+        }
         break;
       }
     }

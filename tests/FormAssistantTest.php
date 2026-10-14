@@ -52,6 +52,6 @@ class FormAssistantTest extends TestCase
         // No scripted reply, so the fake API answers with an error
         $this->postJson('/video-demo/studio/complete', ['prompt' => '', 'model' => 'claude-opus-5-5'])
             ->assertStatus(502)
-            ->assertJsonPath('error', 'Claude could not be reached. Check ANTHROPIC_API_KEY and try again.');
+            ->assertJsonPath('error', 'The AI provider could not be reached. Check your API key and try again.');
     }
 }

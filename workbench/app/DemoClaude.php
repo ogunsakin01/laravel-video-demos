@@ -24,6 +24,14 @@ class DemoClaude extends Claude
 
         // "Suggest videos" asks for a list
         if (isset($params['outputConfig']['format']['schema']['properties']['suggestions'])) {
+            // "Suggest more" lists the ideas already kept; answer with new ones
+            if (str_contains(json_encode($params['messages']), 'ideas_already_suggested')) {
+                return $this->reply($params['model'], ['suggestions' => [
+                    ['title' => 'Invite your hiring team', 'prompt' => 'How an admin invites colleagues to review applicants together.', 'why' => 'Hiring is a team effort.', 'start_path' => '/', 'target_seconds' => 45, 'style' => 'quick'],
+                    ['title' => 'Move an applicant to interview', 'prompt' => 'How a recruiter moves an applicant to the interview stage and leaves a note.', 'why' => 'The most common daily task.', 'start_path' => '/', 'target_seconds' => 60, 'style' => 'clean'],
+                ]]);
+            }
+
             return $this->reply($params['model'], ['suggestions' => [
                 ['title' => 'Post your first job', 'prompt' => 'How a recruiter posts a new job, from the jobs page to a live listing.', 'why' => 'It is the first thing every new customer does.', 'start_path' => '/', 'target_seconds' => 60, 'style' => 'clean'],
                 ['title' => 'Find people with the right skills', 'prompt' => 'How to search people by skill and location and save a shortlist.', 'why' => 'Search is the main reason people come back.', 'start_path' => '/', 'target_seconds' => 75, 'style' => 'detailed'],
