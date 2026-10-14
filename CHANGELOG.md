@@ -2,6 +2,12 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/). While the version is 0.x, minor releases may include breaking changes; they will be listed here.
 
+## v0.7.1 - 2026-10-14
+
+### Fixed
+
+- Getting suggestions or planning a video no longer fails with "Object of class Closure could not be converted to string" in apps whose controllers add middleware with `$this->middleware(function ...)`.
+
 ## v0.7.0 - 2026-10-14
 
 Run `php artisan migrate` after updating: it adds the new style settings, and the Spotlight style for apps that already have styles.

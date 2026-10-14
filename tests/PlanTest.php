@@ -2,6 +2,8 @@
 
 namespace Ogunsakin01\VideoDemo\Tests;
 
+use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Route;
 use Ogunsakin01\VideoDemo\Ai\CodeTools;
 use Ogunsakin01\VideoDemo\Ai\Drivers\Drivers;
 use Ogunsakin01\VideoDemo\Ai\Planner;
@@ -146,6 +148,27 @@ class PlanTest extends TestCase
         $found = array_merge(...array_map(fn ($t) => $unions($t['schema'], $t['name']), $tools));
 
         $this->assertLessThanOrEqual(16, count($found), 'Union-typed fields: '.implode(', ', $found));
+    }
+
+    public function test_the_route_list_skips_closure_middleware(): void
+    {
+        // Like a controller that adds middleware in its constructor with $this->middleware(function ...).
+        $controller = new class extends Controller
+        {
+            public function __construct()
+            {
+                $this->middleware(fn ($request, $next) => $next($request));
+            }
+
+            public function show(): string
+            {
+                return 'ok';
+            }
+        };
+        $this->app->instance($controller::class, $controller);
+        Route::get('/talent', [$controller::class, 'show'])->middleware('auth');
+
+        $this->assertMatchesRegularExpression('#^GET /talent .*  middleware=auth$#m', (new CodeTools)->routeList());
     }
 
     public function test_empty_values_from_the_model_mean_not_set(): void

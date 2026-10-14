@@ -122,7 +122,7 @@ class CodeTools
                 ltrim($r->uri(), '/'),
                 $r->getName() ? "  name={$r->getName()}" : '',
                 $r->getActionName() !== 'Closure' ? '  action='.Str::after($r->getActionName(), 'App\\Http\\Controllers\\') : '',
-                ($mw = array_values(array_intersect($r->gatherMiddleware(), ['auth', 'guest', 'verified', 'admin']))) ? '  middleware='.implode(',', $mw) : '',
+                ($mw = array_values(array_intersect(array_filter($r->gatherMiddleware(), is_string(...)), ['auth', 'guest', 'verified', 'admin']))) ? '  middleware='.implode(',', $mw) : '',
             ))
             ->values()
             ->implode("\n");
