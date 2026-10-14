@@ -26,13 +26,16 @@ class StyleTest extends TestCase
     {
         $style = [
             'name' => 'Onboarding series', 'direction' => 'Friendly. Address the viewer as you.',
-            'theme' => 'light', 'accent' => '#0f766e', 'captions' => 'top', 'pace' => 'relaxed',
+            'theme' => 'light', 'accent' => '#0f766e', 'captions' => 'top', 'pace' => 'relaxed', 'art' => 'abstract',
         ];
 
         $this->post('/video-demo/studio/styles', $style)->assertRedirect('/video-demo/studio/styles');
         $added = VideoStyle::where('name', 'Onboarding series')->firstOrFail();
-        $this->assertSame(5, VideoStyle::count());
+        // The five defaults from config, plus this one
+        $this->assertSame(6, VideoStyle::count());
         $this->assertSame('#0f766e', $added->accent);
+        $this->assertSame('abstract', $added->art);
+        $this->assertSame('abstract', $added->snapshot()['art']);
 
         $this->put("/video-demo/studio/styles/{$added->id}", [...$style, 'pace' => 'brisk'])->assertRedirect();
         $this->assertSame('brisk', $added->fresh()->pace);
@@ -40,7 +43,8 @@ class StyleTest extends TestCase
         $this->post('/video-demo/studio/styles', [...$style, 'accent' => 'teal'])->assertSessionHasErrors('accent');
 
         $this->delete("/video-demo/studio/styles/{$added->id}")->assertRedirect();
-        $this->assertSame(4, VideoStyle::count());
+        $this->assertSame(5, VideoStyle::count());
+        $this->assertSame('Promo ad', VideoStyle::where('key', 'ad')->value('name'));
     }
 
     public function test_the_last_style_cannot_be_deleted(): void

@@ -18,6 +18,9 @@ return [
     'studio' => [
         'enabled' => env('VIDEO_DEMO_STUDIO', env('APP_ENV') === 'local'),
         'allow_in_production' => false,
+        // Outside local, only users this gate allows may use the studio. With
+        // no such gate defined, the studio is closed outside local.
+        'gate' => 'viewVideoDemoStudio',
         'prefix' => 'video-demo/studio',
         'middleware' => ['web'],
         'domain' => null,
@@ -96,17 +99,31 @@ return [
     'ai' => [
         'api_key' => env('ANTHROPIC_API_KEY'),
         'model' => env('VIDEO_DEMO_MODEL', 'claude-opus-5-5'),
+        // How hard Claude thinks (low to max). Other providers ignore it.
         'effort' => env('VIDEO_DEMO_EFFORT', 'high'),
 
+        // Seconds to wait for one reply from the model
+        'timeout' => 600,
+
         // When Claude Opus or Sonnet declines a request, let the API retry it
-        // on another model instead of failing
+        // on another model instead of failing (Anthropic only)
         'fallbacks' => true,
 
+        // Each model's provider and prices (US dollars per million tokens).
+        // "anthropic" models use the Anthropic SDK. Any other provider goes
+        // through Prism (composer require prism-php/prism), with its key in
+        // config/prism.php. Leave prices out and the cost shows as unknown.
         'models' => [
-            'claude-opus-5-5' => ['label' => 'Claude Opus 5.5', 'input' => 4.00, 'output' => 20.00, 'cache_read' => 0.20],
-            'claude-sonnet-5-5' => ['label' => 'Claude Sonnet 5.5', 'input' => 2.00, 'output' => 10.00, 'cache_read' => 0.20],
+            'claude-opus-5-5' => ['label' => 'Claude Opus 5.5', 'provider' => 'anthropic', 'input' => 4.00, 'output' => 20.00, 'cache_read' => 0.20],
+            'claude-sonnet-5-5' => ['label' => 'Claude Sonnet 5.5', 'provider' => 'anthropic', 'input' => 2.00, 'output' => 10.00, 'cache_read' => 0.20],
             // Haiku's rates for prompts of up to 100K tokens; longer prompts cost 5 times as much
-            'claude-haiku-5-5' => ['label' => 'Claude Haiku 5.5', 'input' => 0.10, 'output' => 0.50, 'cache_read' => 0.01],
+            'claude-haiku-5-5' => ['label' => 'Claude Haiku 5.5', 'provider' => 'anthropic', 'input' => 0.10, 'output' => 0.50, 'cache_read' => 0.01],
+
+            // Other providers, through Prism. Use the model names your provider
+            // lists, and copy prices from its pricing page:
+            // 'your-openai-model' => ['label' => 'OpenAI model', 'provider' => 'openai', 'input' => null, 'output' => null],
+            // 'your-gemini-model' => ['label' => 'Gemini model', 'provider' => 'gemini', 'input' => null, 'output' => null],
+            // 'qwen3-coder' => ['label' => 'Qwen3 Coder (local)', 'provider' => 'ollama', 'input' => 0, 'output' => 0],
         ],
 
         // Writing to the 5-minute prompt cache costs this many times the input price
@@ -118,6 +135,11 @@ return [
             'paths' => ['app', 'routes', 'resources/views', 'resources/js', 'resources/ts', 'lang'],
             'deny' => ['.env', '.env.*', '*.key', '*.pem', 'auth.json', '*secret*', '*credential*'],
             'max_file_bytes' => 60_000,
+            // Hide things that look like secrets (API keys, tokens, private
+            // keys, long quoted passwords) in code and pages before they are
+            // sent. Add your own as label => regular expression.
+            'redact' => true,
+            'redact_patterns' => [],
         ],
 
         // Anything Claude should know that the code doesn't say: the sample
@@ -176,6 +198,11 @@ return [
         'node_modules' => env('VIDEO_DEMO_NODE_MODULES', storage_path('video-demo/recorder/node_modules')),
 
         'timeout' => 600,
+
+        // Videos play this many times faster than they were recorded, which
+        // makes clicks and typing snappy. Captions, title cards and pauses
+        // are held longer while recording, so they keep a readable length.
+        'speed' => (float) env('VIDEO_DEMO_SPEED', 2),
     ],
 
     /*
@@ -240,7 +267,9 @@ return [
     | styles on the studio's Styles page. "direction" tells Claude how to
     | write the video. "theme" (light or dark) and "accent" set the look of
     | title cards and captions, "captions" puts them at the top or bottom,
-    | and "pace" (relaxed, normal or brisk) sets how fast the video moves.
+    | "pace" (relaxed, normal or brisk) sets how fast the video moves, and
+    | "art" (none or abstract) puts animated line art behind title cards,
+    | with the words rising into place, like an ad.
     |
     */
 
@@ -276,6 +305,16 @@ return [
             'accent' => '#171717',
             'captions' => 'top',
             'pace' => 'normal',
+            'art' => 'abstract',
+        ],
+        'ad' => [
+            'name' => 'Promo ad',
+            'direction' => 'A short ad. Open on a card with one bold claim about what the user gains, in under eight words. Cut quickly through the two or three moments that prove it, each with a caption of under six words. Close on a card that names the result and says where to start. No step-by-step explanation.',
+            'theme' => 'light',
+            'accent' => '#c4532d',
+            'captions' => 'bottom',
+            'pace' => 'brisk',
+            'art' => 'abstract',
         ],
     ],
 

@@ -1,0 +1,13 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Checkout</title>
+<style>*{box-sizing:border-box}body{font-family:system-ui;margin:0;padding:32px;background:#f6f6f8}iframe{width:100%;height:96px;border:1px solid #ddd;border-radius:8px;background:#fff}button{margin-top:16px;padding:10px 18px;font:inherit}</style></head>
+<body><h1>Checkout</h1><p>Pro plan, £12 a month</p>
+<!-- Like Stripe Elements: the card field lives in its own iframe -->
+<iframe title="Secure card payment input frame" srcdoc='<!doctype html><html><body style="font-family:system-ui;margin:12px"><label for="card">Card number</label><br><input id="card" style="width:100%;padding:8px;font:inherit" inputmode="numeric"></body></html>'></iframe>
+<button type="button" onclick="pay()">Pay £12</button>
+<p id="result" role="status"></p>
+<script>
+function pay() {
+  const card = document.querySelector('iframe').contentDocument.getElementById('card').value.replace(/\s/g, '');
+  document.getElementById('result').textContent = card === '4242424242424242' ? 'Payment received' : 'Card declined';
+}
+</script></body></html>

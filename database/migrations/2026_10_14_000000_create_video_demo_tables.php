@@ -53,6 +53,7 @@ return new class extends Migration
             $table->string('accent')->default('#171717');
             $table->string('captions')->default('bottom');
             $table->string('pace')->default('normal');
+            $table->string('art')->default('none');
             $table->unsignedInteger('position')->default(0);
             $table->timestamps();
         });

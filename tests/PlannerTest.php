@@ -85,7 +85,7 @@ class PlannerTest extends TestCase
         $session = $planner->plan($video);
 
         $this->assertCount(3, $session->plan->steps);
-        $this->assertSame('tu_plan', $session->pendingSubmitId);
+        $this->assertSame('tu_plan', $session->pendingSubmit['id']);
 
         // The request the SDK sent
         $first = $this->request(1);
@@ -128,7 +128,7 @@ class PlannerTest extends TestCase
         $this->assertSame('tu_plan', $last['content'][0]['tool_use_id']);
         $this->assertTrue($last['content'][0]['is_error']);
         $this->assertStringContainsString('button "Post job"', $last['content'][0]['content']);
-        $this->assertSame('tu_fixed', $session->pendingSubmitId);
+        $this->assertSame('tu_fixed', $session->pendingSubmit['id']);
         $this->assertSame(1, $session->repairs);
 
         // Each response: 10 input, 5,000 cache writes, 20,000 cache reads, 1,000 output on Opus 5.5
@@ -165,7 +165,7 @@ class PlannerTest extends TestCase
         config(['video-demo.limits.max_cost_per_video' => 2.0]);
         $this->respond(2, [], 'refusal', ['output_tokens' => 0]);
         $this->expectException(PlanningFailed::class);
-        $this->expectExceptionMessage('Claude declined this request');
+        $this->expectExceptionMessage('The model declined this request');
         app(Planner::class)->plan($this->video());
     }
 }

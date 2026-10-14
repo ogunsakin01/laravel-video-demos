@@ -3,6 +3,9 @@
 namespace Ogunsakin01\VideoDemo\Ai;
 
 use InvalidArgumentException;
+use Ogunsakin01\VideoDemo\Ai\Drivers\Drivers;
+use Ogunsakin01\VideoDemo\Ai\Drivers\ToolOutput;
+use Ogunsakin01\VideoDemo\Ai\Drivers\Turn;
 use Ogunsakin01\VideoDemo\Models\Video;
 use Ogunsakin01\VideoDemo\Recording\Devices;
 use Ogunsakin01\VideoDemo\Recording\Plan;
@@ -10,19 +13,19 @@ use Ogunsakin01\VideoDemo\Recording\RecordingResult;
 use RuntimeException;
 
 /**
- * Asks Claude to read the app's code and write a step-by-step plan for the
- * video, then to fix the plan when a step fails in the browser.
+ * Asks the model to read the app's code and write a step-by-step plan for
+ * the video, then to fix the plan when a step fails in the browser. Works
+ * with any driver: Claude through the Anthropic SDK, or other providers
+ * through Prism.
  */
 class Planner
 {
-    protected const MAX_TOKENS = 16_000;
-
-    public function __construct(protected Claude $claude, protected CodeTools $code) {}
+    public function __construct(protected Drivers $drivers, protected CodeTools $code) {}
 
     public function plan(Video $video): PlanningSession
     {
         $session = new PlanningSession;
-        $session->messages[] = ['role' => 'user', 'content' => $this->brief($video)];
+        $this->drivers->for($video->model)->addUserText($session->messages, $this->brief($video));
 
         $this->run($session, $video);
 
@@ -32,21 +35,23 @@ class Planner
     /** Sends the failure back as the result of submit_plan and waits for a corrected plan */
     public function repair(PlanningSession $session, Video $video, RecordingResult $failure): PlanningSession
     {
-        if ($session->pendingSubmitId === null) {
+        if ($session->pendingSubmit === null) {
             throw new PlanningFailed('There is no plan to repair.');
         }
 
         $session->repairs++;
-        $session->messages[] = ['role' => 'user', 'content' => [
+        $this->drivers->for($video->model)->addToolOutputs($session->messages, [
             ...$session->pendingResults,
-            [
-                'type' => 'tool_result',
-                'toolUseID' => $session->pendingSubmitId,
-                'isError' => true,
-                'content' => $failure->describeForRepair(),
-            ],
-        ]];
-        $session->pendingSubmitId = null;
+            new ToolOutput(
+                $session->pendingSubmit['id'],
+                'submit_plan',
+                $session->pendingSubmit['input'],
+                // The page may show secrets too, such as an API settings screen
+                (new Redactor)->redact($failure->describeForRepair()),
+                isError: true,
+            ),
+        ]);
+        $session->pendingSubmit = null;
         $session->pendingResults = [];
 
         $this->run($session, $video);
@@ -58,110 +63,76 @@ class Planner
     {
         $maxTurns = (int) config('video-demo.limits.max_turns', 30);
         $maxCost = (float) config('video-demo.limits.max_cost_per_video', 2.0);
+        $driver = $this->drivers->for($video->model);
+        $tools = [...$this->code->definitions(), $this->submitTool()];
 
         while ($session->turns < $maxTurns) {
             $session->turns++;
-            $response = $this->send($session->messages, $video);
-            $video->addUsage($this->usage($response, $video->model));
+            $turn = $driver->send($session->messages, $this->systemPrompt(), $tools, $video->model, $video->effort);
+            $video->addUsage($turn->usage);
 
-            $session->messages[] = ['role' => 'assistant', 'content' => $response->content];
-
-            if ($response->stopReason === 'refusal') {
-                throw new PlanningFailed('Claude declined this request'.($response->stopDetails?->explanation ? ': '.$response->stopDetails->explanation : '.'));
+            if ($turn->stop === Turn::REFUSAL) {
+                throw new PlanningFailed('The model declined this request'.($turn->refusal ? ': '.$turn->refusal : '.'));
             }
-            if ($response->stopReason === 'max_tokens') {
+            if ($turn->stop === Turn::MAX_TOKENS) {
                 throw new PlanningFailed('The plan was longer than one response allows. Ask for a shorter video or split the flow.');
             }
             if ($video->cost > $maxCost) {
                 throw new PlanningFailed(sprintf('Stopped at $%.2f, over the $%.2f limit per video.', $video->cost, $maxCost));
             }
 
-            if ($response->stopReason !== 'tool_use') {
-                $session->messages[] = ['role' => 'user', 'content' => 'Call submit_plan with the finished plan now.'];
+            if ($turn->stop !== Turn::TOOL_USE) {
+                $driver->addUserText($session->messages, 'Call submit_plan with the finished plan now.');
 
                 continue;
             }
 
             $results = [];
             $submitted = null;
-            foreach ($response->content as $block) {
-                if ($block->type !== 'tool_use') {
-                    continue;
-                }
-                if ($block->name === 'submit_plan') {
-                    $plan = Plan::fromArray($block->input);
+            foreach ($turn->toolCalls as $call) {
+                if ($call['name'] === 'submit_plan') {
+                    $plan = Plan::fromArray($call['input']);
                     $problems = $this->problems($plan);
                     if ($problems === [] && $submitted === null) {
-                        $submitted = [$block->id, $plan];
+                        $submitted = [$call, $plan];
                     } else {
-                        $results[] = $this->toolResult($block->id, $problems ? "The plan was not accepted:\n- ".implode("\n- ", $problems) : 'Submit one plan at a time.', true);
+                        $results[] = new ToolOutput($call['id'], $call['name'], $call['input'], $problems ? "The plan was not accepted:\n- ".implode("\n- ", $problems) : 'Submit one plan at a time.', isError: true);
                     }
 
                     continue;
                 }
 
-                $results[] = $this->runCodeTool($block->id, $block->name, $block->input);
-                $video->addLog($this->describeToolCall($block->name, $block->input));
+                $results[] = $this->runCodeTool($call);
+                $hidden = $this->code->hiddenSecrets();
+                $video->addLog($this->describeToolCall($call['name'], $call['input'])
+                    .($hidden ? " ($hidden ".($hidden === 1 ? 'secret' : 'secrets').' hidden)' : ''));
             }
 
             if ($submitted) {
-                [$session->pendingSubmitId, $session->plan] = $submitted;
+                [$session->pendingSubmit, $session->plan] = $submitted;
                 $session->pendingResults = $results;
 
                 return;
             }
 
-            $session->messages[] = ['role' => 'user', 'content' => $results];
+            $driver->addToolOutputs($session->messages, $results);
         }
 
-        throw new PlanningFailed("No plan after $maxTurns requests to Claude. Try a narrower description, or raise video-demo.limits.max_turns.");
+        throw new PlanningFailed("No plan after $maxTurns requests to the model. Try a narrower description, or raise video-demo.limits.max_turns.");
     }
 
-    protected function send(array $messages, Video $video): object
+    /** @param array{id: string, name: string, input: array} $call */
+    protected function runCodeTool(array $call): ToolOutput
     {
-        return $this->claude->create([
-            'model' => $video->model,
-            'maxTokens' => self::MAX_TOKENS,
-            'system' => $this->systemPrompt(),
-            'tools' => [...$this->code->definitions(), $this->submitTool()],
-            'thinking' => ['type' => 'adaptive'],
-            'outputConfig' => ['effort' => $video->effort],
-            // Caches everything up to the latest message, so each request
-            // pays the cheap cached price for the conversation so far
-            'cacheControl' => ['type' => 'ephemeral'],
-            'messages' => $messages,
-        ]);
-    }
-
-    protected function usage(object $response, string $requestedModel): Usage
-    {
-        // After a fallback the answering model may differ; price by it when known
-        $model = config("video-demo.ai.models.{$response->model}") ? $response->model : $requestedModel;
-
-        return Usage::fromResponse($response->usage, $model);
-    }
-
-    protected function runCodeTool(string $id, string $name, array $input): array
-    {
-        if (! $this->code->handles($name)) {
-            return $this->toolResult($id, "There is no tool called $name.", true);
+        if (! $this->code->handles($call['name'])) {
+            return new ToolOutput($call['id'], $call['name'], $call['input'], "There is no tool called {$call['name']}.", isError: true);
         }
 
         try {
-            return $this->toolResult($id, $this->code->run($name, $input));
+            return new ToolOutput($call['id'], $call['name'], $call['input'], $this->code->run($call['name'], $call['input']));
         } catch (RuntimeException|InvalidArgumentException $e) {
-            return $this->toolResult($id, $e->getMessage(), true);
+            return new ToolOutput($call['id'], $call['name'], $call['input'], $e->getMessage(), isError: true);
         }
-    }
-
-    protected function toolResult(string $id, string $content, bool $error = false): array
-    {
-        return array_filter([
-            'type' => 'tool_result',
-            'toolUseID' => $id,
-            'content' => $content,
-            'isError' => $error ?: null,
-        ], fn ($v) => $v !== null);
     }
 
     protected function describeToolCall(string $name, array $input): string
@@ -188,7 +159,9 @@ class Planner
         foreach ($plan->steps as $i => $step) {
             $n = $i + 1;
             $action = $step['action'] ?? null;
-            $hasTarget = is_array($step['target'] ?? null) && array_filter($step['target'], fn ($v) => $v !== null && $v !== '') !== [];
+            // A frame alone isn't a target: something must identify the element in it
+            $hasTarget = is_array($step['target'] ?? null)
+                && array_filter(array_diff_key($step['target'], ['frame' => true]), fn ($v) => $v !== null && $v !== '') !== [];
 
             $missing = match ($action) {
                 'goto' => empty($step['url']) ? 'url' : null,
@@ -216,8 +189,7 @@ class Planner
         return [
             'name' => 'submit_plan',
             'description' => 'Submit the finished video plan. The recorder plays it in a real browser; if a step fails you get the error and the page as it was, and can submit a corrected plan.',
-            'inputSchema' => Plan::schema(),
-            'strict' => true,
+            'schema' => Plan::schema(),
         ];
     }
 
@@ -254,6 +226,8 @@ class Planner
         - click, hover and check act on an element; type fills a field with value; select picks an option by its label; press sends a key such as Enter; scroll moves the page (target scrolls to an element; otherwise ms is ignored and the page scrolls by one screen); wait waits for an element to appear.
         - caption shows a short title and sentence over the bottom of the page while the app stays visible; card shows a full-screen title card. Use a card to open and close the video, and captions to explain what the viewer is looking at. Keep each caption title under 8 words and its sentence under 20.
         - pause holds still so the viewer can take in a result.
+
+        Payments and other services often show their fields inside an iframe, such as the card fields of Stripe Elements or a PayPal button. Give the iframe's CSS selector in target.frame for those, and check the developer's notes for test card numbers and test accounts; never use real payment details. Hosted pages on another site (a Stripe Checkout page, say) are reached by clicking through from the app, not with goto. Steps that need an email, a text message or a CAPTCHA can't be recorded; if the flow depends on one, say so in a caption and skip to what the user sees next.
 
         Identify elements the way a user sees them. Prefer role and name together (role "button", name "Post job"), then label for form fields, then visible text. Use a CSS selector only when nothing visible identifies the element. Labels must match what the rendered page shows, after translations and components are applied, so check the view and any component it uses.
 

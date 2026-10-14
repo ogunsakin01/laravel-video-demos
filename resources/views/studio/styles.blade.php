@@ -12,7 +12,7 @@
     <div>
       <p class="vd-eyebrow">Studio</p>
       <h1>Styles</h1>
-      <p class="vd-sub">How Claude writes each video and how its title cards and captions look. The first ones come from the <code>styles</code> section of <code>config/video-demo.php</code>.</p>
+      <p class="vd-sub">How the AI writes each video and how its title cards and captions look. The first ones come from the <code>styles</code> section of <code>config/video-demo.php</code>.</p>
     </div>
   </section>
 
@@ -22,10 +22,19 @@
         @php($dark = $style->theme === 'dark')
         <article class="vd-card" style="display:grid;grid-template-columns:132px minmax(0,1fr);gap:18px;align-items:start">
           {{-- A small picture of the style's title card --}}
-          <div aria-hidden="true" style="aspect-ratio:16/10;border-radius:8px;border:1px solid var(--vd-border);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:{{ $dark ? '#171717' : '#faf8f3' }}">
-            <span style="width:16px;height:2px;border-radius:2px;background:{{ $dark && strtolower($style->accent) === '#171717' ? '#fafaf8' : $style->accent }}"></span>
-            <span style="width:62%;height:6px;border-radius:3px;background:{{ $dark ? '#fafaf8' : '#171717' }}"></span>
-            <span style="width:44%;height:4px;border-radius:2px;background:{{ $dark ? 'rgba(250,250,248,.5)' : '#b8b5ae' }}"></span>
+          <div aria-hidden="true" style="position:relative;overflow:hidden;aspect-ratio:16/10;border-radius:8px;border:1px solid var(--vd-border);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:{{ $dark ? '#141412' : '#faf8f3' }}">
+            @if ($style->art === 'abstract')
+              <svg viewBox="0 0 160 100" style="position:absolute;inset:0;width:100%;height:100%" fill="none" stroke="{{ $dark ? 'rgba(250,250,248,.22)' : '#d6d2c8' }}" stroke-width="1">
+                @foreach ([10, 18, 26, 34, 42] as $r)
+                  <ellipse cx="18" cy="50" rx="{{ $r }}" ry="{{ $r * .78 }}" />
+                @endforeach
+                <circle cx="150" cy="16" r="2.5" fill="{{ $dark && strtolower($style->accent) === '#171717' ? '#fafaf8' : $style->accent }}" stroke="none" />
+                <path d="M110 16 L150 16 M130 88 L158 80" />
+              </svg>
+            @endif
+            <span style="position:relative;width:16px;height:2px;border-radius:2px;background:{{ $dark && strtolower($style->accent) === '#171717' ? '#fafaf8' : $style->accent }}"></span>
+            <span style="position:relative;width:62%;height:6px;border-radius:3px;background:{{ $dark ? '#fafaf8' : '#171717' }}"></span>
+            <span style="position:relative;width:44%;height:4px;border-radius:2px;background:{{ $dark ? 'rgba(250,250,248,.5)' : '#b8b5ae' }}"></span>
           </div>
           <div>
             <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
@@ -42,6 +51,7 @@
               <span class="vd-pill">{{ VideoStyle::THEMES[$style->theme] ?? $style->theme }} cards</span>
               <span class="vd-pill">Captions at the {{ strtolower(VideoStyle::CAPTIONS[$style->captions] ?? $style->captions) }}</span>
               <span class="vd-pill">{{ VideoStyle::PACES[$style->pace] ?? $style->pace }} pace</span>
+              @if ($style->art === 'abstract')<span class="vd-pill">Abstract art</span>@endif
               <span class="vd-pill" style="display:inline-flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:3px;background:{{ $style->accent }};border:1px solid var(--vd-border)"></span>{{ $style->accent }}</span>
             </div>
           </div>
@@ -60,7 +70,7 @@
         @error('name')<span class="vd-error">{{ $message }}</span>@enderror
       </div>
       <div>
-        <label for="direction">Direction for Claude</label>
+        <label for="direction">Direction for the AI</label>
         <textarea id="direction" name="direction" required maxlength="2000" placeholder="Friendly and brief. Address the viewer as “you”. One caption per screen.">{{ old('direction', $form->direction) }}</textarea>
         <span class="vd-hint">Tone, how much to explain, and when to use title cards and captions.</span>
         @error('direction')<span class="vd-error">{{ $message }}</span>@enderror
@@ -97,6 +107,15 @@
           <input type="text" id="accent" name="accent" required pattern="#[0-9a-fA-F]{6}" value="{{ old('accent', $form->accent) }}" class="vd-mono">
           @error('accent')<span class="vd-error">{{ $message }}</span>@enderror
         </div>
+      </div>
+      <div>
+        <label for="art">Art</label>
+        <select id="art" name="art">
+          @foreach (VideoStyle::ARTS as $value => $label)
+            <option value="{{ $value }}" @selected(old('art', $form->art) === $value)>{{ $label }}</option>
+          @endforeach
+        </select>
+        <span class="vd-hint">Abstract line art draws itself behind title cards, and the words rise into place, like an ad.</span>
       </div>
       <div class="vd-actions">
         <button class="vd-btn vd-btn-primary">{{ $editing ? 'Save style' : 'Add style' }}</button>

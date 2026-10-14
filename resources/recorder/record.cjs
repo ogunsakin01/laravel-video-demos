@@ -11,7 +11,10 @@ const { CURSOR_JS, OVERLAY_JS, setPace, typingDelay, pause, glide, click, scroll
 
 const job = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const plan = JSON.parse(fs.readFileSync(job.planPath, 'utf8'));
-const style = Object.assign({ theme: 'light', accent: '#171717', captions: 'bottom', pace: 'normal' }, job.style || {});
+// The video is played back this many times faster after recording, so what
+// viewers must read (captions, cards, pauses) is held this much longer now
+const SPEED = job.speed || 1;
+const style = Object.assign({ theme: 'light', accent: '#171717', captions: 'bottom', pace: 'normal', speed: SPEED }, job.style || {});
 setPace(style.pace);
 const FIND_TIMEOUT = 8000;
 const SNAPSHOT_LIMIT = 12000;
@@ -20,12 +23,14 @@ const url = p => job.baseUrl.replace(/\/$/, '') + '/' + String(p).replace(/^\//,
 
 function locate(page, t) {
   if (!t) throw new Error('This step needs a target.');
+  // Inside an iframe, such as the card fields of an embedded payment form
+  const scope = t.frame ? page.frameLocator(t.frame).first() : page;
   let loc;
-  if (t.role) loc = page.getByRole(t.role, t.name ? { name: t.name } : {});
-  else if (t.label) loc = page.getByLabel(t.label);
-  else if (t.placeholder) loc = page.getByPlaceholder(t.placeholder);
-  else if (t.text) loc = page.getByText(t.text);
-  else if (t.selector) loc = page.locator(t.selector);
+  if (t.role) loc = scope.getByRole(t.role, t.name ? { name: t.name } : {});
+  else if (t.label) loc = scope.getByLabel(t.label);
+  else if (t.placeholder) loc = scope.getByPlaceholder(t.placeholder);
+  else if (t.text) loc = scope.getByText(t.text);
+  else if (t.selector) loc = scope.locator(t.selector);
   else throw new Error('The target has no role, label, placeholder, text or selector.');
   return loc.filter({ visible: true }).first();
 }
@@ -51,7 +56,7 @@ async function settle(page) {
 }
 
 async function run(page, step, isLast) {
-  const extra = step.ms || 0;
+  const extra = (step.ms || 0) * SPEED;
   switch (step.action) {
     case 'goto':
       await page.goto(url(step.url), { waitUntil: 'load' });
@@ -125,21 +130,21 @@ async function run(page, step, isLast) {
       return;
     case 'caption':
       await page.evaluate(([t, s]) => window.__demoOverlay.caption(t, s), [step.title, step.text || '']);
-      await pause(page, step.ms || 3000);
+      await pause(page, (step.ms || 3000) * SPEED);
       // The last step stays on screen, so the video doesn't end mid-fade
       if (isLast) return;
       await page.evaluate(() => window.__demoOverlay.hide());
-      await pause(page, 350);
+      await pause(page, 350 * SPEED);
       return;
     case 'card':
       await page.evaluate(([t, s]) => window.__demoOverlay.card(t, s), [step.title, step.text || '']);
-      await pause(page, step.ms || 3500);
+      await pause(page, (step.ms || 3500) * SPEED);
       if (isLast) return;
       await page.evaluate(() => window.__demoOverlay.hide());
-      await pause(page, 450);
+      await pause(page, 450 * SPEED);
       return;
     case 'pause':
-      await pause(page, step.ms || 1500);
+      await pause(page, (step.ms || 1500) * SPEED);
       return;
     default:
       throw new Error(`Unknown action ${step.action}.`);
@@ -148,12 +153,30 @@ async function run(page, step, isLast) {
 
 // What was on the page when a step failed, for Claude to fix the plan
 async function snapshot(page) {
+  let tree = '';
   try {
-    const tree = await page.locator('body').ariaSnapshot({ timeout: 3000 });
-    return tree.length > SNAPSHOT_LIMIT ? tree.slice(0, SNAPSHOT_LIMIT) + '\n… cut' : tree;
-  } catch {
-    return '';
-  }
+    tree = await page.locator('body').ariaSnapshot({ timeout: 3000 });
+  } catch {}
+
+  // The page's iframes and what's inside them, so Claude can target fields in
+  // embedded forms (payment card fields, sign-in widgets) with target.frame
+  try {
+    const frames = await page.locator('iframe').evaluateAll(els => els.map(f => ({
+      title: f.getAttribute('title'), name: f.getAttribute('name'), id: f.id,
+      src: (f.getAttribute('src') || '').slice(0, 120), visible: f.getBoundingClientRect().height > 0,
+    })));
+    const shown = frames.map((f, i) => ({ ...f, i })).filter(f => f.visible).slice(0, 5);
+    for (const f of shown) {
+      const selector = f.title ? `iframe[title="${f.title}"]` : f.name ? `iframe[name="${f.name}"]` : f.id ? `iframe#${f.id}` : `iframe >> nth=${f.i}`;
+      let inside = '';
+      try {
+        inside = await page.frameLocator(`iframe >> nth=${f.i}`).locator('body').ariaSnapshot({ timeout: 3000 });
+      } catch {}
+      tree += `\n\n- iframe (target.frame: ${selector})${f.src ? ` src=${f.src}` : ''}:\n` + inside.split('\n').map(l => '  ' + l).join('\n');
+    }
+  } catch {}
+
+  return tree.length > SNAPSHOT_LIMIT ? tree.slice(0, SNAPSHOT_LIMIT) + '\n… cut' : tree;
 }
 
 (async () => {

@@ -2,9 +2,8 @@
 
 namespace Ogunsakin01\VideoDemo\Tests;
 
-use Anthropic\Client;
-use Ogunsakin01\VideoDemo\Ai\Claude;
 use Ogunsakin01\VideoDemo\Ai\CodeTools;
+use Ogunsakin01\VideoDemo\Ai\Drivers\Drivers;
 use Ogunsakin01\VideoDemo\Ai\Planner;
 use Ogunsakin01\VideoDemo\Recording\Plan;
 
@@ -73,13 +72,13 @@ class PlanTest extends TestCase
 
     public function test_planner_rejects_incomplete_steps(): void
     {
-        $planner = new Planner(new Claude(new Client(apiKey: 'test')), new CodeTools);
+        $planner = new Planner(new Drivers, new CodeTools);
 
         $this->assertSame([], $planner->problems($this->plan()));
 
         $problems = $planner->problems(new Plan('x', 'y', [
             $this->step('goto'),
-            $this->step('click', ['target' => ['role' => null, 'name' => null, 'label' => null, 'placeholder' => null, 'text' => null, 'selector' => null]]),
+            $this->step('click', ['target' => ['role' => null, 'name' => null, 'label' => null, 'placeholder' => null, 'text' => null, 'selector' => null, 'frame' => 'iframe']]),
             $this->step('type', ['target' => ['label' => 'Title']]),
             $this->step('goto', ['url' => 'https://example.com/jobs']),
         ]));
@@ -103,5 +102,18 @@ class PlanTest extends TestCase
         $this->assertCount(2, $plan->forDevice('desktop')->steps);
         $this->assertCount(3, $plan->forDevice('mobile')->steps);
         $this->assertSame(['desktop', 'tv', 'tablet', 'mobile'], Plan::schema()['properties']['steps']['items']['properties']['only_on']['items']['enum']);
+    }
+
+    public function test_at_double_speed_actions_are_quicker_but_reading_time_is_kept(): void
+    {
+        $plan = $this->plan();
+        $normal = $plan->estimatedSeconds();
+        $fast = $plan->estimatedSeconds(2);
+
+        $reading = (3500 + 3000 + 1500) / 1000;
+        $this->assertEqualsWithDelta($reading + ($normal - $reading) / 2, $fast, 0.1);
+
+        // Fitting to a length at 2x leaves more room for captions and cards
+        $this->assertGreaterThan($plan->fitTo(12)->steps[0]['ms'], $plan->fitTo(12, 2)->steps[0]['ms']);
     }
 }

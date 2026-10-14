@@ -58,6 +58,7 @@ class StyleController extends Controller
             'accent' => ['required', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'captions' => ['required', Rule::in(array_keys(VideoStyle::CAPTIONS))],
             'pace' => ['required', Rule::in(array_keys(VideoStyle::PACES))],
+            'art' => ['required', Rule::in(array_keys(VideoStyle::ARTS))],
         ]);
     }
 }

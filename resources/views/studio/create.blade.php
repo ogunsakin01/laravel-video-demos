@@ -7,7 +7,7 @@
     <div>
       <p class="vd-eyebrow">Studio</p>
       <h1>New video</h1>
-      <p class="vd-sub">Claude reads your app's code, plans the walkthrough, and records it in a browser against this local copy.</p>
+      <p class="vd-sub">The AI model reads your app's code, plans the walkthrough, and it is recorded in a browser against this local copy.</p>
     </div>
   </section>
 
@@ -47,7 +47,7 @@
       <div>
         <span class="vd-label" id="vd-devices-label">Versions</span>
         @include('video-demo::studio.partials.devices', ['devices' => $devices, 'selected' => old('devices', $defaults['devices'])])
-        <span class="vd-hint">Claude writes one plan for all of them. Each extra version only adds recording time on this machine.</span>
+        <span class="vd-hint">The AI writes one plan for all of them. Each extra version only adds recording time on this machine.</span>
         @error('devices')<span class="vd-error">Choose at least one version.</span>@enderror
       </div>
 
@@ -68,7 +68,7 @@
       <div class="vd-row">
         <div>
           <label for="title">Title <span class="vd-optional">optional</span></label>
-          <input type="text" id="title" name="title" value="{{ old('title') }}" maxlength="160" placeholder="Claude suggests one">
+          <input type="text" id="title" name="title" value="{{ old('title') }}" maxlength="160" placeholder="The AI suggests one">
         </div>
         <div>
           <label for="start_path">Start page <span class="vd-optional">optional</span></label>
@@ -83,7 +83,7 @@
           <label for="model">Model</label>
           <select id="model" name="model">
             @foreach ($models as $id => $label)
-              <option value="{{ $id }}" @selected(old('model', $defaults['model']) === $id)>{{ $label }}</option>
+              <option value="{{ $id }}" data-effort="{{ \Ogunsakin01\VideoDemo\Ai\Drivers\Drivers::supportsEffort($id) ? '1' : '0' }}" @selected(old('model', $defaults['model']) === $id)>{{ $label }}</option>
             @endforeach
           </select>
         </div>
@@ -107,7 +107,7 @@
 
     <aside class="vd-card vd-stack" aria-live="polite">
       <div>
-        <p class="vd-eyebrow">Estimated Claude cost</p>
+        <p class="vd-eyebrow">Estimated AI cost</p>
         <div class="vd-figure" id="vd-estimate">—</div>
         <div class="vd-small vd-muted" id="vd-estimate-note">&nbsp;</div>
       </div>
@@ -152,6 +152,11 @@
             const res = await post(@json(route('video-demo.studio.estimate')), { model: form.elements.model.value, effort: form.elements.effort.value, target_seconds: seconds.value });
             const e = await res.json();
             if (mine !== seq) return;
+            if (!e.known) {
+              out.textContent = 'Unknown';
+              note.textContent = 'This model has no prices in config/video-demo.php, so its cost can\'t be shown.';
+              return;
+            }
             out.textContent = money(e.low) + ' – ' + money(e.high);
             note.textContent = 'Most likely about ' + money(e.expected) + ', over roughly ' + e.turns + ' requests.';
           } catch {
@@ -159,9 +164,16 @@
           }
         }
         for (const k of ['model', 'effort']) form.elements[k].addEventListener('change', estimate);
+
+        // Effort is a Claude setting; other providers ignore it
+        const effort = form.elements.effort;
+        const syncEffort = () => { effort.disabled = form.elements.model.selectedOptions[0]?.dataset.effort === '0'; };
+        form.elements.model.addEventListener('change', syncEffort);
+        syncEffort();
+        form.addEventListener('submit', () => { effort.disabled = false; });
         estimate();
 
-        // Show what the chosen style asks Claude to do
+        // Show what the chosen style asks the AI to do
         const styleSelect = form.elements.style_id;
         const styleHint = document.getElementById('vd-style-hint');
         const showStyle = () => { styleHint.textContent = styleSelect.selectedOptions[0]?.dataset.direction || ''; };
@@ -185,7 +197,7 @@
             if (d.title) form.elements.title.value = d.title;
             if (d.start_path) form.elements.start_path.value = d.start_path;
             if (d.target_seconds) setSeconds(d.target_seconds);
-            status.textContent = 'Written by Claude for ' + money(d.cost) + '. Edit anything before you generate.';
+            status.textContent = (d.cost_known ? 'Written by AI for ' + money(d.cost) : 'Written by AI') + '. Edit anything before you generate.';
             estimate();
           } catch (e) {
             status.textContent = e.message;

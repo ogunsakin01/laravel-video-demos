@@ -49,9 +49,14 @@ composer check     # all of the above, then the tests
 
 CI runs Pint and PHPStan on every pull request. Please fix what PHPStan finds rather than ignoring it; it has already caught real bugs here.
 
-## Tests and Claude
+## Tests and AI providers
 
-The planner is tested with the real Anthropic SDK against a local fake of the Messages API (`tests/Concerns/FakesAnthropic.php`), so tests never spend money. Please test new Claude features the same way, and never add tests that call the real API.
+Tests never call a real AI API, so they never spend money:
+
+- Claude: the real Anthropic SDK runs against a local fake of the Messages API (`tests/Concerns/FakesAnthropic.php`).
+- Other providers: Prism's own fake (`Prism::fake()`), as in `tests/PrismDriverTest.php`.
+
+Please test new AI features the same way.
 
 ## Pull requests
 

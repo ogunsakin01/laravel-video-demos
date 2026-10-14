@@ -19,13 +19,16 @@ class CodeTools
 
     protected const MAX_MATCHES = 60;
 
-    public function __construct(protected ?string $root = null)
+    protected Redactor $redactor;
+
+    public function __construct(protected ?string $root = null, ?Redactor $redactor = null)
     {
+        $this->redactor = $redactor ?? new Redactor;
         $root ??= base_path();
         $this->root = rtrim(realpath($root) ?: $root, '/');
     }
 
-    /** Tool definitions for the Messages API */
+    /** Tool definitions: name, description and a JSON schema for the input */
     public function definitions(): array
     {
         $paths = implode(', ', $this->allowedPaths());
@@ -34,18 +37,17 @@ class CodeTools
             [
                 'name' => 'list_files',
                 'description' => "List the files under a folder of the app, relative to its root. Readable folders: $paths.",
-                'inputSchema' => [
+                'schema' => [
                     'type' => 'object',
                     'properties' => ['path' => ['type' => 'string', 'description' => 'Folder, for example resources/views/jobs']],
                     'required' => ['path'],
                     'additionalProperties' => false,
                 ],
-                'strict' => true,
             ],
             [
                 'name' => 'read_file',
                 'description' => 'Read a file of the app, with line numbers. Long files are cut; ask for later lines with from_line.',
-                'inputSchema' => [
+                'schema' => [
                     'type' => 'object',
                     'properties' => [
                         'path' => ['type' => 'string'],
@@ -54,12 +56,11 @@ class CodeTools
                     'required' => ['path', 'from_line'],
                     'additionalProperties' => false,
                 ],
-                'strict' => true,
             ],
             [
                 'name' => 'search_code',
                 'description' => 'Find lines matching a case-insensitive regular expression in the readable folders, for example a button label or a route name.',
-                'inputSchema' => [
+                'schema' => [
                     'type' => 'object',
                     'properties' => [
                         'pattern' => ['type' => 'string'],
@@ -68,7 +69,6 @@ class CodeTools
                     'required' => ['pattern', 'path'],
                     'additionalProperties' => false,
                 ],
-                'strict' => true,
             ],
         ];
     }
@@ -78,15 +78,21 @@ class CodeTools
         return in_array($tool, ['list_files', 'read_file', 'search_code'], true);
     }
 
-    /** Runs a tool and returns its text result; a RuntimeException means the input was refused */
+    /** Runs a tool and returns its text result, secrets hidden; a RuntimeException means the input was refused */
     public function run(string $tool, array $input): string
     {
-        return match ($tool) {
+        return $this->redactor->redact(match ($tool) {
             'list_files' => $this->listFiles((string) $input['path']),
             'read_file' => $this->readFile((string) $input['path'], (int) ($input['from_line'] ?? 1)),
             'search_code' => $this->search((string) $input['pattern'], $input['path'] ?? null),
             default => throw new RuntimeException("Unknown tool $tool"),
-        };
+        });
+    }
+
+    /** How many secrets the last tool calls hid */
+    public function hiddenSecrets(): int
+    {
+        return $this->redactor->takeCount();
     }
 
     /** The app's routes, one per line, sent with the first request */

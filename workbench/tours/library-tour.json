@@ -3,9 +3,10 @@
   "summary": "What your app's users see.",
   "style": {
     "theme": "light",
-    "accent": "#171717",
+    "accent": "#c4532d",
     "captions": "bottom",
-    "pace": "normal"
+    "pace": "normal",
+    "art": "abstract"
   },
   "devices": [
     "desktop",
@@ -18,8 +19,8 @@
       "url": null,
       "target": null,
       "value": null,
-      "title": "What your users see",
-      "text": "Short how-to videos, inside your app and in a help library.",
+      "title": "Answers where users look",
+      "text": "Short how-to videos, inside your app.",
       "ms": 3600,
       "chapter": null,
       "only_on": null
@@ -42,7 +43,7 @@
       "url": null,
       "target": null,
       "value": null,
-      "title": "Drop a video into any page",
+      "title": "One line to embed",
       "text": "<x-video-demo::player slug=\"post-a-job\" />",
       "ms": 3800,
       "chapter": null,
@@ -104,8 +105,8 @@
       "url": null,
       "target": null,
       "value": null,
-      "title": "A help library, ready made",
-      "text": "Public and staff-only pages, at the addresses you choose.",
+      "title": "A help library, built in",
+      "text": "Search it, watch it, done.",
       "ms": 3600,
       "chapter": null,
       "only_on": null
@@ -135,8 +136,8 @@
       "url": null,
       "target": null,
       "value": null,
-      "title": "Chapters to jump straight in",
-      "text": "Taken from the plan as the video records.",
+      "title": "Jump to any step",
+      "text": "Chapters come straight from the plan.",
       "ms": 3200,
       "chapter": null,
       "only_on": null
@@ -197,8 +198,8 @@
       "url": null,
       "target": null,
       "value": null,
-      "title": "The right version for each screen",
-      "text": "The player picks the version that fits. Viewers can switch.",
+      "title": "Made for every screen",
+      "text": "The right version plays automatically.",
       "ms": 3600,
       "chapter": null,
       "only_on": null
@@ -221,8 +222,8 @@
       "url": null,
       "target": null,
       "value": null,
-      "title": "Nothing yet? Users can ask",
-      "text": "Requests show up in your studio as ideas for the next video.",
+      "title": "Missing a video? Ask.",
+      "text": "Requests land in your studio.",
       "ms": 3600,
       "chapter": null,
       "only_on": null
@@ -253,7 +254,7 @@
       "target": null,
       "value": null,
       "title": "Made on your machine. Watched everywhere.",
-      "text": "Videos publish to any Laravel disk, such as S3 or R2.",
+      "text": "Publish to S3, R2 or any Laravel disk.",
       "ms": 3800,
       "chapter": null,
       "only_on": null

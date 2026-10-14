@@ -4,6 +4,10 @@ All notable changes to this package are listed here. The format follows [Keep a 
 
 ## Unreleased
 
+## v0.1.0 - 2026-10-14
+
+The first release.
+
 ### Added
 
 - Studio, for making videos on a developer's machine: describe a flow, choose the length, style, versions, model and effort, and see the estimated cost first.
@@ -17,6 +21,13 @@ All notable changes to this package are listed here. The format follows [Keep a 
 - Per-video cost from the API's token counts, and a spending limit per video.
 - Laravel Pint and PHPStan (Larastan, level 5) in CI, with `composer check` to run everything locally.
 - Animated previews of the tour videos in the README, since GitHub doesn't play videos stored in a repository.
+- Other AI providers through Prism: OpenAI, Gemini, Mistral, DeepSeek, Groq, xAI, OpenRouter and local Ollama models. Claude stays the default, through the Anthropic SDK.
+- Models without prices work, with their cost shown as unknown.
+- A `viewVideoDemoStudio` gate: outside local, only users it allows can use the studio, and without it the studio is closed.
+- Secrets that look like API keys, tokens, private keys or long passwords are hidden before code or page snapshots are sent to the AI, with custom patterns in `ai.code.redact_patterns`.
+- Plan steps can target elements inside iframes, such as embedded payment card fields, and failed steps show the model each iframe's contents.
+- Videos play at twice the recorded speed by default (`recorder.speed`), with captions, cards and pauses held longer so they stay readable.
+- An "art" setting for styles: abstract line art that draws itself on behind title cards, with words rising into place. A new "Promo ad" default style uses it.
 
 ### Fixed
 

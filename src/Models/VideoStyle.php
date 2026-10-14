@@ -19,6 +19,7 @@ use Illuminate\Support\Str;
  * @property string $accent
  * @property string $captions
  * @property string $pace
+ * @property string $art
  * @property int $position
  */
 class VideoStyle extends Model
@@ -28,6 +29,9 @@ class VideoStyle extends Model
     public const CAPTIONS = ['bottom' => 'Bottom', 'top' => 'Top'];
 
     public const PACES = ['relaxed' => 'Relaxed', 'normal' => 'Normal', 'brisk' => 'Brisk'];
+
+    /** Behind title cards: nothing, or animated abstract line art with words that rise in, like an ad */
+    public const ARTS = ['none' => 'None', 'abstract' => 'Abstract line art'];
 
     protected $table = 'video_demo_styles';
 
@@ -53,7 +57,7 @@ class VideoStyle extends Model
 
     public static function defaults(): array
     {
-        return ['theme' => 'light', 'accent' => '#171717', 'captions' => 'bottom', 'pace' => 'normal'];
+        return ['theme' => 'light', 'accent' => '#171717', 'captions' => 'bottom', 'pace' => 'normal', 'art' => 'none'];
     }
 
     protected static function booted(): void
@@ -67,6 +71,6 @@ class VideoStyle extends Model
     /** What a video keeps, so recording it again later looks the same */
     public function snapshot(): array
     {
-        return $this->only(['key', 'name', 'direction', 'theme', 'accent', 'captions', 'pace']);
+        return $this->only(['key', 'name', 'direction', 'theme', 'accent', 'captions', 'pace', 'art']);
     }
 }

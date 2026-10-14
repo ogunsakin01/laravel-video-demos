@@ -31,9 +31,16 @@ class CostEstimator
     /** Thinking tokens per turn, by effort */
     protected const THINKING = ['low' => 300, 'medium' => 900, 'high' => 1_800, 'xhigh' => 3_000, 'max' => 5_000];
 
-    /** @return array{low: float, high: float, expected: float, turns: int} */
+    /**
+     * @return array{low: ?float, high: ?float, expected: ?float, turns: int, known: bool}
+     *                                                                                     Prices are null when the model has none in the config
+     */
     public function estimate(string $model, string $effort, int $targetSeconds, int $routeCount): array
     {
+        if (! Pricing::known($model)) {
+            return ['low' => null, 'expected' => null, 'high' => null, 'turns' => 4 + (int) ceil($targetSeconds / 20) + 1, 'known' => false];
+        }
+
         $thinking = self::THINKING[$effort] ?? self::THINKING['high'];
         $steps = (int) ceil($targetSeconds / self::SECONDS_PER_STEP);
         $turns = min(4 + (int) ceil($targetSeconds / 20), (int) config('video-demo.limits.max_turns', 30));
@@ -63,6 +70,7 @@ class CostEstimator
             'expected' => round($expected + $repair * 0.5, 4),
             'high' => round(($expected + $repair) * 1.5, 4),
             'turns' => $turns + 1,
+            'known' => true,
         ];
     }
 

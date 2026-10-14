@@ -57,7 +57,7 @@ class RecordToursCommand extends Command
                 }
 
                 File::ensureDirectoryExists($out);
-                $encoder->encode($result->video, "$out/$name.mp4", "$out/$name.jpg", $result->trimSeconds);
+                $encoder->encode($result->video, "$out/$name.mp4", "$out/$name.jpg", $result->trimSeconds, Recorder::speed());
                 if (! isset($data['out'])) {
                     $this->preview("$out/$name.mp4", "$out/$name.gif", $device === 'mobile' ? 260 : 720);
                 }
@@ -74,13 +74,13 @@ class RecordToursCommand extends Command
     }
 
     /**
-     * An animated preview at 2.5× speed for the README: GitHub doesn't play
-     * videos stored in the repository, but it does play GIFs.
+     * An animated preview for the README, at the video's own speed: GitHub
+     * doesn't play videos stored in the repository, but it does play GIFs.
      */
     protected function preview(string $mp4, string $gif, int $width): void
     {
         Process::timeout(300)->run([
-            config('video-demo.recorder.ffmpeg', 'ffmpeg'), '-y', '-v', 'error', '-itsscale', '0.4', '-i', $mp4,
+            config('video-demo.recorder.ffmpeg', 'ffmpeg'), '-y', '-v', 'error', '-i', $mp4,
             '-filter_complex', "[0:v]scale=$width:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=96:stats_mode=diff[p];[b][p]paletteuse=dither=none:diff_mode=rectangle",
             '-r', '8', $gif,
         ])->throw();

@@ -11,9 +11,10 @@
   ],
   "style": {
     "theme": "light",
-    "accent": "#171717",
+    "accent": "#c4532d",
     "captions": "bottom",
-    "pace": "normal"
+    "pace": "normal",
+    "art": "abstract"
   },
   "steps": [
     {
@@ -22,7 +23,7 @@
       "url": null,
       "target": null,
       "value": null,
-      "title": "Post a job",
+      "title": "Post a job in a minute",
       "text": "From an empty form to a live listing.",
       "ms": 3000,
       "chapter": null,
@@ -66,7 +67,7 @@
       "target": null,
       "value": null,
       "title": "Start with the basics",
-      "text": "A clear title helps the right people find the job.",
+      "text": "A clear title finds the right people.",
       "ms": 3000,
       "chapter": null,
       "only_on": null
@@ -211,7 +212,7 @@
       "target": null,
       "value": null,
       "title": "Live straight away",
-      "text": "Applicants can find it on your careers page now.",
+      "text": "Applicants can find it now.",
       "ms": 2800,
       "chapter": null,
       "only_on": null

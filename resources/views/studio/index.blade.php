@@ -14,10 +14,10 @@
     <div>
       <p class="vd-eyebrow">Studio</p>
       <h1>Videos</h1>
-      <p class="vd-sub">Describe a flow in your app and Claude records a walkthrough of it. Publish the ones you like to the library.</p>
+      <p class="vd-sub">Describe a flow in your app and AI records a walkthrough of it. Publish the ones you like to the library.</p>
     </div>
     <dl style="margin:0;min-width:180px">
-      <dt class="vd-eyebrow">Spent on Claude</dt>
+      <dt class="vd-eyebrow">Spent on AI</dt>
       <dd class="vd-figure" style="margin:0">${{ number_format($totalCost, 2) }}</dd>
     </dl>
   </section>
@@ -27,7 +27,7 @@
       @if ($videos->isEmpty())
         <div class="vd-empty">
           <strong>No videos yet</strong>
-          <p style="margin:0 0 16px">Describe a flow and Claude will plan and record it.</p>
+          <p style="margin:0 0 16px">Describe a flow and the AI will plan and record it.</p>
           <a class="vd-btn vd-btn-primary" href="{{ route('video-demo.studio.create') }}">Make the first one</a>
         </div>
       @else

@@ -21,7 +21,7 @@ class StudioTest extends TestCase
         ]);
 
         $this->get('/video-demo/studio')->assertOk()->assertSee('How to post a job');
-        $this->get('/video-demo/studio/create')->assertOk()->assertSee('Estimated Claude cost')->assertSee('Complete with AI')->assertSee('Product showcase');
+        $this->get('/video-demo/studio/create')->assertOk()->assertSee('Estimated AI cost')->assertSee('Complete with AI')->assertSee('Product showcase');
         $this->get('/video-demo/studio/styles')->assertOk()->assertSee('Detailed tutorial');
         $this->get('/video-demo/studio/create')->assertSee('name="devices[]" value="tv"', false)->assertSee('390×844');
         $this->get("/video-demo/studio/{$video->id}")->assertOk()->assertSee('Could not find a visible element');

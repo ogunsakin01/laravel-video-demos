@@ -13,13 +13,8 @@ final readonly class Usage
         public float $cost = 0.0,
     ) {}
 
-    public static function fromResponse(object $usage, string $model): self
+    public static function fromCounts(string $model, int $input, int $cacheWrite, int $cacheRead, int $output): self
     {
-        $input = (int) $usage->inputTokens;
-        $cacheWrite = (int) ($usage->cacheCreationInputTokens ?? 0);
-        $cacheRead = (int) ($usage->cacheReadInputTokens ?? 0);
-        $output = (int) $usage->outputTokens;
-
         return new self($input, $cacheWrite, $cacheRead, $output, Pricing::cost($model, $input, $cacheWrite, $cacheRead, $output));
     }
 

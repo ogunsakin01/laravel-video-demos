@@ -5,6 +5,7 @@ namespace Ogunsakin01\VideoDemo\Tests;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Ogunsakin01\VideoDemo\VideoDemoServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
+use Prism\Prism\PrismServiceProvider;
 
 abstract class TestCase extends Orchestra
 {
@@ -14,7 +15,11 @@ abstract class TestCase extends Orchestra
 
     protected function getPackageProviders($app): array
     {
-        return [VideoDemoServiceProvider::class];
+        // Prism is optional; in apps that install it, Laravel discovers it
+        return array_filter([
+            VideoDemoServiceProvider::class,
+            class_exists(PrismServiceProvider::class) ? PrismServiceProvider::class : null,
+        ]);
     }
 
     protected function defineEnvironment($app): void

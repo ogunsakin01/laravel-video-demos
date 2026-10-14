@@ -48,10 +48,15 @@ final class Plan
         return new self($this->title, $this->summary, $steps);
     }
 
-    /** Estimated length of the recording, in seconds */
-    public function estimatedSeconds(): float
+    /**
+     * Estimated length of the finished video, in seconds. At $speed above 1
+     * the recording is played back faster: actions take less time, while
+     * captions, cards and pauses are held longer while recording, so they
+     * keep their length.
+     */
+    public function estimatedSeconds(float $speed = 1): float
     {
-        return array_sum(array_map(fn ($s) => $this->stepMs($s), $this->steps)) / 1000;
+        return array_sum(array_map(fn ($s) => $this->stepMs($s, $speed), $this->steps)) / 1000;
     }
 
     /**
@@ -59,12 +64,12 @@ final class Plan
      * the target length. Actions keep their natural speed, and nothing is cut
      * to less than half or more than three times its planned time.
      */
-    public function fitTo(int $targetSeconds): self
+    public function fitTo(int $targetSeconds, float $speed = 1): self
     {
         $flexibleMs = 0;
         $fixedMs = 0;
         foreach ($this->steps as $step) {
-            $this->isFlexible($step) ? $flexibleMs += $this->stepMs($step) : $fixedMs += $this->stepMs($step);
+            $this->isFlexible($step) ? $flexibleMs += $this->stepMs($step, $speed) : $fixedMs += $this->stepMs($step, $speed);
         }
 
         if ($flexibleMs === 0) {
@@ -104,7 +109,8 @@ final class Plan
         return in_array($step['action'] ?? null, ['caption', 'card', 'pause'], true);
     }
 
-    protected function stepMs(array $step): int
+    /** How long a step lasts in the finished video */
+    protected function stepMs(array $step, float $speed = 1): int
     {
         $action = $step['action'] ?? 'pause';
 
@@ -117,8 +123,8 @@ final class Plan
             $ms += (int) (strlen((string) ($step['value'] ?? '')) / self::TYPING_PER_SECOND * 1000);
         }
 
-        // A pause the plan adds after an action
-        return $ms + (int) ($step['ms'] ?? 0);
+        // Actions play back faster; a pause the plan adds after one keeps its length
+        return (int) ($ms / max($speed, 0.1)) + (int) ($step['ms'] ?? 0);
     }
 
     /** JSON schema for the submit_plan tool, strict-mode compatible */
@@ -151,8 +157,9 @@ final class Plan
                                             'placeholder' => $nullableString('Input placeholder text'),
                                             'text' => $nullableString('Visible text of the element'),
                                             'selector' => $nullableString('CSS selector, only when nothing above identifies it'),
+                                            'frame' => $nullableString('CSS selector of the iframe the element is inside, such as iframe[title="Secure card number input frame"]. Null when it is on the page itself.'),
                                         ],
-                                        'required' => ['role', 'name', 'label', 'placeholder', 'text', 'selector'],
+                                        'required' => ['role', 'name', 'label', 'placeholder', 'text', 'selector', 'frame'],
                                         'additionalProperties' => false,
                                     ],
                                     ['type' => 'null'],

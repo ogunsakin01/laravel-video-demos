@@ -115,8 +115,13 @@
 
     <aside class="vd-stack">
       <div class="vd-card">
-        <p class="vd-eyebrow">Claude cost</p>
-        <div class="vd-figure" id="vd-cost">${{ number_format($video->cost, 4) }}</div>
+        <p class="vd-eyebrow">AI cost</p>
+        @if (\Ogunsakin01\VideoDemo\Ai\Pricing::known($video->model))
+          <div class="vd-figure" id="vd-cost">${{ number_format($video->cost, 4) }}</div>
+        @else
+          <div class="vd-figure">Unknown</div>
+          <p class="vd-small vd-muted" style="margin:4px 0 0">No prices for this model in the config.</p>
+        @endif
         <dl style="margin:12px 0 0">
           @if ($video->estimate_low !== null)
             <div class="vd-stat"><dt>Estimate</dt><dd class="vd-num">${{ number_format($video->estimate_low, 2) }} – ${{ number_format($video->estimate_high, 2) }}</dd></div>
@@ -170,7 +175,7 @@
                 </select>
               </div>
             </div>
-            <button class="vd-btn vd-btn-block">Ask Claude for a new plan</button>
+            <button class="vd-btn vd-btn-block">Ask the AI for a new plan</button>
           </form>
         </div>
 

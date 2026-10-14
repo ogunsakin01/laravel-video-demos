@@ -10,12 +10,19 @@ use Symfony\Component\Process\Exception\ProcessStartFailedException;
 /** Converts the browser's WebM recording to an MP4 that plays everywhere, and grabs a poster frame */
 class Encoder
 {
-    /** $trimSeconds cuts the browser's start-up from the beginning */
-    public function encode(string $webm, string $mp4, string $poster, float $trimSeconds = 0): void
+    /**
+     * $trimSeconds (in recording time) cuts the browser's start-up from the
+     * beginning; $speed plays the recording back that many times faster.
+     */
+    public function encode(string $webm, string $mp4, string $poster, float $trimSeconds = 0, float $speed = 1): void
     {
         $ffmpeg = config('video-demo.recorder.ffmpeg', 'ffmpeg');
+        $speed = max($speed, 0.1);
 
-        $this->run([$ffmpeg, '-y', '-v', 'error', '-i', $webm, '-ss', number_format($trimSeconds, 2, '.', ''),
+        $this->run([$ffmpeg, '-y', '-v', 'error',
+            // Squeezes the timestamps, so frames play $speed times faster
+            '-itsscale', number_format(1 / $speed, 6, '.', ''),
+            '-i', $webm, '-ss', number_format($trimSeconds / $speed, 2, '.', ''), '-r', '30',
             '-c:v', 'libx264', '-crf', '26', '-preset', 'slow', '-pix_fmt', 'yuv420p',
             '-movflags', '+faststart', '-an', $mp4]);
 

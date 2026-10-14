@@ -3,6 +3,7 @@
 namespace Ogunsakin01\VideoDemo\Tests;
 
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Process;
 use Ogunsakin01\VideoDemo\Recording\Encoder;
 use Ogunsakin01\VideoDemo\Recording\Plan;
 use Ogunsakin01\VideoDemo\Recording\Recorder;
@@ -41,7 +42,7 @@ class RecorderTest extends TestCase
     protected function step(string $action, array $fields = []): array
     {
         $target = isset($fields['target'])
-            ? [...['role' => null, 'name' => null, 'label' => null, 'placeholder' => null, 'text' => null, 'selector' => null], ...$fields['target']]
+            ? [...['role' => null, 'name' => null, 'label' => null, 'placeholder' => null, 'text' => null, 'selector' => null, 'frame' => null], ...$fields['target']]
             : null;
 
         return [...['action' => $action, 'why' => '', 'url' => null, 'value' => null, 'title' => null, 'text' => null, 'ms' => null, 'chapter' => null], ...$fields, 'target' => $target];
@@ -67,8 +68,12 @@ class RecorderTest extends TestCase
         $this->assertSame('Fill it in', $result->chapters[0]['title']);
 
         $this->assertGreaterThan(0, $result->trimSeconds);
-        (new Encoder)->encode($result->video, "$this->out/video.mp4", "$this->out/poster.jpg", $result->trimSeconds);
+        (new Encoder)->encode($result->video, "$this->out/video.mp4", "$this->out/poster.jpg", $result->trimSeconds, Recorder::speed());
         $this->assertGreaterThan(10_000, filesize("$this->out/video.mp4"));
+
+        // Played back at 2x: the file is as long as the result says, about
+        // half the time the recording took
+        $this->assertEqualsWithDelta($result->seconds, $this->duration("$this->out/video.mp4"), 0.6);
         $this->assertFileExists("$this->out/poster.jpg");
     }
 
@@ -107,9 +112,42 @@ class RecorderTest extends TestCase
         $this->assertTrue($job['touch']);
         $this->assertSame('dark', $job['style']['theme']);
 
-        (new Encoder)->encode($result->video, "$this->out/mobile.mp4", "$this->out/mobile.jpg", $result->trimSeconds);
+        (new Encoder)->encode($result->video, "$this->out/mobile.mp4", "$this->out/mobile.jpg", $result->trimSeconds, Recorder::speed());
         // Recorded at the phone's screen size, filling the frame
         [$width, $height] = getimagesize("$this->out/mobile.jpg");
         $this->assertSame([390, 844], [$width, $height]);
+    }
+
+    public function test_fills_card_fields_inside_an_iframe_like_embedded_payment_forms(): void
+    {
+        $frame = 'iframe[title="Secure card payment input frame"]';
+        $plan = new Plan('Pay', 'Paying by card.', [
+            $this->step('goto', ['url' => '/checkout.html']),
+            $this->step('type', ['target' => ['label' => 'Card number', 'frame' => $frame], 'value' => '4242 4242 4242 4242']),
+            $this->step('click', ['target' => ['role' => 'button', 'name' => 'Pay']]),
+            $this->step('wait', ['target' => ['text' => 'Payment received']]),
+        ]);
+
+        $result = (new Recorder)->record($plan, $this->out);
+        $this->assertTrue($result->ok, $result->summary());
+
+        // When a field in a frame can't be found, Claude is shown the frame and what's in it
+        $plan = new Plan('Pay', 'Paying by card.', [
+            $this->step('goto', ['url' => '/checkout.html']),
+            $this->step('type', ['target' => ['label' => 'Card number'], 'value' => '4242 4242 4242 4242']),
+        ]);
+        $result = (new Recorder)->record($plan, $this->out);
+
+        $this->assertSame(2, $result->failedStep);
+        $this->assertStringContainsString('iframe (target.frame: '.$frame.')', $result->snapshot);
+        $this->assertStringContainsString('textbox "Card number"', $result->snapshot);
+    }
+
+    protected function duration(string $file): float
+    {
+        $out = Process::run([config('video-demo.recorder.ffmpeg'), '-i', $file])->errorOutput();
+        preg_match('/Duration: (\d+):(\d+):([\d.]+)/', $out, $m);
+
+        return $m ? $m[1] * 3600 + $m[2] * 60 + (float) $m[3] : 0.0;
     }
 }

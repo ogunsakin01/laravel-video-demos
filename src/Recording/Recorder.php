@@ -32,8 +32,9 @@ class Recorder
             'viewport' => ['width' => $screen['width'], 'height' => $screen['height']],
             'touch' => $screen['touch'],
             'channel' => config('video-demo.recorder.channel'),
+            'speed' => static::speed(),
             'ignoreHttpsErrors' => (bool) config('video-demo.recorder.ignore_https_errors'),
-            'style' => [...VideoStyle::defaults(), ...array_intersect_key($style, array_flip(['theme', 'accent', 'captions', 'pace']))],
+            'style' => [...VideoStyle::defaults(), ...array_intersect_key($style, array_flip(['theme', 'accent', 'captions', 'pace', 'art']))],
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
         File::delete("$dir/result.json");
 
@@ -49,7 +50,20 @@ class Recorder
                 : 'The recorder stopped without a result: '.str($output)->limit(600));
         }
 
-        return RecordingResult::fromArray(json_decode(File::get("$dir/result.json"), true) ?: [], $device);
+        $result = json_decode(File::get("$dir/result.json"), true) ?: [];
+
+        // Lengths and chapter times as they will be in the sped-up video
+        $speed = static::speed();
+        $result['durationMs'] = ($result['durationMs'] ?? 0) / $speed;
+        $result['chapters'] = array_map(fn ($c) => [...$c, 'at' => round($c['at'] / $speed, 2)], $result['chapters'] ?? []);
+
+        return RecordingResult::fromArray($result, $device);
+    }
+
+    /** How many times faster the finished video plays than it was recorded */
+    public static function speed(): float
+    {
+        return max(0.25, min(4.0, (float) config('video-demo.recorder.speed', 2)));
     }
 
     public static function script(): string

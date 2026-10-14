@@ -48,7 +48,7 @@ class GenerateVideo implements ShouldQueue
             $video->moveTo(VideoStatus::Planning, 'Claude is reading the code');
             $session = $planner->plan($video);
             $plan = $session->plan;
-            $video->addLog(sprintf('Plan ready: %d steps, about %d seconds', count($plan->steps), $plan->estimatedSeconds()));
+            $video->addLog(sprintf('Plan ready: %d steps, about %d seconds', count($plan->steps), $plan->estimatedSeconds(Recorder::speed())));
         } else {
             $plan = Plan::fromArray($video->plan ?? []);
         }
@@ -58,7 +58,7 @@ class GenerateVideo implements ShouldQueue
         // Every version plays the same plan. A failure on any of them goes back
         // to Claude, and the corrected plan is recorded on all of them again.
         while (true) {
-            $plan = $plan->fitTo(min($video->target_seconds, (int) config('video-demo.limits.max_seconds', 300)));
+            $plan = $plan->fitTo(min($video->target_seconds, (int) config('video-demo.limits.max_seconds', 300)), Recorder::speed());
             $video->update(['plan' => $plan->toArray()]);
 
             $results = [];
@@ -92,7 +92,7 @@ class GenerateVideo implements ShouldQueue
         $work = Storage::disk(config('video-demo.storage.work_disk'));
         $recordings = [];
         foreach ($results as $device => $result) {
-            $encoder->encode($result->video, $work->path($video->workFile($device)), $work->path($video->workFile($device, 'poster')), $result->trimSeconds);
+            $encoder->encode($result->video, $work->path($video->workFile($device)), $work->path($video->workFile($device, 'poster')), $result->trimSeconds, Recorder::speed());
             File::deleteDirectory("$dir/$device");
             $recordings[$device] = ['seconds' => $result->seconds, 'chapters' => $result->chapters];
         }

@@ -3,9 +3,10 @@
   "summary": "Making, checking and publishing a video in the studio.",
   "style": {
     "theme": "light",
-    "accent": "#171717",
+    "accent": "#c4532d",
     "captions": "bottom",
-    "pace": "normal"
+    "pace": "normal",
+    "art": "abstract"
   },
   "steps": [
     {
@@ -14,8 +15,8 @@
       "url": null,
       "target": null,
       "value": null,
-      "title": "Laravel Video Demo",
-      "text": "Describe a flow in your app. Claude records a walkthrough of it.",
+      "title": "How-to videos, made by AI",
+      "text": "Describe a flow. Get a recorded walkthrough.",
       "ms": 3800,
       "chapter": null,
       "only_on": null
@@ -39,7 +40,7 @@
       "target": null,
       "value": null,
       "title": "Every video in one place",
-      "text": "Status, length and what Claude cost. The studio only runs on your machine.",
+      "text": "Status, length and cost at a glance.",
       "ms": 3600,
       "chapter": null,
       "only_on": null
@@ -127,7 +128,7 @@
       "target": null,
       "value": null,
       "title": "Complete with AI",
-      "text": "A few words become a title, a full description, a start page and a length.",
+      "text": "A few words become a full brief.",
       "ms": 3800,
       "chapter": null,
       "only_on": null
@@ -141,7 +142,7 @@
         "name": null,
         "label": null,
         "placeholder": null,
-        "text": "Claude writes one plan for all of them",
+        "text": "The AI writes one plan for all of them",
         "selector": null
       },
       "value": null,
@@ -195,8 +196,8 @@
       "url": null,
       "target": null,
       "value": null,
-      "title": "Every screen from one plan",
-      "text": "Desktop, TV, tablet and mobile. Extra versions cost recording time, not Claude credit.",
+      "title": "Every screen, one plan",
+      "text": "Desktop, TV, tablet and mobile.",
       "ms": 4000,
       "chapter": null,
       "only_on": null
@@ -213,7 +214,7 @@
         "text": null,
         "selector": null
       },
-      "value": "Product showcase",
+      "value": "Promo ad",
       "title": null,
       "text": null,
       "ms": 600,
@@ -227,7 +228,7 @@
       "target": null,
       "value": null,
       "title": "A style for every purpose",
-      "text": "Each style tells Claude how to write the video and sets how it looks.",
+      "text": "Tutorials, quick tips, even ads.",
       "ms": 3600,
       "chapter": null,
       "only_on": null
@@ -257,8 +258,8 @@
       "url": null,
       "target": null,
       "value": null,
-      "title": "See the cost first",
-      "text": "An estimate before anything is spent, charged to your own API key.",
+      "title": "The cost, before you spend",
+      "text": "An estimate up front, on your own key.",
       "ms": 3600,
       "chapter": null,
       "only_on": null
@@ -282,7 +283,7 @@
       "target": null,
       "value": null,
       "title": "Make styles your own",
-      "text": "Start from the defaults in the config file, then add as many as you like.",
+      "text": "Start from the config, add your own.",
       "ms": 3600,
       "chapter": null,
       "only_on": null
@@ -305,8 +306,8 @@
       "url": null,
       "target": null,
       "value": null,
-      "title": "Watch it before anyone else does",
-      "text": "Check every version, the plan Claude wrote and what it actually cost.",
+      "title": "Review every version",
+      "text": "Watch it before anyone else does.",
       "ms": 3800,
       "chapter": null,
       "only_on": null
@@ -375,7 +376,7 @@
       "target": null,
       "value": null,
       "title": "Publish when it is right",
-      "text": "It appears in your app’s video library, public or staff-only.",
+      "text": "Straight into your app’s help library.",
       "ms": 3600,
       "chapter": null,
       "only_on": null
