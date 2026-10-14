@@ -65,8 +65,10 @@ class SuggestionsTest extends TestCase
         $this->suggestions(1, [['title' => 'Invite a teammate', 'prompt' => 'How an admin invites a colleague.', 'why' => 'Teams grow.', 'start_path' => '/team', 'target_seconds' => 45, 'style' => 'quick']]);
 
         Artisan::call('video-demo:suggest', ['--json' => true]);
-        $result = json_decode(Artisan::output(), true);
+        $output = Artisan::output();
+        $result = json_decode($output, true);
 
+        $this->assertArrayHasKey('suggestions', $result, $output);
         $this->assertSame('Invite a teammate', $result['suggestions'][0]['title']);
         $this->assertTrue($result['cost_known']);
         $this->assertGreaterThan(0, $result['cost']);

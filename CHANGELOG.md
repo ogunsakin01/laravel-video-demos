@@ -2,6 +2,12 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/). While the version is 0.x, minor releases may include breaking changes; they will be listed here.
 
+## v0.8.2 - 2026-10-14
+
+### Fixed
+
+- The test suite's fake Anthropic server now asks the system for a free port and checks that it started, retrying if not, so tests no longer fail now and then on CI. Tests only; the package itself is unchanged.
+
 ## v0.8.1 - 2026-10-14
 
 ### Changed

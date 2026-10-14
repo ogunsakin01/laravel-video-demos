@@ -26,15 +26,24 @@ trait FakesAnthropic
     {
         $this->dir = sys_get_temp_dir().'/video-demo-api-'.uniqid();
         File::ensureDirectoryExists($this->dir);
-        $port = random_int(20000, 40000);
-        $this->server = new Process([PHP_BINARY, '-S', "127.0.0.1:$port", __DIR__.'/../fixtures/fake-anthropic.php'], null, ['FAKE_DIR' => $this->dir]);
-        $this->server->start();
-        // Stop the server even if a test dies with a fatal error, or the
-        // orphaned server keeps the whole test run waiting.
-        $server = $this->server;
-        register_shutdown_function(fn () => $server->isRunning() && $server->stop(0));
-        for ($i = 0; $i < 50 && ! @fsockopen('127.0.0.1', $port); $i++) {
-            usleep(100_000);
+        // A port taken by something else makes the server exit at once, so
+        // ask the system for a free one and check the server really started.
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
+            $port = $this->freePort();
+            $this->server = new Process([PHP_BINARY, '-S', "127.0.0.1:$port", __DIR__.'/../fixtures/fake-anthropic.php'], null, ['FAKE_DIR' => $this->dir]);
+            $this->server->start();
+            // Stop the server even if a test dies with a fatal error, or the
+            // orphaned server keeps the whole test run waiting.
+            $server = $this->server;
+            register_shutdown_function(fn () => $server->isRunning() && $server->stop(0));
+
+            for ($i = 0; $i < 50 && $this->server->isRunning() && ! @fsockopen('127.0.0.1', $port); $i++) {
+                usleep(100_000);
+            }
+            if ($this->server->isRunning() && @fsockopen('127.0.0.1', $port)) {
+                break;
+            }
+            $this->server->stop(0);
         }
 
         $this->app->instance(Claude::class, new Claude(new Client(
@@ -42,6 +51,18 @@ trait FakesAnthropic
             baseUrl: "http://127.0.0.1:$port",
             requestOptions: RequestOptions::with(maxRetries: 0),
         )));
+    }
+
+    /**
+     * Get a port nothing is listening on.
+     */
+    protected function freePort(): int
+    {
+        $socket = stream_socket_server('tcp://127.0.0.1:0');
+        $name = stream_socket_get_name($socket, false);
+        fclose($socket);
+
+        return (int) substr(strrchr((string) $name, ':'), 1);
     }
 
     /**
