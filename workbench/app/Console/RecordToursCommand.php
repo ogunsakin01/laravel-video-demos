@@ -4,6 +4,7 @@ namespace Workbench\App\Console;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Process;
 use Ogunsakin01\VideoDemo\Recording\Devices;
 use Ogunsakin01\VideoDemo\Recording\Encoder;
 use Ogunsakin01\VideoDemo\Recording\Plan;
@@ -57,6 +58,9 @@ class RecordToursCommand extends Command
 
                 File::ensureDirectoryExists($out);
                 $encoder->encode($result->video, "$out/$name.mp4", "$out/$name.jpg", $result->trimSeconds);
+                if (! isset($data['out'])) {
+                    $this->preview("$out/$name.mp4", "$out/$name.gif", $device === 'mobile' ? 260 : 720);
+                }
                 if (isset($data['out'])) {
                     // Sample clips keep their length and chapters for the demo seeder
                     File::put("$out/$name.json", json_encode(['seconds' => $result->seconds, 'chapters' => $result->chapters]));
@@ -67,5 +71,18 @@ class RecordToursCommand extends Command
         }
 
         return self::SUCCESS;
+    }
+
+    /**
+     * An animated preview at 2.5× speed for the README: GitHub doesn't play
+     * videos stored in the repository, but it does play GIFs.
+     */
+    protected function preview(string $mp4, string $gif, int $width): void
+    {
+        Process::timeout(300)->run([
+            config('video-demo.recorder.ffmpeg', 'ffmpeg'), '-y', '-v', 'error', '-itsscale', '0.4', '-i', $mp4,
+            '-filter_complex', "[0:v]scale=$width:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=96:stats_mode=diff[p];[b][p]paletteuse=dither=none:diff_mode=rectangle",
+            '-r', '8', $gif,
+        ])->throw();
     }
 }

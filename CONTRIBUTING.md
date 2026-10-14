@@ -38,6 +38,17 @@ composer serve
 
 Then open http://127.0.0.1:8123/video-demo/studio. The demo app answers "Complete with AI" with a fixed reply unless `ANTHROPIC_API_KEY` is set, so it costs nothing to try.
 
+## Code style and static analysis
+
+```bash
+composer format    # fix code style with Laravel Pint
+composer lint      # check code style, as CI does
+composer analyse   # PHPStan (Larastan), level 5
+composer check     # all of the above, then the tests
+```
+
+CI runs Pint and PHPStan on every pull request. Please fix what PHPStan finds rather than ignoring it; it has already caught real bugs here.
+
 ## Tests and Claude
 
 The planner is tested with the real Anthropic SDK against a local fake of the Messages API (`tests/Concerns/FakesAnthropic.php`), so tests never spend money. Please test new Claude features the same way, and never add tests that call the real API.
@@ -48,6 +59,6 @@ The planner is tested with the real Anthropic SDK against a local fake of the Me
 - Keep to the style of the surrounding code: plain names, short comments that explain why.
 - UI changes: include before and after screenshots, check light and dark mode and phone width, and use solid colours (no gradients).
 - Add a line under "Unreleased" in [CHANGELOG.md](CHANGELOG.md).
-- Make sure `composer test` passes.
+- Make sure `composer check` passes.
 
 By contributing, you agree that your contributions are licensed under the [MIT license](LICENSE.md).

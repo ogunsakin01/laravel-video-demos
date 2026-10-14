@@ -13,12 +13,21 @@ Videos are made on your machine and published to any Laravel disk. Your producti
 
 ## See it
 
-These tours were recorded by the package itself, from the demo app in [`workbench/`](workbench). Click an image to play the video.
+These tours were recorded by the package itself, from the demo app in [`workbench/`](workbench). The previews below play at 2.5× speed; download the full videos for the normal pace.
 
-| The studio, where you make videos | The library, where your users watch them |
+### The studio, where you make videos
+
+[![The studio, at 2.5× speed](docs/studio-tour.gif)](docs/studio-tour.mp4)
+
+[Full studio tour (MP4, 1½ minutes)](https://raw.githubusercontent.com/ogunsakin01/laravel-video-demos/main/docs/studio-tour.mp4)
+
+### The library, where your users watch them
+
+| Desktop | Mobile |
 | --- | --- |
-| [![The studio](docs/studio-tour.jpg)](docs/studio-tour.mp4) | [![The library](docs/library-tour.jpg)](docs/library-tour.mp4) |
-| | [Mobile version of the library tour](docs/library-tour-mobile.mp4) |
+| [![The library on desktop, at 2.5× speed](docs/library-tour.gif)](docs/library-tour.mp4) | [![The library on mobile, at 2.5× speed](docs/library-tour-mobile.gif)](docs/library-tour-mobile.mp4) |
+
+[Full library tour (MP4)](https://raw.githubusercontent.com/ogunsakin01/laravel-video-demos/main/docs/library-tour.mp4) · [Mobile version (MP4)](https://raw.githubusercontent.com/ogunsakin01/laravel-video-demos/main/docs/library-tour-mobile.mp4)
 
 The videos in the demo library all play one sample clip, recorded from the demo app's "Post a job" page. The demo app answers "Complete with AI" with a fixed reply, so the tours could be recorded without an API key.
 

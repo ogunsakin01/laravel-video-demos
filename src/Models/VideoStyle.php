@@ -19,6 +19,7 @@ use Illuminate\Support\Str;
  * @property string $accent
  * @property string $captions
  * @property string $pace
+ * @property int $position
  */
 class VideoStyle extends Model
 {

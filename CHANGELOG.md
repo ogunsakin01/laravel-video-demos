@@ -15,3 +15,10 @@ All notable changes to this package are listed here. The format follows [Keep a 
 - Library pages for production, with search and requests for missing videos, plus `<x-video-demo::player>` and `<x-video-demo::search>` components.
 - `video-demo:install` and `video-demo:refresh` commands.
 - Per-video cost from the API's token counts, and a spending limit per video.
+- Laravel Pint and PHPStan (Larastan, level 5) in CI, with `composer check` to run everything locally.
+- Animated previews of the tour videos in the README, since GitHub doesn't play videos stored in a repository.
+
+### Fixed
+
+- The recorder now finds its user through any guard's user provider, not only guards that expose `getProvider()`.
+- A work disk that isn't local (such as S3) is refused with a clear message, instead of failing during recording.

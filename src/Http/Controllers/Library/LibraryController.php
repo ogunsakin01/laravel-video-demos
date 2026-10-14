@@ -34,7 +34,7 @@ class LibraryController extends Controller
         $area = $this->area($request);
         $video = $this->manifest->find($slug, $area);
 
-        abort_unless($video, 404);
+        abort_if($video === null, 404);
 
         return view('video-demo::library.show', [
             'area' => $area,

@@ -16,6 +16,7 @@ use Symfony\Component\Finder\Finder;
 class CodeTools
 {
     protected const MAX_LISTED = 400;
+
     protected const MAX_MATCHES = 60;
 
     public function __construct(protected ?string $root = null)
@@ -142,7 +143,7 @@ class CodeTools
         for ($n = $from; $n <= count($lines); $n++) {
             $line = $n.'  '.$lines[$n - 1]."\n";
             if (strlen($out) + strlen($line) > $max) {
-                return $out."… cut at line ".($n - 1).' of '.count($lines).'. Read on with from_line '.$n.'.';
+                return $out.'… cut at line '.($n - 1).' of '.count($lines).'. Read on with from_line '.$n.'.';
             }
             $out .= $line;
         }

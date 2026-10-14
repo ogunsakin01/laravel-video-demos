@@ -91,7 +91,14 @@ class Recorder
             return null;
         }
 
-        $provider = Auth::guard(config('video-demo.recorder.guard'))->getProvider();
+        // The guard's user provider, whatever kind of guard it is
+        $guard = config('video-demo.recorder.guard') ?: config('auth.defaults.guard');
+        $provider = Auth::createUserProvider(config("auth.guards.$guard.provider"));
+
+        if (! $provider) {
+            throw new RuntimeException("The [$guard] guard has no user provider. Check video-demo.recorder.guard.");
+        }
+
         $user = is_numeric($loginAs)
             ? $provider->retrieveById($loginAs)
             : $provider->retrieveByCredentials(['email' => $loginAs]);
@@ -106,12 +113,13 @@ class Recorder
     /** The absolute path of a folder on the work disk, which must be a local disk */
     public static function workDir(string $path): string
     {
-        $disk = Storage::disk(config('video-demo.storage.work_disk'));
+        $name = config('video-demo.storage.work_disk');
 
-        if (! method_exists($disk, 'path')) {
-            throw new RuntimeException('video-demo.storage.work_disk must be a local disk.');
+        // Every disk has path(), but only a local one gives a folder Node and ffmpeg can write to
+        if (config("filesystems.disks.$name.driver") !== 'local') {
+            throw new RuntimeException("video-demo.storage.work_disk must be a local disk; [$name] is not.");
         }
 
-        return $disk->path($path);
+        return Storage::disk($name)->path($path);
     }
 }

@@ -15,11 +15,17 @@ class CostEstimator
 {
     // Measured guesses; tune these against the actual costs your videos show
     protected const SYSTEM_TOKENS = 3_500;
+
     protected const TOKENS_PER_ROUTE = 25;
+
     protected const CODE_TOKENS_PER_TURN = 3_000;
+
     protected const OUTPUT_TOKENS_PER_TURN = 400;
+
     protected const TOKENS_PER_STEP = 90;
+
     protected const SECONDS_PER_STEP = 2.5;
+
     protected const REPAIR_SNAPSHOT_TOKENS = 4_000;
 
     /** Thinking tokens per turn, by effort */

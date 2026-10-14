@@ -235,7 +235,7 @@ class Planner
             ! empty($video->style['direction']) ? "<style name=\"{$video->style['name']}\">\n{$video->style['direction']}\n</style>\nFollow this style for the tone, the captions and cards you use, and how much you explain." : null,
             $video->start_path ? "Start at: {$video->start_path}" : null,
             count($devices) > 1
-                ? "The same plan is recorded on each of these screens: ".implode('; ', array_map(Devices::describe(...), $devices)).". Choose targets that exist on all of them. Where a layout differs, such as navigation behind a menu button on small screens, add the extra steps with only_on naming the screens that need them. $signedIn"
+                ? 'The same plan is recorded on each of these screens: '.implode('; ', array_map(Devices::describe(...), $devices)).". Choose targets that exist on all of them. Where a layout differs, such as navigation behind a menu button on small screens, add the extra steps with only_on naming the screens that need them. $signedIn"
                 : 'Screen: '.Devices::describe($devices[0]).". $signedIn",
             $notes !== '' ? "<notes_from_the_developer>\n$notes\n</notes_from_the_developer>" : null,
             "<routes>\n".$this->code->routeList()."\n</routes>",

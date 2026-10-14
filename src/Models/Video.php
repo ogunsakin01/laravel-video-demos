@@ -3,6 +3,7 @@
 namespace Ogunsakin01\VideoDemo\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Ogunsakin01\VideoDemo\Ai\Usage;
@@ -26,12 +27,16 @@ use Ogunsakin01\VideoDemo\Recording\Devices;
  * @property ?array<string, array{seconds: float, chapters: array}> $recordings
  * @property ?array $log
  * @property ?string $error
+ * @property int $input_tokens
+ * @property int $cache_write_tokens
+ * @property int $cache_read_tokens
+ * @property int $output_tokens
  * @property float $cost
  * @property ?float $estimate_low
  * @property ?float $estimate_high
  * @property ?float $duration_seconds
  * @property int $version
- * @property ?\Illuminate\Support\Carbon $published_at
+ * @property ?Carbon $published_at
  */
 class Video extends Model
 {
@@ -61,7 +66,7 @@ class Video extends Model
     protected static function booted(): void
     {
         static::creating(function (Video $video) {
-            $video->slug ??= static::uniqueSlug($video->title ?: Str::words($video->prompt, 8, ""));
+            $video->slug ??= static::uniqueSlug($video->title ?: Str::words($video->prompt, 8, ''));
         });
     }
 

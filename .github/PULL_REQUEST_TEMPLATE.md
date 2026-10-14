@@ -8,7 +8,7 @@
 
 ## Checklist
 
-- [ ] `composer test` passes
+- [ ] `composer check` passes (code style, PHPStan and tests)
 - [ ] Tests cover the change
 - [ ] A line is added under "Unreleased" in CHANGELOG.md
 - [ ] Docs are updated if behaviour or config changed
