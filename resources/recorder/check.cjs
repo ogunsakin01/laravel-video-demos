@@ -32,7 +32,7 @@ async function describeError(page) {
     const page = await context.newPage();
 
     if (job.loginPath) {
-      const res = await page.goto(url(job.loginPath), { waitUntil: 'load' });
+      const res = await page.goto(url(job.loginPath), { waitUntil: 'domcontentloaded', timeout: 60000 });
       if (!res || res.status() >= 400) {
         problems.push({ path: '(sign in)', problem: `Signing the recorder in failed with HTTP ${res ? res.status() : 'no response'}`, status: res ? res.status() : null, url: null, detail: 'Is the studio enabled and the app running at ' + job.baseUrl + '?' });
       }
@@ -43,7 +43,9 @@ async function describeError(page) {
       const onError = e => jsErrors.push(String(e.message || e).split('\n')[0]);
       page.on('pageerror', onError);
       try {
-        const res = await page.goto(url(p), { waitUntil: 'load', timeout: 20000 });
+        // A slow image or script from another site doesn't make the page broken.
+        const res = await page.goto(url(p), { waitUntil: 'domcontentloaded', timeout: 30000 });
+        await page.waitForLoadState('load', { timeout: 10000 }).catch(() => {});
         await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
         const status = res ? res.status() : null;
         const finalUrl = page.url();

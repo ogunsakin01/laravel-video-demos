@@ -72,9 +72,10 @@ async function find(page, t) {
   return loc;
 }
 
-// Wait for the page to load and its network to go quiet, without failing if it never does.
+// Wait for the page to load and its network to go quiet, without failing if it never does:
+// a slow image or script from another site must not stop the video.
 async function settle(page) {
-  await page.waitForLoadState('load').catch(() => {});
+  await page.waitForLoadState('load', { timeout: 10000 }).catch(() => {});
   await page.waitForLoadState('networkidle', { timeout: 4000 }).catch(() => {});
 }
 
@@ -83,7 +84,8 @@ async function run(page, step, isLast) {
   switch (step.action) {
     case 'goto':
       await wide(page);
-      await page.goto(url(step.url), { waitUntil: 'load' });
+      // Only the page itself must arrive; images and scripts get settle()'s grace period.
+      await page.goto(url(step.url), { waitUntil: 'domcontentloaded', timeout: 60000 });
       await settle(page);
       if (/\/login\b/.test(new URL(page.url()).pathname) && !/\/login\b/.test(step.url)) {
         throw new Error(`Opening ${step.url} went to the sign-in page instead. ${job.loginPath ? "The recorder's user may not have access." : 'The recorder is signed out; set video-demo.recorder.login_as.'}`);
@@ -234,7 +236,7 @@ async function snapshot(page) {
       const ctx = await browser.newContext(common);
       if (job.cookies?.length) await ctx.addCookies(job.cookies);
       const p = await ctx.newPage();
-      const res = await p.goto(url(job.loginPath), { waitUntil: 'load' });
+      const res = await p.goto(url(job.loginPath), { waitUntil: 'domcontentloaded', timeout: 60000 });
       if (!res || res.status() >= 400) throw new Error(`Signing in failed with HTTP ${res ? res.status() : 'no response'}. Is the studio enabled and the app running at ${job.baseUrl}?`);
       storageState = await ctx.storageState();
       await ctx.close();

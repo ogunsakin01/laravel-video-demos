@@ -372,6 +372,7 @@ class SampleDataTest extends TestCase
     {
         // The sample database can't be built here, which is only a warning.
         config(['video-demo.sample_data.artisan' => $this->root.'/missing-artisan']);
+        $video = Video::create(['prompt' => 'x', 'target_seconds' => 30, 'model' => 'claude-sonnet-5-5', 'effort' => 'high', 'status' => VideoStatus::Ready, 'cost' => 0.3727, 'output_tokens' => 1200]);
 
         try {
             $this->artisan('video-demo:install', ['--no-browser' => true])
@@ -380,9 +381,30 @@ class SampleDataTest extends TestCase
                 ->expectsOutputToContain('Run this command again after each upgrade')
                 ->assertSuccessful();
             $this->assertFileExists(config_path('video-demo.php'));
+
+            // Running it again, as after an upgrade, keeps what videos have cost so far.
+            $this->artisan('video-demo:install', ['--no-browser' => true, '--no-sample-data' => true])->assertSuccessful();
+            $this->assertSame([0.3727, 1200], [$video->fresh()->cost, $video->fresh()->output_tokens]);
         } finally {
             File::delete(config_path('video-demo.php'));
         }
+    }
+
+    public function test_the_base_database_is_kept_until_a_file_really_changes(): void
+    {
+        $folder = $this->root.'/migrations';
+        File::ensureDirectoryExists($folder);
+        File::put("$folder/2026_01_01_000000_create_things.php", '<?php // things');
+        app('migrator')->path($folder);
+        $before = Sandbox::fingerprint();
+
+        // composer update rewrites files unchanged, with a new modification time.
+        touch("$folder/2026_01_01_000000_create_things.php", time() + 3600);
+        clearstatcache();
+        $this->assertSame($before, Sandbox::fingerprint());
+
+        File::put("$folder/2026_01_01_000000_create_things.php", '<?php // things, changed');
+        $this->assertNotSame($before, Sandbox::fingerprint());
     }
 
     public function test_clean_keeps_the_current_base_and_databases_in_use(): void

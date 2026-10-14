@@ -20,13 +20,13 @@ See [Installation](#installation) for the `.env` settings and the queue worker.
 
 ## See it
 
-These tours were recorded by the package itself, from the demo app in [`workbench/`](workbench), in the "Promo ad" style. GitHub doesn't play videos stored in a repository, so the previews below are GIFs of the same videos; the links under them are the full MP4s.
+GitHub doesn't play videos stored in a repository, so the previews below are GIFs; the links under them are the full MP4s.
 
-### The studio, where you make videos
+### What it does
 
-[![The studio](docs/studio-tour.gif)](docs/studio-tour.mp4)
+[![Laravel Video Demos in dark mode: describe a flow, and the AI plans and records it](docs/promo.gif)](https://raw.githubusercontent.com/ogunsakin01/laravel-video-demos/main/docs/social/laravel-video-demos-promo.mp4)
 
-[Full studio tour (MP4, about a minute)](https://raw.githubusercontent.com/ogunsakin01/laravel-video-demos/main/docs/studio-tour.mp4)
+[Full video (MP4, about a minute and a half)](https://raw.githubusercontent.com/ogunsakin01/laravel-video-demos/main/docs/social/laravel-video-demos-promo.mp4)
 
 ### The library, where your users watch them
 
@@ -36,7 +36,7 @@ These tours were recorded by the package itself, from the demo app in [`workbenc
 
 [Full library tour (MP4)](https://raw.githubusercontent.com/ogunsakin01/laravel-video-demos/main/docs/library-tour.mp4) · [Mobile version (MP4)](https://raw.githubusercontent.com/ogunsakin01/laravel-video-demos/main/docs/library-tour-mobile.mp4)
 
-The videos in the demo library all play one sample clip, recorded from the demo app's "Post a job" page. The demo app answers "Complete with AI" with a fixed reply, so the tours could be recorded without an API key.
+The library tours were recorded by the package itself, from the demo app in [`workbench/`](workbench), in the "Promo ad" style. The videos in the demo library all play one sample clip, recorded from the demo app's "Post a job" page. The demo app answers "Complete with AI" with a fixed reply, so the tours could be recorded without an API key.
 
 ## How it works
 
@@ -151,12 +151,12 @@ The studio is where videos are made. It is only registered when `APP_ENV` is `lo
   - **Record as**: the type of user the video shows the app as, such as Admin or Member, or a guest (signed out). Types come from the way your app models roles: [spatie/laravel-permission](https://github.com/spatie/laravel-permission), Laratrust, Bouncer, a `role_id` or `role`/`type` column on users, or an `is_admin` flag. For the recording, a user of that type is signed in, preferring one with no other roles (so a Member video isn't recorded by someone who is also an admin) and the default user when they qualify. If your app does roles another way, list the types in `recorder.user_types`: `'Admin' => 'admin@example.com'`.
   - **Record on sample data** (on by default): record against a temporary copy of your database, filled with sample data, instead of your own. Untick it to record on your own local data. See [Sample data](#sample-data).
   - **Start page**: search the pages the chosen type of user can open, by title or address, or type any path (`/jobs/5`). The list comes from your GET routes that need no parameters, each opened as that user to keep the ones that return a page; the title is the page's heading. Logout, delete, export and API routes are never opened.
-  - **Spending limit**: the most this video may cost ($2 unless you change it, or `limits.max_cost_per_video`). The AI is told its budget, sees how many requests it has left, and stops before a request that would go over. The form warns you if even the lowest estimate is above the limit.
+  - **Spending limit**: the most this video may cost: $0.50 unless you change it for the video, or for every video with `VIDEO_DEMO_MAX_COST` (`limits.max_cost_per_video`). The AI is told its budget, sees how many requests it has left, and stops before a request that would go over. The form warns you if even the lowest estimate is above the limit.
   - **Max steps**: the most steps the plan may have. Fewer steps make a shorter, cheaper plan.
   - **Playback speed**: how much faster the video plays than it was recorded, from 1× (real time) to 3×. See [Speed](#speed).
 - **Video page**: watch each version, read the plan, see the actual cost and progress, publish or unpublish, record the same plan again (free), or ask the AI for a new plan.
   - **Stop** a video while it is being made: at once if it is still queued, otherwise before the next AI request or by closing the browser mid-recording. You pay only for what was used so far. **Try again** starts it over.
-  - **Pages are checked first.** Before planning, the start page is opened as the chosen user; before recording, every page in the plan is. A page that returns an error, sends the user to sign in, throws a JavaScript error or doesn't load stops the video there, with the problem listed at the top of the page (including Laravel's error message), so no AI is spent on a page that can't work. An error from your app during recording also stops it, instead of asking the AI to "repair" a plan that was right.
+  - **Pages are checked first.** Before planning, the start page is opened as the chosen user; before recording, every page in the plan is. A page that returns an error, sends the user to sign in, throws a JavaScript error or doesn't load stops the video there, with the problem listed at the top of the page (including Laravel's error message), so no AI is spent on a page that can't work. An error from your app during recording also stops it, instead of asking the AI to "repair" a plan that was right. On [sample data](#sample-data) these go to the AI instead, since they usually mean data is missing, which it can add; a video on your own data offers **Try again on sample data**.
   - **Embed**: once published, copy the code to show it anywhere: the Blade component for your own pages, or a plain HTML `<video>` tag.
 - **Styles**: how the AI writes each video (its "direction") and how cards and captions look: light or dark, accent colour, captions at the top or bottom, pace, and **art**. With abstract art, title cards get line art that draws itself on and drifts, and the words rise into place, like an ad. A style can also set:
   - **App appearance**: record the app in light or dark mode, for apps that follow the device's setting.
@@ -195,7 +195,7 @@ What it can't do:
 
 - **Migrations that only run on MySQL or Postgres.** Sample data uses SQLite. Most migrations are portable; one that isn't stops the build with its error, so you can guard it (`if (DB::getDriverName() === 'mysql')`).
 - **Outside services.** Calls your app makes to other services, such as Stripe or an AI API, still go out. Use their test keys locally.
-- **Files.** Uploaded files are not copied; the AI points image columns at files your app already has, or at image URLs.
+- **Files.** Uploaded files are not copied; the AI points image columns at files your app already has under `public/`.
 - **Octane.** The database is chosen when a request starts the app, which Octane does once per worker; serve the app with Herd, Valet, `php artisan serve` or PHP-FPM while recording.
 - **Slow seeders.** The base database is built once, so a slow build costs time only then. A seeder that fails is reported and the rest of the data is kept.
 
@@ -218,7 +218,7 @@ php artisan video-demo:refresh                     # re-record published videos 
 php artisan video-demo:clean                       # free disk space (see Disk space)
 ```
 
-`video-demo:generate` also takes `--title`, `--model`, `--effort`, `--start=/path`, `--private`, `--max-cost=0.50` (the spending limit in dollars), `--max-steps=20`, `--speed=1.5`, `--as=` (a user type such as `admin`, `guest`, or a user id or email) and `--queue` (queue it and return straight away). With `--json`, broken pages found before recording are listed under `issues`. `video-demo:suggest --replace` starts the ideas over.
+`video-demo:generate` also takes `--title`, `--model`, `--effort`, `--start=/path`, `--private`, `--max-cost=0.50` (the spending limit in dollars), `--max-steps=20`, `--speed=1.5`, `--as=` (a user type such as `admin`, `guest`, or a user id or email), `--own-data` (record on your own local data instead of [sample data](#sample-data)) and `--queue` (queue it and return straight away). With `--json`, broken pages found before recording are listed under `issues`. `video-demo:suggest --replace` starts the ideas over.
 
 ## The library
 

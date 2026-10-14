@@ -190,8 +190,9 @@ return [
     */
 
     'limits' => [
-        // Stop a video's generation once its cost passes this, in US dollars.
-        'max_cost_per_video' => 2.00,
+        // The spending limit of each new video, in US dollars, unless a video
+        // sets its own. The AI plans within it and stops before going over.
+        'max_cost_per_video' => (float) env('VIDEO_DEMO_MAX_COST', 0.50),
 
         // The most requests to the AI model while it reads code and writes
         // the plan.

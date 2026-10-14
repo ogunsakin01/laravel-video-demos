@@ -59,7 +59,7 @@ Library pages: `/help/videos` (public) and `/admin/videos` (private videos too).
 - Styles set the AI's direction and the look of cards and captions; "ad" has animated abstract line art, and "spotlight" records the app in dark mode, zooms in on each step and highlights it.
 - Secrets in code and pages are redacted before anything is sent to the AI. The AI can only read folders in `ai.code.paths`.
 - Plan steps can reach into iframes (embedded payment fields). CAPTCHAs, SMS codes and social logins can't be automated.
-- Each video records its actual AI cost and has a spending limit (default `limits.max_cost_per_video`, $2): the AI is told its budget and stops before going over. A video can be stopped from the studio at any time.
+- Each video records its actual AI cost and has a spending limit (default `limits.max_cost_per_video`, $0.50, or `VIDEO_DEMO_MAX_COST`): the AI is told its budget and stops before going over. A video can be stopped from the studio at any time.
 - The default model is the cheapest one marked `reliable` whose provider has a key (Claude Sonnet 5.5); `VIDEO_DEMO_MODEL` overrides it.
 - Pages are checked for errors (HTTP errors, sign-in redirects, JavaScript errors) before planning and recording, so no AI is spent on broken pages.
 - Videos are recorded as a type of user (found from spatie/laravel-permission, Laratrust, Bouncer, a role column or an is_admin flag, or `recorder.user_types`), or as a guest.

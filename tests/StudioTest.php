@@ -138,4 +138,30 @@ class StudioTest extends TestCase
         $this->post("/video-demo/studio/{$planned->id}/retry", ['mode' => 'record'])->assertRedirect();
         Queue::assertPushed(GenerateVideo::class, fn ($job) => $job->video->is($planned) && ! $job->replan);
     }
+
+    public function test_make_it_again_can_change_the_style(): void
+    {
+        Queue::fake();
+        $clean = VideoStyle::options()->firstWhere('key', 'clean');
+        $spotlight = VideoStyle::options()->firstWhere('key', 'spotlight');
+        $video = Video::create(['prompt' => 'x', 'target_seconds' => 30, 'model' => 'claude-sonnet-5-5', 'effort' => 'high', 'status' => VideoStatus::Ready, 'style' => $clean->snapshot()]);
+
+        // The form offers every style, with the video's own picked.
+        $this->get("/video-demo/studio/{$video->id}")
+            ->assertSee('<label for="r-style">Style</label>', false)
+            ->assertSee('value="'.$clean->id.'" data-direction="'.e($clean->direction).'" selected', false)
+            ->assertSee('Spotlight');
+
+        $form = ['prompt' => 'x', 'target_seconds' => 30, 'effort' => 'high'];
+        $this->post("/video-demo/studio/{$video->id}/regenerate", [...$form, 'style_id' => $spotlight->id])->assertRedirect();
+        $this->assertSame(['Spotlight', true], [$video->fresh()->style['name'], $video->fresh()->style['zoom']]);
+        Queue::assertPushed(GenerateVideo::class, fn ($job) => $job->video->is($video) && $job->replan);
+
+        // Without a choice, the style stays as it was; a style that doesn't exist is refused.
+        $video->refresh()->update(['status' => VideoStatus::Ready]);
+        $this->post("/video-demo/studio/{$video->id}/regenerate", [...$form, 'style_id' => ''])->assertRedirect();
+        $this->assertSame('Spotlight', $video->fresh()->style['name']);
+        $video->refresh()->update(['status' => VideoStatus::Ready]);
+        $this->post("/video-demo/studio/{$video->id}/regenerate", [...$form, 'style_id' => 999])->assertSessionHasErrors('style_id');
+    }
 }

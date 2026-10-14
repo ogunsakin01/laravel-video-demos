@@ -216,7 +216,7 @@ class Video extends Model
      */
     public function spendLimit(): float
     {
-        return (float) ($this->max_cost ?: config('video-demo.limits.max_cost_per_video', 2.0));
+        return (float) ($this->max_cost ?: config('video-demo.limits.max_cost_per_video', 0.5));
     }
 
     /**

@@ -139,12 +139,14 @@ class Sandbox
         $parts = [json_encode(config('video-demo.sample_data.seeders')), json_encode(array_keys(RecordAs::types()))];
         $folders = [...app('migrator')->paths(), database_path('migrations'), database_path('seeders'), database_path('factories')];
 
+        // By content, not modification time: composer update rewrites the
+        // package's migrations unchanged, which must not rebuild the base.
         foreach (array_unique($folders) as $folder) {
             if (! is_dir($folder)) {
                 continue;
             }
             foreach (File::allFiles($folder) as $file) {
-                $parts[] = $file->getRealPath().':'.$file->getSize().':'.$file->getMTime();
+                $parts[] = $file->getFilename().':'.sha1_file($file->getRealPath());
             }
         }
         sort($parts);

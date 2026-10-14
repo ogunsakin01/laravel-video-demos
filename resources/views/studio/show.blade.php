@@ -203,6 +203,19 @@
             <label for="r-prompt">Description</label>
             <textarea id="r-prompt" name="prompt" required maxlength="4000">{{ $video->prompt }}</textarea>
           </div>
+          <div>
+            <label for="r-style">Style</label>
+            @php($currentStyle = $styles->first(fn ($s) => $s->key === ($video->style['key'] ?? null)) ?? $styles->first(fn ($s) => $s->name === ($video->style['name'] ?? null)))
+            <select id="r-style" name="style_id">
+              @unless ($currentStyle)
+                <option value="" selected>{{ $video->style['name'] ?? 'Its current style' }} (as it was)</option>
+              @endunless
+              @foreach ($styles as $style)
+                <option value="{{ $style->id }}" data-direction="{{ $style->direction }}" @selected($currentStyle?->is($style))>{{ $style->name }}</option>
+              @endforeach
+            </select>
+            <span class="vd-hint" id="r-style-hint">{{ $currentStyle?->direction }}</span>
+          </div>
           <div class="vd-row">
             <div>
               <label for="r-seconds">Seconds</label>
@@ -309,6 +322,11 @@
       v.poster = b.dataset.poster; v.src = b.dataset.src; v.style.aspectRatio = b.dataset.ratio;
       document.querySelectorAll('[data-src]').forEach(o => o.setAttribute('aria-pressed', String(o === b)));
     }));
+    // Show the chosen style's direction under the style picker in "Make it again".
+    const styleSelect = document.getElementById('r-style');
+    styleSelect?.addEventListener('change', () => {
+      document.getElementById('r-style-hint').textContent = styleSelect.selectedOptions[0]?.dataset.direction || '';
+    });
   </script>
 
   @if ($video->status->isWorking())

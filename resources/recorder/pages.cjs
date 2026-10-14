@@ -35,7 +35,7 @@ function titleOf(html) {
     if (job.cookies?.length) await context.addCookies(job.cookies);
     if (job.loginPath) {
       const page = await context.newPage();
-      await page.goto(url(job.loginPath), { waitUntil: 'load' });
+      await page.goto(url(job.loginPath), { waitUntil: 'domcontentloaded', timeout: 60000 });
       await page.close();
     }
 

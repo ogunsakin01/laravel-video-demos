@@ -2,6 +2,19 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/). While the version is 0.x, minor releases may include breaking changes; they will be listed here.
 
+## v0.9.1 - 2026-10-14
+
+### Changed
+
+- **Make it again** can change the video's style too, along with the description, length, effort, limits, speed and sample data.
+- **The default spending limit is $0.50** a video, down from $2. Change it for one video in the form or with `--max-cost`, or for every video with `VIDEO_DEMO_MAX_COST`. Videos that set their own limit keep it.
+
+### Fixed
+
+- Updating the package no longer rebuilds the sample database. It was fingerprinted by the files' modification times, which `composer update` changes even when a migration is the same; it now goes by their contents.
+- A slow image or script from another site no longer fails a recording with "page.goto: Timeout 30000ms exceeded". The recorder waits for the page itself (up to a minute), then gives images and scripts up to 10 seconds more without failing. The page check does the same.
+- The AI is told to use images the app already has for sample data, not image hosting sites, which can be slow.
+
 ## v0.9.0 - 2026-10-14
 
 ### Changed

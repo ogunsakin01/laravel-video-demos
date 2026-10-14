@@ -75,7 +75,7 @@ class VideoController extends Controller
                 'effort' => config('video-demo.ai.effort'),
                 'target_seconds' => (int) $request->query('target_seconds', 60),
                 'devices' => Devices::defaults(),
-                'max_cost' => (float) config('video-demo.limits.max_cost_per_video', 2.0),
+                'max_cost' => (float) config('video-demo.limits.max_cost_per_video', 0.5),
                 'speed' => (float) $request->query('speed', Recorder::speed()),
                 'max_steps' => $request->query('max_steps'),
                 'record_as' => $request->query('record_as', config('video-demo.recorder.login_as') ? '' : RecordAs::GUEST),
@@ -191,6 +191,7 @@ class VideoController extends Controller
             'video' => $video,
             'devices' => Devices::all(),
             'efforts' => self::EFFORTS,
+            'styles' => VideoStyle::options(),
             'queueWarning' => $video->status->isWorking() ? VideoDemoServiceProvider::queueWarning() : null,
         ]);
     }
@@ -245,7 +246,11 @@ class VideoController extends Controller
     {
         abort_if($video->status->isWorking(), 409, 'This video is still being made.');
 
+        // A new style is copied onto the video, like on the new-video form.
+        $style = $request->filled('style_id') ? VideoStyle::find($request->validate(['style_id' => ['integer', Rule::exists(VideoStyle::class, 'id')]])['style_id']) : null;
+
         $video->update([
+            ...($style ? ['style' => $style->snapshot()] : []),
             ...$request->validate([
                 'prompt' => ['required', 'string', 'max:4000'],
                 'target_seconds' => ['required', 'integer', 'min:10', 'max:'.config('video-demo.limits.max_seconds', 300)],
