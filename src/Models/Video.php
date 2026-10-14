@@ -48,6 +48,8 @@ use Ogunsakin01\VideoDemo\Recording\Recorder;
  * @property ?string $record_as_label
  * @property ?list<array{path: string, problem: string, status: ?int, url: ?string, detail: ?string}> $issues
  * @property bool $stop_requested
+ * @property bool $sample_data
+ * @property ?list<array<string, mixed>> $sample_records
  */
 class Video extends Model
 {
@@ -78,6 +80,8 @@ class Video extends Model
             'speed' => 'float',
             'issues' => 'array',
             'stop_requested' => 'boolean',
+            'sample_data' => 'boolean',
+            'sample_records' => 'array',
         ];
     }
 

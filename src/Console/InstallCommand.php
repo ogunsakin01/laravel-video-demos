@@ -70,6 +70,7 @@ class InstallCommand extends Command
 
         $this->newLine();
         $this->components->info('Next: run php artisan migrate, set ANTHROPIC_API_KEY and VIDEO_DEMO_LOGIN_AS in .env, start a queue worker, and open /'.trim(config('video-demo.studio.prefix'), '/'));
+        $this->line('  To record videos on sample data instead of your own, build the sample database once: php artisan video-demo:sample-database');
 
         return self::SUCCESS;
     }

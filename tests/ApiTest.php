@@ -97,17 +97,24 @@ class ApiTest extends TestCase
         $this->artisan('video-demo:clean')->expectsOutputToContain('Nothing to clean up')->assertSuccessful();
     }
 
-    public function test_pages_use_the_apps_favicon(): void
+    public function test_pages_have_their_own_favicon(): void
     {
-        $this->assertNull(Favicon::find());
-
-        File::put(public_path('favicon.ico'), 'icon');
+        // The package's own icon, even when the app has one.
+        File::put(public_path('favicon.jpg'), 'icon');
         try {
-            $this->assertStringContainsString('/favicon.ico?v=', Favicon::find()['href']);
-            $this->get('/video-demo/studio')->assertSee('rel="icon"', false)->assertSee('favicon.ico?v=', false);
+            $this->assertStringStartsWith('data:image/svg+xml,', Favicon::find()['href']);
+            $this->get('/video-demo/studio')->assertSee('rel="icon" href="data:image/svg+xml,', false);
+
+            // "app" uses the app's favicon, whatever its format.
+            config(['video-demo.ui.favicon' => 'app']);
+            $this->assertStringContainsString('/favicon.jpg?v=', Favicon::find()['href']);
+            $this->get('/video-demo/studio')->assertSee('favicon.jpg?v=', false);
         } finally {
-            File::delete(public_path('favicon.ico'));
+            File::delete(public_path('favicon.jpg'));
         }
+
+        // With no app favicon to use, the package's own icon stays.
+        $this->assertStringStartsWith('data:image/svg+xml,', Favicon::find()['href']);
 
         config(['video-demo.ui.favicon' => 'https://cdn.example.com/icon.png']);
         $this->assertSame('https://cdn.example.com/icon.png', Favicon::find()['href']);

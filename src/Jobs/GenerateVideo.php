@@ -18,6 +18,7 @@ use Ogunsakin01\VideoDemo\Recording\Devices;
 use Ogunsakin01\VideoDemo\Recording\Encoder;
 use Ogunsakin01\VideoDemo\Recording\Plan;
 use Ogunsakin01\VideoDemo\Recording\Recorder;
+use Ogunsakin01\VideoDemo\SampleData\Sandbox;
 use Ogunsakin01\VideoDemo\VideoDemoServiceProvider;
 use RuntimeException;
 use Throwable;
@@ -29,6 +30,10 @@ use Throwable;
  * Pages are checked first, and an error in the app itself stops the job with
  * the problem listed, since no plan can fix it and repairs would only cost
  * money. With $replan false the stored plan is recorded again, at no AI cost.
+ *
+ * On sample data, the video is recorded against a temporary database made
+ * for it. Failing pages then go back to the model too, since they usually
+ * mean data is missing, which it can add.
  */
 class GenerateVideo implements ShouldQueue
 {
@@ -75,14 +80,20 @@ class GenerateVideo implements ShouldQueue
         $maxRepairs = (int) config('video-demo.limits.max_repairs', 2);
         $shouldStop = fn () => $video->stopRequested();
         $session = null;
+        $sandbox = null;
 
         try {
+            if ($video->sample_data) {
+                $sandbox = $this->sampleDatabase($video, $recorder);
+            }
+
             if ($this->replan) {
                 // A broken start page would fail every plan, so check it first at no AI cost.
-                $this->checkPages($recorder, $video, [$video->start_path ?: '/'], 'Checking the start page');
+                // On sample data the model is told instead, as it can add what the page needs.
+                $problems = $this->checkPages($recorder, $video, [$video->start_path ?: '/'], 'Checking the start page', fail: ! $sandbox);
 
                 $video->moveTo(VideoStatus::Planning, 'The AI is reading the code');
-                $session = $planner->plan($video);
+                $session = $planner->plan($video, $sandbox, $problems);
                 $plan = $session->plan;
                 $video->addLog(sprintf('Plan ready: %d steps, about %d seconds', count($plan->steps), $plan->estimatedSeconds($video->playbackSpeed())));
             } else {
@@ -97,7 +108,15 @@ class GenerateVideo implements ShouldQueue
                 $plan = $plan->fitTo(min($video->target_seconds, (int) config('video-demo.limits.max_seconds', 300)), $video->playbackSpeed());
                 $video->update(['plan' => $plan->toArray()]);
 
-                $this->checkPages($recorder, $video, $plan->paths(), 'Checking the pages in the plan');
+                $canRepair = $session?->sampleData && $session->repairs < $maxRepairs;
+                $problems = $this->checkPages($recorder, $video, $plan->paths(), 'Checking the pages in the plan', fail: ! $canRepair);
+                if ($problems !== []) {
+                    $video->moveTo(VideoStatus::Planning, 'Asking the AI to fix the data or the plan');
+                    $planner->repairPages($session, $video, $problems);
+                    $plan = $session->plan;
+
+                    continue;
+                }
 
                 $results = [];
                 $failure = null;
@@ -118,13 +137,15 @@ class GenerateVideo implements ShouldQueue
                     break;
                 }
 
-                if ($issue = $failure->issue()) {
+                // On sample data an app error is often missing data, which the model can add.
+                $sampleFix = $session?->sampleData && $failure->appError && $failure->failedStep !== null && $session->repairs < $maxRepairs;
+                if (($issue = $failure->issue()) && ! $sampleFix) {
                     $video->update(['issues' => [$issue]]);
 
                     throw new RuntimeException("The app itself failed at {$issue['path']}: {$issue['problem']}. Fix it, then try again; asking the AI to repair the plan wouldn't help.");
                 }
 
-                if (! $session || ! $failure->canRepair() || $session->repairs >= $maxRepairs) {
+                if (! $session || ! ($failure->canRepair() || $sampleFix) || $session->repairs >= $maxRepairs) {
                     throw new RuntimeException($failure->summary().($session ? '' : '. Try again with a new plan to let the AI fix it.'));
                 }
 
@@ -139,6 +160,9 @@ class GenerateVideo implements ShouldQueue
             $this->stopped($video);
 
             return;
+        } finally {
+            $sandbox?->delete();
+            $recorder->sandbox = null;
         }
 
         $video->moveTo(VideoStatus::Encoding, count($results) > 1 ? 'Encoding '.count($results).' versions' : 'Encoding the video');
@@ -181,18 +205,70 @@ class GenerateVideo implements ShouldQueue
     }
 
     /**
-     * Check the pages before any AI is spent on them, failing the job when one
-     * is broken.
+     * Make the video's sample database, a copy of the base one, and point
+     * the recorder at it.
+     *
+     * A new plan starts from the base; recording a plan again also adds back
+     * the records the AI added for it, so its pages find them.
      */
-    protected function checkPages(Recorder $recorder, Video $video, array $paths, string $message): void
+    protected function sampleDatabase(Video $video, Recorder $recorder): Sandbox
+    {
+        $this->stopIfAsked($video);
+        $video->moveTo(VideoStatus::Checking, is_file(Sandbox::dir().'/base-'.Sandbox::fingerprint().'.sqlite')
+            ? 'Copying the sample database'
+            : 'Building the sample database: running your migrations and seeders once (php artisan video-demo:sample-database does this ahead of time)');
+        $sandbox = Sandbox::create($video);
+        $recorder->sandbox = $sandbox;
+
+        try {
+            $info = $sandbox->prepare($video->record_as);
+            foreach ($info['warnings'] as $warning) {
+                $video->addLog($warning);
+            }
+            $video->addLog($info['user']
+                ? 'Sample database ready. Signed in as '.($info['user']['email'] ?? 'user #'.$info['user']['id'])
+                : 'Sample database ready');
+
+            if ($this->replan) {
+                $video->update(['sample_records' => null]);
+            } elseif ($records = $video->sample_records) {
+                $failed = array_filter($sandbox->seed($records), fn ($r) => ! ($r['ok'] ?? false));
+                $video->addLog(sprintf('Added back the %d sample records the AI made', count($records) - count($failed)));
+                foreach ($failed as $result) {
+                    $video->addLog("A sample record ({$result['what']}) could not be added back: {$result['error']}");
+                }
+            }
+        } catch (Throwable $e) {
+            $sandbox->delete();
+            $recorder->sandbox = null;
+
+            throw $e;
+        }
+
+        return $sandbox;
+    }
+
+    /**
+     * Check the pages before any AI is spent on them, and return the ones that
+     * fail. With $fail, a failing page fails the job instead.
+     *
+     * @return list<array{path: string, problem: string, status: ?int, url: ?string, detail: ?string}>
+     */
+    protected function checkPages(Recorder $recorder, Video $video, array $paths, string $message, bool $fail = true): array
     {
         if (! config('video-demo.recorder.check_pages', true) || $paths === []) {
-            return;
+            return [];
         }
 
         $this->stopIfAsked($video);
         $video->moveTo(VideoStatus::Checking, $message.' ('.count($paths).')');
         $problems = $recorder->checkPages($paths, $video->record_as, $video->deviceList()[0], fn () => $video->stopRequested());
+
+        if ($problems !== [] && ! $fail) {
+            $video->addLog(count($problems) === 1 ? "{$problems[0]['path']} failed: {$problems[0]['problem']}" : count($problems).' pages failed the check');
+
+            return $problems;
+        }
 
         if ($problems !== []) {
             $video->update(['issues' => $problems]);
@@ -204,6 +280,8 @@ class GenerateVideo implements ShouldQueue
         }
 
         $this->stopIfAsked($video);
+
+        return [];
     }
 
     /**

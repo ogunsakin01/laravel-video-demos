@@ -110,8 +110,11 @@ class CodeTools
 
     /**
      * Get the app's routes, one per line, to send with the first request.
+     *
+     * Each route lists the sign-in middleware it uses, or with $allMiddleware
+     * every middleware, such as permission:view reports.
      */
-    public function routeList(): string
+    public function routeList(bool $allMiddleware = false): string
     {
         return collect(Router::getRoutes()->getRoutes())
             ->reject(fn (Route $r) => Str::startsWith($r->getName() ?? '', ['video-demo.', 'ignition.', 'debugbar.', 'telescope', 'horizon', 'sanctum.'])
@@ -122,10 +125,25 @@ class CodeTools
                 ltrim($r->uri(), '/'),
                 $r->getName() ? "  name={$r->getName()}" : '',
                 $r->getActionName() !== 'Closure' ? '  action='.Str::after($r->getActionName(), 'App\\Http\\Controllers\\') : '',
-                ($mw = array_values(array_intersect(array_filter($r->gatherMiddleware(), is_string(...)), ['auth', 'guest', 'verified', 'admin']))) ? '  middleware='.implode(',', $mw) : '',
+                ($mw = $this->middlewareOf($r, $allMiddleware)) ? '  middleware='.implode(',', $mw) : '',
             ))
             ->values()
             ->implode("\n");
+    }
+
+    /**
+     * Get the middleware of a route worth listing. Middleware added as a
+     * closure, as a controller can, has no name and is left out.
+     *
+     * @return list<string>
+     */
+    protected function middlewareOf(Route $route, bool $all): array
+    {
+        $names = array_filter($route->gatherMiddleware(), is_string(...));
+
+        return array_values($all
+            ? array_unique(array_diff($names, ['web', 'api']))
+            : array_intersect($names, ['auth', 'guest', 'verified', 'admin']));
     }
 
     /**

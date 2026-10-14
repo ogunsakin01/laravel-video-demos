@@ -2,6 +2,19 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/). While the version is 0.x, minor releases may include breaking changes; they will be listed here.
 
+## v0.8.0 - 2026-10-14
+
+Run `php artisan migrate` after updating.
+
+### Added
+
+- **Record on sample data**: record a video against a temporary SQLite database instead of your own data. A base database is built once from your migrations and seeders, with a user of each type, and copied for each video (`php artisan video-demo:sample-database` builds it ahead of time; it is rebuilt when a migration, seeder or factory changes). While planning, the AI reads the routes' middleware, your policies and gates, and adds or updates the records the flow needs, such as a permission, a profile photo or tickets that belong to the user. Pages that fail before recording, and app errors while recording, go back to the AI to fix. Only the recorder's browser uses the database. On the form, with `--sample-data`, or `'sample_data' => true` in `VideoDemo::make`.
+
+### Changed
+
+- The studio and library pages have their own browser tab icon, a play button, instead of the app's favicon. Set `VIDEO_DEMO_FAVICON=app` to use the app's favicon (now also found as `favicon.webp` or `favicon.jpg`), or an image URL to use that image.
+- On wide screens, the estimated cost and the Generate video button on the New video page stay in view while you scroll the form.
+
 ## v0.7.1 - 2026-10-14
 
 ### Fixed

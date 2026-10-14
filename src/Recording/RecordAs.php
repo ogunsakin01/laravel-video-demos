@@ -66,7 +66,10 @@ class RecordAs
      * Get the user types the app has, each with a label and a way to find one
      * such user.
      *
-     * @return array<string, array{label: string, users: Closure(): ?Authenticatable}>
+     * Each also says how the app gives a user that type (via) and the role's
+     * name, so a user of the type can be made in a sample database.
+     *
+     * @return array<string, array{label: string, users: Closure(): ?Authenticatable, via?: string, role?: string}>
      */
     public static function types(): array
     {
@@ -209,7 +212,7 @@ class RecordAs
     /**
      * Get the Eloquent user model, or null when users aren't Eloquent models.
      */
-    protected static function model(): ?string
+    public static function model(): ?string
     {
         $model = config('auth.providers.'.config('auth.guards.'.static::guard().'.provider').'.model')
             ?? config('auth.providers.users.model');
@@ -259,7 +262,7 @@ class RecordAs
     {
         $types = [];
         foreach ((array) config('video-demo.recorder.user_types', []) as $label => $user) {
-            $types[Str::slug($label)] = ['label' => (string) $label, 'users' => fn () => static::find((string) $user)];
+            $types[Str::slug($label)] = ['label' => (string) $label, 'users' => fn () => static::find((string) $user), 'via' => 'configured', 'role' => (string) $user];
         }
 
         return $types;
@@ -279,7 +282,7 @@ class RecordAs
 
         $types = [];
         foreach ($roleModel::query()->orderBy('name')->pluck('name') as $role) {
-            $types[Str::slug($role)] = ['label' => Str::headline($role), 'users' => static::first(
+            $types[Str::slug($role)] = ['label' => Str::headline($role), 'via' => 'spatie', 'role' => $role, 'users' => static::first(
                 fn ($q) => $q->role($role),
                 fn ($table, $key) => DB::table(config('permission.table_names.model_has_roles', 'model_has_roles'))
                     ->selectRaw('count(*)')
@@ -300,7 +303,7 @@ class RecordAs
             return [];
         }
 
-        return static::fromRolesTable(fn ($q, $id) => $q->whereIn(
+        return static::fromRolesTable('laratrust', fn ($q, $id) => $q->whereIn(
             (new (static::model()))->getKeyName(),
             DB::table('role_user')->where('role_id', $id)->select('user_id'),
         ), fn ($table, $key) => DB::table('role_user')->selectRaw('count(*)')->whereColumn('role_user.user_id', "$table.$key"));
@@ -315,7 +318,7 @@ class RecordAs
             return [];
         }
 
-        return static::fromRolesTable(fn ($q, $id) => $q->whereIn(
+        return static::fromRolesTable('bouncer', fn ($q, $id) => $q->whereIn(
             (new (static::model()))->getKeyName(),
             DB::table('assigned_roles')->where('role_id', $id)->where('entity_type', static::model())->select('entity_id'),
         ), fn ($table, $key) => DB::table('assigned_roles')->selectRaw('count(*)')->whereColumn('assigned_roles.entity_id', "$table.$key"));
@@ -331,7 +334,7 @@ class RecordAs
             return [];
         }
 
-        return static::fromRolesTable(fn ($q, $id) => $q->where('role_id', $id));
+        return static::fromRolesTable('role_table', fn ($q, $id) => $q->where('role_id', $id));
     }
 
     /**
@@ -339,7 +342,7 @@ class RecordAs
      *
      * @param  Closure(Builder<Model>, mixed): Builder<Model>  $scope
      */
-    protected static function fromRolesTable(Closure $scope, ?Closure $roleCount = null): array
+    protected static function fromRolesTable(string $via, Closure $scope, ?Closure $roleCount = null): array
     {
         if (! static::model()) {
             return [];
@@ -348,7 +351,7 @@ class RecordAs
         $label = Schema::hasColumn('roles', 'display_name') ? 'display_name' : (Schema::hasColumn('roles', 'title') ? 'title' : 'name');
         $types = [];
         foreach (DB::table('roles')->orderBy('name')->limit(30)->get() as $role) {
-            $types[Str::slug($role->name)] = ['label' => $label !== 'name' && $role->{$label} ? $role->{$label} : Str::headline($role->name), 'users' => static::first(fn ($q) => $scope($q, $role->id), $roleCount)];
+            $types[Str::slug($role->name)] = ['label' => $label !== 'name' && $role->{$label} ? $role->{$label} : Str::headline($role->name), 'via' => $via, 'role' => $role->name, 'users' => static::first(fn ($q) => $scope($q, $role->id), $roleCount)];
         }
 
         return $types;
@@ -374,7 +377,7 @@ class RecordAs
             $types = [];
             foreach ($values as $value) {
                 $value = (string) $value;
-                $types[Str::slug($value) ?: $value] = ['label' => Str::headline($value), 'users' => static::first(fn ($q) => $q->where($column, $value))];
+                $types[Str::slug($value) ?: $value] = ['label' => Str::headline($value), 'via' => "column:$column", 'role' => $value, 'users' => static::first(fn ($q) => $q->where($column, $value))];
             }
 
             if ($types) {
@@ -399,8 +402,8 @@ class RecordAs
         foreach (self::ADMIN_FLAGS as $column) {
             if (Schema::hasColumn($table, $column)) {
                 return [
-                    'admin' => ['label' => 'Admin', 'users' => static::first(fn ($q) => $q->where($column, true))],
-                    'user' => ['label' => 'Other users', 'users' => static::first(fn ($q) => $q->where(fn ($w) => $w->where($column, false)->orWhereNull($column)))],
+                    'admin' => ['label' => 'Admin', 'via' => "flag:$column", 'role' => 'admin', 'users' => static::first(fn ($q) => $q->where($column, true))],
+                    'user' => ['label' => 'Other users', 'via' => "flag:$column", 'role' => 'user', 'users' => static::first(fn ($q) => $q->where(fn ($w) => $w->where($column, false)->orWhereNull($column)))],
                 ];
             }
         }

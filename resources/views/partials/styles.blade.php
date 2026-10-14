@@ -88,6 +88,8 @@
   .vd-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
   .vd-split { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr) 340px; align-items: start; }
   @media (max-width: 900px) { .vd-split { grid-template-columns: 1fr; } }
+  /* Stays in view below the top bar while the form beside it scrolls. */
+  @media (min-width: 901px) { .vd-sticky { position: sticky; top: 84px; max-height: calc(100vh - 104px); overflow-y: auto; } }
   .vd-divider { border: 0; border-top: 1px solid var(--vd-border); margin: 16px 0; }
 
   /* Buttons */

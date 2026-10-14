@@ -232,6 +232,7 @@ async function snapshot(page) {
     let storageState;
     if (job.loginPath) {
       const ctx = await browser.newContext(common);
+      if (job.cookies?.length) await ctx.addCookies(job.cookies);
       const p = await ctx.newPage();
       const res = await p.goto(url(job.loginPath), { waitUntil: 'load' });
       if (!res || res.status() >= 400) throw new Error(`Signing in failed with HTTP ${res ? res.status() : 'no response'}. Is the studio enabled and the app running at ${job.baseUrl}?`);
@@ -241,6 +242,8 @@ async function snapshot(page) {
 
     const recordingStarted = Date.now();
     const context = await browser.newContext({ ...common, storageState, recordVideo: { dir: job.outDir, size: job.viewport } });
+    // Sample data: the cookie sends every request to the video's own database.
+    if (job.cookies?.length) await context.addCookies(job.cookies);
     await context.addInitScript(`window.__demoStyle = ${JSON.stringify(style)};`);
     // Touch screens show where a finger taps instead of a cursor.
     if (job.touch) await context.addInitScript('window.__demoTouch = true;');

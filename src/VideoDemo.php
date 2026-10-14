@@ -43,10 +43,12 @@ class VideoDemo
      * Options, all optional: title, start (a path), length (seconds), style
      * (a key or name), devices (list), model, effort, private (bool),
      * max_cost (dollars), max_steps, speed (0.25 to 4), as (a user type such
-     * as "admin", "guest", or a user id or email) and queue (false makes it
-     * now, in this process). Throws InvalidArgumentException for a bad option.
+     * as "admin", "guest", or a user id or email), sample_data (true records
+     * against a temporary database with sample data, not the app's own) and
+     * queue (false makes it now, in this process). Throws
+     * InvalidArgumentException for a bad option.
      *
-     * @param  array{title?: string, start?: string, length?: int, style?: string, devices?: list<string>, model?: string, effort?: string, private?: bool, max_cost?: float, max_steps?: int, speed?: float, as?: string, queue?: bool}  $options
+     * @param  array{title?: string, start?: string, length?: int, style?: string, devices?: list<string>, model?: string, effort?: string, private?: bool, max_cost?: float, max_steps?: int, speed?: float, as?: string, sample_data?: bool, queue?: bool}  $options
      */
     public function make(string $description, array $options = []): Video
     {
@@ -146,6 +148,7 @@ class VideoDemo
             'speed' => $speed !== null ? (float) $speed : null,
             'record_as' => $recordAs,
             'record_as_label' => RecordAs::label($recordAs),
+            'sample_data' => (bool) ($options['sample_data'] ?? config('video-demo.sample_data.default', false)),
             'status' => VideoStatus::Queued,
             'estimate_low' => $estimate['low'],
             'estimate_high' => $estimate['high'],

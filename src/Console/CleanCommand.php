@@ -7,11 +7,12 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use Ogunsakin01\VideoDemo\Models\Video;
 use Ogunsakin01\VideoDemo\Recording\Recorder;
+use Ogunsakin01\VideoDemo\SampleData\Sandbox;
 use Throwable;
 
 /**
- * Frees disk space: leftover working files, and optionally the recorder's
- * browser. Finished videos and the library are never touched.
+ * Frees disk space: leftover working files and sample databases, and
+ * optionally the recorder's browser. Finished videos and the library are never touched.
  */
 class CleanCommand extends Command
 {
@@ -100,6 +101,28 @@ class CleanCommand extends Command
 
         foreach (File::directories($root) as $dir) {
             $name = basename($dir);
+
+            // Sample databases of videos still being made are in use.
+            if ($name === 'sandbox') {
+                $current = 'base-'.Sandbox::fingerprint().'.sqlite';
+                foreach (File::files($dir) as $file) {
+                    $name = $file->getFilename();
+                    // The current base database is kept: every video's copy comes from it.
+                    if (str_starts_with($name, 'base')) {
+                        if (! str_starts_with($name, $current) && $name !== 'base.lock') {
+                            $remove[] = ['path' => $file->getPathname(), 'why' => 'an out-of-date sample database'];
+                        }
+
+                        continue;
+                    }
+                    $id = (int) strtok($name, '-');
+                    if (! $videos->get($id)?->status->isWorking()) {
+                        $remove[] = ['path' => $file->getPathname(), 'why' => 'sample database of video #'.$id];
+                    }
+                }
+
+                continue;
+            }
 
             if (in_array($name, ['checks', 'camera'], true)) {
                 $remove[] = ['path' => $dir, 'why' => "temporary files ($name)"];

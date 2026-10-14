@@ -27,6 +27,8 @@ async function describeError(page) {
       viewport: job.viewport, hasTouch: !!job.touch,
       isMobile: !!job.touch && job.viewport.width < 600, ignoreHTTPSErrors: !!job.ignoreHttpsErrors,
     });
+    // Sample data: the cookie sends every request to the video's own database.
+    if (job.cookies?.length) await context.addCookies(job.cookies);
     const page = await context.newPage();
 
     if (job.loginPath) {

@@ -1,0 +1,342 @@
+<?php
+
+namespace Ogunsakin01\VideoDemo\Tests;
+
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Schema;
+use Ogunsakin01\VideoDemo\Ai\AccessRules;
+use Ogunsakin01\VideoDemo\Ai\CodeTools;
+use Ogunsakin01\VideoDemo\Ai\Planner;
+use Ogunsakin01\VideoDemo\Enums\VideoStatus;
+use Ogunsakin01\VideoDemo\Models\Video;
+use Ogunsakin01\VideoDemo\Models\VideoStyle;
+use Ogunsakin01\VideoDemo\SampleData\Builder;
+use Ogunsakin01\VideoDemo\SampleData\Filler;
+use Ogunsakin01\VideoDemo\SampleData\Sandbox;
+use Ogunsakin01\VideoDemo\Tests\Concerns\FakesAnthropic;
+use Ogunsakin01\VideoDemo\VideoDemo;
+
+/**
+ * Recording on sample data: the sandbox database, the cookie that sends the
+ * recorder's requests to it, filling it, and the planner's tools for it.
+ */
+class SampleDataTest extends TestCase
+{
+    use FakesAnthropic;
+
+    protected string $root;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->root = sys_get_temp_dir().'/video-demo-sandbox-'.uniqid();
+        config(['filesystems.disks.local.root' => $this->root]);
+    }
+
+    protected function tearDown(): void
+    {
+        File::deleteDirectory($this->root);
+        parent::tearDown();
+    }
+
+    public function test_the_cookie_only_opens_databases_the_package_made(): void
+    {
+        File::ensureDirectoryExists(Sandbox::dir());
+        $path = Sandbox::dir().'/5-abcdefghijkl.sqlite';
+        File::put($path, '');
+        $cookie = (new Sandbox($path))->cookie();
+
+        $this->assertSame(Sandbox::COOKIE, $cookie['name']);
+        $this->assertSame($path, Sandbox::fromCookie($cookie['value']));
+
+        // Tampered with, not made by the package, a finished base database, or gone.
+        $this->assertNull(Sandbox::fromCookie($cookie['value'].'0'));
+        $this->assertNull(Sandbox::fromCookie('5-abcdefghijkl.sqlite.'.str_repeat('0', 64)));
+        $this->assertNull(Sandbox::fromCookie((new Sandbox(Sandbox::dir().'/../../.env'))->cookie()['value']));
+        File::put(Sandbox::dir().'/base-0123456789ab.sqlite', '');
+        $this->assertNull(Sandbox::fromCookie((new Sandbox(Sandbox::dir().'/base-0123456789ab.sqlite'))->cookie()['value']));
+        File::delete($path);
+        $this->assertNull(Sandbox::fromCookie($cookie['value']));
+    }
+
+    public function test_activating_points_every_connection_at_the_sandbox(): void
+    {
+        $before = config()->all();
+        $this->beforeApplicationDestroyed(fn () => config($before));
+        config(['database.connections.mysql' => ['driver' => 'mysql', 'database' => 'real'], 'session.driver' => 'database']);
+
+        Sandbox::activate('/tmp/5-abcdefghijkl.sqlite');
+
+        $this->assertSame(Sandbox::CONNECTION, config('database.default'));
+        // Code that names a connection, as Telescope's migrations do, reaches the sandbox too.
+        $this->assertSame('/tmp/5-abcdefghijkl.sqlite', config('database.connections.mysql.database'));
+        $this->assertSame('sqlite', config('database.connections.mysql.driver'));
+        $this->assertSame(['array', 'sync', 'array', 'null', Sandbox::CONNECTION], [
+            config('cache.default'), config('queue.default'), config('mail.default'), config('broadcasting.default'), config('session.connection'),
+        ]);
+    }
+
+    public function test_required_columns_get_sensible_values(): void
+    {
+        Schema::create('teams', function (Blueprint $table) {
+            $table->id();
+            $table->string('name');
+        });
+        Schema::create('tickets', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('team_id')->constrained();
+            $table->enum('status', ['open', 'closed']);
+            $table->string('email');
+            $table->string('password');
+            $table->string('title');
+            $table->timestamp('due_at');
+            $table->integer('views');
+            $table->json('meta');
+            $table->string('note')->nullable();
+            $table->string('kind')->default('bug');
+        });
+
+        // The model's casts say which text columns hold JSON.
+        $values = (new Filler)->missing('tickets', ['title' => 'Given'], ['meta' => 'array']);
+
+        $this->assertSame(['team_id', 'status', 'email', 'password', 'due_at', 'views', 'meta'], array_keys($values));
+        $this->assertSame('open', $values['status']);
+        // A foreign key points at a real row, made in the parent table when it has none.
+        $this->assertSame(DB::table('teams')->value('id'), $values['team_id']);
+        $this->assertStringEndsWith('@example.com', $values['email']);
+        $this->assertTrue(Hash::check('password', $values['password']));
+        $this->assertSame([0, '[]'], [$values['views'], $values['meta']]);
+        DB::table('tickets')->insert([...$values, 'title' => 'Given']);
+    }
+
+    public function test_records_are_added_updated_and_read(): void
+    {
+        Schema::create('tickets', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('user_id');
+            $table->string('subject');
+            $table->string('status')->default('open');
+            $table->timestamp('due_at')->nullable();
+            $table->string('secret_token')->nullable();
+        });
+        File::ensureDirectoryExists($this->root);
+        config(['database.connections.'.Sandbox::CONNECTION.'.database' => $this->root.'/1-abcdefghijkl.sqlite']);
+        File::put($this->root.'/1-abcdefghijkl.sqlite.refs.json', json_encode(['user' => ['ids' => [4], 'table' => 'users']]));
+        $builder = new Builder;
+
+        $result = $builder->seed(['records' => [
+            ['ref' => 'ticket', 'table' => 'tickets', 'data' => ['user_id' => '@user', 'subject' => 'Passport upload stuck', 'due_at' => 'now +3 days', 'secret_token' => 'abc']],
+            ['table' => 'tickets', 'data' => ['user_id' => '@user', 'colour' => 'red']],
+            ['table' => 'tickets', 'data' => ['user_id' => '@nobody', 'subject' => 'x']],
+            ['table' => 'tickets', 'where' => ['id' => '@ticket'], 'data' => ['status' => 'closed']],
+        ]])['results'];
+
+        $this->assertTrue($result[0]['ok']);
+        $this->assertSame([1], $result[0]['ids']);
+        $this->assertSame(4, (int) $result[0]['first']['user_id']);
+        // Secrets are never shown back.
+        $this->assertArrayNotHasKey('secret_token', $result[0]['first']);
+        $this->assertSame(now()->addDays(3)->toDateString(), substr($result[0]['first']['due_at'], 0, 10));
+        // A wrong column names the real ones; an unknown ref names the known ones.
+        $this->assertStringContainsString('[tickets] has no column colour. Its columns: id, user_id, subject', $result[1]['error']);
+        $this->assertStringContainsString('Nothing was saved as [@nobody] yet. Known: @user, @ticket', $result[2]['error']);
+        // where updates the rows it matches instead of adding one.
+        $this->assertTrue($result[3]['ok']);
+        $this->assertSame('closed', DB::table('tickets')->value('status'));
+        $this->assertSame(1, DB::table('tickets')->count());
+
+        $read = $builder->query(['table' => 'tickets', 'where' => ['user_id' => '@user']]);
+        $this->assertSame(1, $read['total']);
+        $this->assertContains('subject varchar', $read['columns']);
+        $this->assertSame('No rows in [tickets] match {"id":99}.', $builder->seed(['records' => [['table' => 'tickets', 'where' => ['id' => 99], 'data' => ['status' => 'x']]]])['results'][0]['error']);
+    }
+
+    public function test_a_base_database_is_built_once_and_copied_for_each_video(): void
+    {
+        $package = realpath(__DIR__.'/..');
+        putenv("TESTBENCH_WORKING_PATH=$package");
+        config([
+            'video-demo.sample_data.artisan' => "$package/vendor/bin/testbench",
+            'video-demo.sample_data.seeders' => [],
+            'video-demo.recorder.login_as' => 'demo@example.com',
+        ]);
+
+        try {
+            $base = Sandbox::base();
+            $this->assertTrue($base['built']);
+            $this->assertFileExists($base['path']);
+            $this->assertSame(Sandbox::dir().'/base-'.Sandbox::fingerprint().'.sqlite', $base['path']);
+            // The second time it is reused.
+            $this->assertFalse(Sandbox::base()['built']);
+
+            $video = Video::create(['prompt' => 'x', 'target_seconds' => 30, 'model' => 'claude-sonnet-5-5', 'effort' => 'high', 'status' => VideoStatus::Queued]);
+            $sandbox = Sandbox::create($video);
+            $this->assertNotSame($base['path'], $sandbox->path);
+
+            // The default user doesn't exist in the sample data, so it is made.
+            $info = $sandbox->prepare(null);
+            $this->assertSame('demo@example.com', $info['user']['email']);
+            $this->assertSame($info['user']['id'], $sandbox->userId());
+
+            $saved = $sandbox->seed([['table' => 'users', 'ref' => 'teammate', 'data' => ['email' => 'sam@example.com', 'name' => 'Sam']]]);
+            $this->assertTrue($saved[0]['ok'], json_encode($saved));
+            $this->assertSame(2, $sandbox->query('users')['total']);
+
+            // Only the video's copy changed; the app's own database has neither user.
+            $this->assertFalse(Schema::hasTable('users') && DB::table('users')->where('email', 'sam@example.com')->exists());
+            $sandbox->delete();
+            $this->assertFileDoesNotExist($sandbox->path);
+            $this->assertFileExists($base['path']);
+        } finally {
+            putenv('TESTBENCH_WORKING_PATH');
+        }
+    }
+
+    public function test_the_planner_adds_sample_data_and_hears_about_failing_pages(): void
+    {
+        $this->startFakeAnthropic();
+        $this->app->instance(CodeTools::class, new CodeTools(sys_get_temp_dir()));
+        Route::get('/deadlines', fn () => 'ok')->middleware(['web', 'auth', 'permission:view deadlines']);
+
+        $sandbox = new class('/tmp/1-abcdefghijkl.sqlite') extends Sandbox
+        {
+            public array $sent = [];
+
+            public function seed(array $records): array
+            {
+                $this->sent = $records;
+
+                return [
+                    ['ok' => true, 'what' => 'SupportTicket', 'ref' => 'ticket', 'ids' => [7], 'first' => ['id' => 7, 'subject' => 'Passport upload stuck']],
+                    ['ok' => true, 'what' => 'User', 'ref' => null, 'ids' => [4], 'first' => null],
+                    ['ok' => false, 'what' => 'Nope', 'error' => 'There is no model [Nope].'],
+                ];
+            }
+
+            public function query(string $table = '', array $where = [], int $limit = 10): array
+            {
+                return ['tables' => ['users' => 3]];
+            }
+        };
+        $sandbox->info = [
+            'user' => ['id' => 4, 'email' => 'member@example.com', 'roles' => ['member'], 'permissions' => ['view deadlines'], 'email_verified' => true],
+            'tables' => ['users' => 3], 'seeded' => ['DatabaseSeeder'], 'warnings' => [],
+        ];
+
+        $record = fn ($ref, $model, $data, $where = '') => ['ref' => $ref, 'model' => $model, 'table' => '', 'count' => 1, 'data_json' => $data, 'where_json' => $where];
+        $this->respond(1, [
+            ['type' => 'tool_use', 'id' => 'tu_q', 'name' => 'query_data', 'input' => ['table' => '', 'where_json' => '{}', 'limit' => 10]],
+            ['type' => 'tool_use', 'id' => 'tu_s', 'name' => 'seed_data', 'input' => ['records' => [
+                $record('ticket', 'SupportTicket', '{"user_id": "@user", "subject": "Passport upload stuck"}'),
+                $record('', 'User', '{"avatar": "/images/avatar.jpg"}', '{"id": "@user"}'),
+                $record('', 'Nope', '{}'),
+                $record('', 'Bad', 'not json'),
+            ]]],
+        ]);
+        $plan = ['type' => 'tool_use', 'id' => 'tu_plan', 'name' => 'submit_plan', 'input' => ['title' => 'Tickets', 'summary' => 'x', 'steps' => [
+            ['action' => 'goto', 'why' => 'x', 'url' => '/support/tickets/7', 'value' => null, 'title' => null, 'text' => null, 'ms' => null, 'chapter' => null, 'target' => null],
+        ]]];
+        $this->respond(2, [$plan]);
+        $this->respond(3, [[...$plan, 'id' => 'tu_plan2']]);
+
+        $video = Video::create(['prompt' => 'How a member reads a ticket', 'target_seconds' => 30, 'model' => 'claude-opus-5-5', 'effort' => 'high', 'status' => VideoStatus::Planning, 'record_as' => 'type:member', 'sample_data' => true]);
+
+        try {
+            $planner = app(Planner::class);
+            $session = $planner->plan($video, $sandbox, [['path' => '/dashboard/talents', 'problem' => 'The page returned HTTP 403', 'status' => 403, 'url' => null, 'detail' => 'Add your photo to meet people here']]);
+
+            $first = $this->request(1)['body'];
+            $this->assertSame(['list_files', 'read_file', 'search_code', 'seed_data', 'query_data', 'submit_plan'], array_column($first['tools'], 'name'));
+            $brief = $first['messages'][0]['content'];
+            $this->assertStringContainsString('<sample_data>', $brief);
+            $this->assertStringContainsString('then these seeders: DatabaseSeeder', $brief);
+            $this->assertStringContainsString('user #4 (member@example.com), roles: member, permissions: view deadlines, email verified', $brief);
+            $this->assertStringContainsString('Tables with rows: users 3', $brief);
+            $this->assertStringContainsString('- /dashboard/talents: The page returned HTTP 403: Add your photo to meet people here', $brief);
+            // Every middleware is listed, so the model sees what each page requires.
+            $this->assertStringContainsString('GET /deadlines  middleware=auth,permission:view deadlines', $brief);
+
+            // Only well-formed records went to the database, and each result came back.
+            $this->assertSame(['SupportTicket', 'User', 'Nope'], array_column($sandbox->sent, 'model'));
+            $this->assertSame(['id' => '@user'], $sandbox->sent[1]['where']);
+            $results = collect($this->request(2)['body']['messages'][2]['content'])->keyBy('tool_use_id');
+            $this->assertStringContainsString('"users": 3', $results['tu_q']['content']);
+            $this->assertStringContainsString("1. Saved SupportTicket as @ticket: id 7\n", $results['tu_s']['content']);
+            $this->assertStringContainsString('2. Updated User: id 4', $results['tu_s']['content']);
+            $this->assertStringContainsString('3. Not saved (Nope): There is no model [Nope].', $results['tu_s']['content']);
+            $this->assertStringContainsString('4. Not saved: data_json is not a JSON object.', $results['tu_s']['content']);
+
+            // The records that saved are kept, so recording again rebuilds the same data.
+            $this->assertSame(['SupportTicket', 'User'], array_column($video->fresh()->sample_records, 'model'));
+            $this->assertContains('Added sample data: SupportTicket, User, Nope, Bad', array_column($video->fresh()->log, 'message'));
+
+            // Pages that fail the check before recording go back to the model.
+            $planner->repairPages($session, $video, [['path' => '/support/tickets/7', 'problem' => 'The page returned HTTP 403', 'status' => 403, 'url' => null, 'detail' => null]]);
+            $last = collect($this->request(3)['body']['messages'])->last()['content'][0];
+            $this->assertSame('tu_plan', $last['tool_use_id']);
+            $this->assertTrue($last['is_error']);
+            $this->assertStringContainsString('- /support/tickets/7: The page returned HTTP 403', $last['content']);
+            $this->assertSame(1, $session->repairs);
+        } finally {
+            $this->stopFakeAnthropic();
+        }
+    }
+
+    public function test_access_rules_list_the_apps_middleware_policies_and_gates(): void
+    {
+        Route::aliasMiddleware('subscribed', SampleDataTest::class);
+        Route::get('/reports', fn () => 'ok')->middleware('subscribed:pro');
+        Gate::policy(Video::class, VideoStyle::class);
+        Gate::define('export-reports', fn () => true);
+
+        $rules = (new AccessRules)->describe();
+
+        $this->assertStringContainsString('- subscribed: '.SampleDataTest::class, $rules);
+        $this->assertStringContainsString('- Video: '.VideoStyle::class, $rules);
+        $this->assertStringContainsString('export-reports', $rules);
+    }
+
+    public function test_the_form_and_facade_record_on_sample_data(): void
+    {
+        Queue::fake();
+
+        $this->post('/video-demo/studio', [
+            'style_id' => VideoStyle::options()->first()->id, 'devices' => ['desktop'], 'prompt' => 'How a member reads a ticket',
+            'target_seconds' => 30, 'model' => 'claude-sonnet-5-5', 'effort' => 'high', 'visibility' => 'public', 'sample_data' => '1',
+        ])->assertRedirect();
+        $this->assertTrue(Video::firstOrFail()->sample_data);
+
+        $this->get('/video-demo/studio/create')->assertSee('Record on sample data');
+        $this->assertTrue(app(VideoDemo::class)->make('x', ['sample_data' => true])->sample_data);
+        $this->assertFalse(app(VideoDemo::class)->make('y')->sample_data);
+    }
+
+    public function test_clean_keeps_the_current_base_and_databases_in_use(): void
+    {
+        File::ensureDirectoryExists(Sandbox::dir());
+        $working = Video::create(['prompt' => 'x', 'target_seconds' => 30, 'model' => 'claude-sonnet-5-5', 'effort' => 'high', 'status' => VideoStatus::Recording]);
+        $done = Video::create(['prompt' => 'y', 'target_seconds' => 30, 'model' => 'claude-sonnet-5-5', 'effort' => 'high', 'status' => VideoStatus::Ready]);
+        $files = [
+            'base' => Sandbox::dir().'/base-'.Sandbox::fingerprint().'.sqlite',
+            'old' => Sandbox::dir().'/base-0123456789ab.sqlite',
+            'working' => Sandbox::dir()."/{$working->id}-abcdefghijkl.sqlite",
+            'done' => Sandbox::dir()."/{$done->id}-abcdefghijkl.sqlite",
+        ];
+        foreach ($files as $file) {
+            File::put($file, 'x');
+        }
+
+        $this->artisan('video-demo:clean')->assertSuccessful();
+
+        $this->assertFileExists($files['base']);
+        $this->assertFileExists($files['working']);
+        $this->assertFileDoesNotExist($files['old']);
+        $this->assertFileDoesNotExist($files['done']);
+    }
+}

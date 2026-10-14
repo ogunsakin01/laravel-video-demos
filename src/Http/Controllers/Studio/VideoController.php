@@ -79,6 +79,7 @@ class VideoController extends Controller
                 'speed' => (float) $request->query('speed', Recorder::speed()),
                 'max_steps' => $request->query('max_steps'),
                 'record_as' => $request->query('record_as', config('video-demo.recorder.login_as') ? '' : RecordAs::GUEST),
+                'sample_data' => (bool) $request->query('sample_data', config('video-demo.sample_data.default', false)),
                 'idea' => $request->query('idea'),
             ],
             'recordAs' => RecordAs::options(),
@@ -161,6 +162,7 @@ class VideoController extends Controller
         unset($data['style_id'], $data['idea']);
         $data['devices'] = array_values(array_intersect(Devices::keys(), $data['devices']));
         $data['record_as'] = ($data['record_as'] ?? '') === '' ? null : $data['record_as'];
+        $data['sample_data'] = $request->boolean('sample_data');
 
         $video = Video::create([
             ...$data,
@@ -463,6 +465,7 @@ class VideoController extends Controller
             'max_steps' => ['nullable', 'integer', 'min:3', 'max:250'],
             'speed' => ['nullable', 'numeric', 'min:0.25', 'max:4'],
             'record_as' => ['nullable', 'string', Rule::in(array_keys(RecordAs::options()))],
+            'sample_data' => ['nullable', 'boolean'],
             'idea' => ['nullable', 'integer'],
             'devices' => ['required', 'array', 'min:1'],
             'devices.*' => ['string', Rule::in(Devices::keys())],

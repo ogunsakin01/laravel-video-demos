@@ -11,6 +11,7 @@ use Ogunsakin01\VideoDemo\Recording\Devices;
 use Ogunsakin01\VideoDemo\Recording\Plan;
 use Ogunsakin01\VideoDemo\Recording\RecordAs;
 use Ogunsakin01\VideoDemo\Recording\RecordingResult;
+use Ogunsakin01\VideoDemo\SampleData\Sandbox;
 use RuntimeException;
 
 /**
@@ -26,11 +27,18 @@ class Planner
 
     /**
      * Start a planning conversation for the video and run it until the model submits a plan.
+     *
+     * With a sandbox, the video is recorded on sample data: the model also
+     * gets the access rules and tools to add the data the flow needs, and
+     * $problems lists pages that already fail for the signed-in user.
+     *
+     * @param  list<array{path: string, problem: string, status: ?int, url: ?string, detail: ?string}>  $problems
      */
-    public function plan(Video $video): PlanningSession
+    public function plan(Video $video, ?Sandbox $sandbox = null, array $problems = []): PlanningSession
     {
         $session = new PlanningSession;
-        $this->drivers->for($video->model)->addUserText($session->messages, $this->brief($video));
+        $session->sampleData = $sandbox ? new SampleDataTools($sandbox) : null;
+        $this->drivers->for($video->model)->addUserText($session->messages, $this->brief($video, $sandbox, $problems));
 
         $this->run($session, $video);
 
@@ -41,6 +49,32 @@ class Planner
      * Send a recording failure back as the result of submit_plan and wait for a corrected plan.
      */
     public function repair(PlanningSession $session, Video $video, RecordingResult $failure): PlanningSession
+    {
+        $text = $failure->describeForRepair();
+        if ($session->sampleData && $failure->appError) {
+            $text .= "\n\nThe app itself returned an error. On sample data that usually means a record the page expects is missing, such as a related row or a setting. Find what the page reads, check it with query_data, add it with seed_data, then submit the plan again.";
+        }
+
+        return $this->repairWith($session, $video, $text);
+    }
+
+    /**
+     * Send pages that failed the check before recording back to the model,
+     * so it can add the data they need or change the plan.
+     *
+     * @param  list<array{path: string, problem: string, status: ?int, url: ?string, detail: ?string}>  $problems
+     */
+    public function repairPages(PlanningSession $session, Video $video, array $problems): PlanningSession
+    {
+        return $this->repairWith($session, $video, "Before recording, these pages were opened as the signed-in user and failed:\n"
+            .$this->listProblems($problems)
+            ."\n\nA 403, a redirect or an error here usually means the user lacks a role or permission, or a record the page needs is missing. Read the middleware, policy or controller involved, add what is missing with seed_data, or change the plan. Then submit the plan again.");
+    }
+
+    /**
+     * Send a failure back as the result of submit_plan and wait for a corrected plan.
+     */
+    protected function repairWith(PlanningSession $session, Video $video, string $failure): PlanningSession
     {
         if ($session->pendingSubmit === null) {
             throw new PlanningFailed('There is no plan to repair.');
@@ -54,7 +88,7 @@ class Planner
                 'submit_plan',
                 $session->pendingSubmit['input'],
                 // The page may show secrets too, such as an API settings screen.
-                (new Redactor)->redact($failure->describeForRepair()),
+                (new Redactor)->redact($failure),
                 isError: true,
             ),
         ]);
@@ -74,7 +108,7 @@ class Planner
         $maxTurns = (int) config('video-demo.limits.max_turns', 30);
         $maxCost = $video->spendLimit();
         $driver = $this->drivers->for($video->model);
-        $tools = [...$this->code->definitions(), $this->submitTool()];
+        $tools = [...$this->code->definitions(), ...($session->sampleData?->definitions() ?? []), $this->submitTool()];
         $lastCost = 0.0;
 
         while ($session->turns < $maxTurns) {
@@ -120,6 +154,13 @@ class Planner
                     } else {
                         $results[] = new ToolOutput($call['id'], $call['name'], $call['input'], $problems ? "The plan was not accepted:\n- ".implode("\n- ", $problems) : 'Submit one plan at a time.', isError: true);
                     }
+
+                    continue;
+                }
+
+                if ($session->sampleData?->handles($call['name'])) {
+                    $results[] = $this->runSampleDataTool($session->sampleData, $call, $video);
+                    $video->addLog($session->sampleData->describe($call['name'], $call['input']));
 
                     continue;
                 }
@@ -195,6 +236,32 @@ class Planner
     }
 
     /**
+     * Run one sample data tool call, turning a failure into an error result.
+     *
+     * @param  array{id: string, name: string, input: array}  $call
+     */
+    protected function runSampleDataTool(SampleDataTools $tools, array $call, Video $video): ToolOutput
+    {
+        try {
+            return new ToolOutput($call['id'], $call['name'], $call['input'], $tools->run($call['name'], $call['input'], $video));
+        } catch (RuntimeException|InvalidArgumentException $e) {
+            return new ToolOutput($call['id'], $call['name'], $call['input'], $e->getMessage(), isError: true);
+        }
+    }
+
+    /**
+     * List page problems, one per line.
+     *
+     * @param  list<array{path: string, problem: string, status: ?int, url: ?string, detail: ?string}>  $problems
+     */
+    protected function listProblems(array $problems): string
+    {
+        return implode("\n", array_map(fn ($p) => "- {$p['path']}: {$p['problem']}"
+            .(! empty($p['url']) && parse_url($p['url'], PHP_URL_PATH) !== $p['path'] ? ' (ended on '.$p['url'].')' : '')
+            .(! empty($p['detail']) ? ": {$p['detail']}" : ''), $problems));
+    }
+
+    /**
      * Get a short log line describing a tool call.
      */
     protected function describeToolCall(string $name, array $input): string
@@ -266,11 +333,11 @@ class Planner
     /**
      * Build the first message: the request, its limits, the screens and the app's routes.
      */
-    protected function brief(Video $video): string
+    protected function brief(Video $video, ?Sandbox $sandbox = null, array $problems = []): string
     {
         $notes = trim((string) config('video-demo.ai.notes'));
         $devices = $video->deviceList();
-        $user = RecordAs::describe($video);
+        $user = $sandbox ? $this->describeSampleUser($video, $sandbox) : RecordAs::describe($video);
         $signedIn = $user === null
             ? 'The recorder is signed out (a guest) when the video starts, so use only pages that don\'t need signing in.'
             : "The recorder is already signed in as $user when the video starts; plan only what that user can see and do.";
@@ -286,8 +353,55 @@ class Planner
                 ? 'The same plan is recorded on each of these screens: '.implode('; ', array_map(Devices::describe(...), $devices)).". Choose targets that exist on all of them. Where a layout differs, such as navigation behind a menu button on small screens, add the extra steps with only_on naming the screens that need them. $signedIn"
                 : 'Screen: '.Devices::describe($devices[0]).". $signedIn",
             $notes !== '' ? "<notes_from_the_developer>\n$notes\n</notes_from_the_developer>" : null,
-            "<routes>\n".$this->code->routeList()."\n</routes>",
+            $sandbox ? $this->sampleDataBrief($sandbox, $problems) : null,
+            $sandbox && ($rules = (new AccessRules)->describe()) !== '' ? "<access_rules>\n$rules\n</access_rules>" : null,
+            "<routes>\n".$this->code->routeList(allMiddleware: $sandbox !== null)."\n</routes>",
         ]));
+    }
+
+    /**
+     * Describe the sample database and what to do with it.
+     *
+     * @param  list<array{path: string, problem: string, status: ?int, url: ?string, detail: ?string}>  $problems
+     */
+    protected function sampleDataBrief(Sandbox $sandbox, array $problems): string
+    {
+        $info = $sandbox->info;
+        $tables = implode(', ', array_map(fn ($t, $n) => "$t $n", array_keys($info['tables']), $info['tables']));
+
+        return implode("\n\n", array_filter([
+            '<sample_data>',
+            'The recorder runs against a temporary copy of the app\'s database, made for this video, not the developer\'s own data. The app\'s migrations ran on it'
+                .($info['seeded'] ? ', then these seeders: '.implode(', ', $info['seeded']) : ', and no seeders ran, so it holds only what you add').'.',
+            $info['warnings'] ? "Seeder problems:\n- ".implode("\n- ", $info['warnings']) : null,
+            $tables !== '' ? "Tables with rows: $tables. Every other table is empty." : 'Every table is empty.',
+            $problems ? "Checked just now as the signed-in user, these pages failed:\n".$this->listProblems($problems) : null,
+            "Before you submit the plan, make sure the data the flow needs exists:\n"
+                ."1. For each page in the flow, read what decides access: the route's middleware (listed with each route, with the files under access_rules), and the policies, gates and checks its controller and views use. Work out what the signed-in user needs to pass them, such as a role, a permission, a verified email, a finished onboarding step or an active subscription, and which records must exist and belong to them.\n"
+                ."2. Read what the pages show, so they look lived in: lists with several entries (three to six), details and dashboards with real-looking content, and records by other users where the page shows other people.\n"
+                ."3. Check what is there with query_data, then add what is missing with seed_data. Values appear on screen, so make them realistic.\n"
+                .'4. Use the ids seed_data returns in the plan\'s paths, such as /tickets/3.',
+            'Only this copy changes, and it is deleted after recording. If a page still fails before recording, you get the reason and can add data or change the plan.',
+            '</sample_data>',
+        ]));
+    }
+
+    /**
+     * Describe the user signed in to the sample database, or null for a guest.
+     */
+    protected function describeSampleUser(Video $video, Sandbox $sandbox): ?string
+    {
+        $user = $sandbox->info['user'];
+        if (! $user) {
+            return null;
+        }
+
+        $type = str_starts_with((string) $video->record_as, RecordAs::TYPE) ? 'a '.RecordAs::label($video->record_as).' user, ' : '';
+
+        return $type.'user #'.$user['id'].($user['email'] ?? null ? " ({$user['email']})" : '')
+            .(! empty($user['roles']) ? ', roles: '.implode(', ', $user['roles']) : '')
+            .(! empty($user['permissions']) ? ', permissions: '.implode(', ', $user['permissions']) : '')
+            .(isset($user['email_verified']) ? ($user['email_verified'] ? ', email verified' : ', email not verified') : '');
     }
 
     /**

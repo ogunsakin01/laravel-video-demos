@@ -27,7 +27,7 @@ php artisan video-demo:publish post-a-job [--unpublish]
 php artisan video-demo:refresh        # re-record published videos from their saved plans, no AI cost
 ```
 
-`generate` options: `--title`, `--length` (seconds), `--style` (clean, quick, detailed, showcase, ad, or a custom style), `--devices` (desktop, tv, tablet, mobile), `--model`, `--effort` (Claude only), `--start` (a path), `--private`, `--max-cost` (spending limit in dollars), `--max-steps`, `--speed` (0.25 to 4; 1 is real time), `--as` (a user type such as `admin`, `guest`, or a user id or email), `--publish`, `--queue`, `--json`. It waits for the video, prints an estimated cost first, and exits non-zero with an `error` on failure; broken pages found before recording are listed under `issues`.
+`generate` options: `--title`, `--length` (seconds), `--style` (clean, quick, detailed, showcase, ad, or a custom style), `--devices` (desktop, tv, tablet, mobile), `--model`, `--effort` (Claude only), `--start` (a path), `--private`, `--max-cost` (spending limit in dollars), `--max-steps`, `--speed` (0.25 to 4; 1 is real time), `--as` (a user type such as `admin`, `guest`, or a user id or email), `--sample-data` (record against a temporary database with sample data), `--publish`, `--queue`, `--json`. It waits for the video, prints an estimated cost first, and exits non-zero with an `error` on failure; broken pages found before recording are listed under `issues`.
 
 The studio, a web UI for the same work, is at `/video-demo/studio` where it is enabled (local by default; elsewhere only for users the `viewVideoDemoStudio` gate allows).
 
@@ -65,6 +65,7 @@ Library pages: `/help/videos` (public) and `/admin/videos` (private videos too).
 - Pages are checked for errors (HTTP errors, sign-in redirects, JavaScript errors) before planning and recording, so no AI is spent on broken pages.
 - Videos are recorded as a type of user (found from spatie/laravel-permission, Laratrust, Bouncer, a role column or an is_admin flag, or `recorder.user_types`), or as a guest.
 - Suggested ideas are saved in the database and can be added to or replaced.
+- With sample data (`--sample-data`, `'sample_data' => true`), a video is recorded against a copy of a base SQLite database built once from the app's migrations, seeders and a user of each type (`php artisan video-demo:sample-database`). The AI reads the routes' middleware, policies and gates and adds or updates the records the flow needs; the app's own database is never used. Only the recorder's browser, with a signed cookie, reaches it.
 
 ## Docs
 

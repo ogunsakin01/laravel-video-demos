@@ -104,6 +104,13 @@
         @error('record_as')<span class="vd-error">{{ $message }}</span>@enderror
       </div>
 
+      <div class="vd-stack-sm">
+        <input type="hidden" name="sample_data" value="0">
+        <label class="vd-check-row"><input type="checkbox" name="sample_data" value="1" @checked(old('sample_data', $defaults['sample_data']))> Record on sample data</label>
+        <span class="vd-hint">Records against a temporary copy of your database instead of your own data. Your migrations and seeders fill it, a user of this type is made, and the AI reads the pages' middleware, policies and gates to add whatever else the flow needs. Adds a little to the AI cost; it is deleted afterwards.</span>
+        @error('sample_data')<span class="vd-error">{{ $message }}</span>@enderror
+      </div>
+
       <div>
         <label for="start_path">Start page <span class="vd-optional">optional</span></label>
         <div class="vd-combo">
@@ -160,7 +167,7 @@
       </div>
     </div>
 
-    <aside class="vd-card vd-stack" aria-live="polite">
+    <aside class="vd-card vd-stack vd-sticky" aria-live="polite">
       <div>
         <p class="vd-eyebrow">Estimated AI cost</p>
         <div class="vd-figure" id="vd-estimate">—</div>

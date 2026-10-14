@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Ogunsakin01\VideoDemo\Ai\VideoStopped;
 use Ogunsakin01\VideoDemo\Models\VideoStyle;
+use Ogunsakin01\VideoDemo\SampleData\Sandbox;
 use RuntimeException;
 
 /**
@@ -17,6 +18,11 @@ use RuntimeException;
  */
 class Recorder
 {
+    /**
+     * The sample database the browser uses, when the video is recorded on sample data.
+     */
+    public ?Sandbox $sandbox = null;
+
     /**
      * Record the plan's steps for one version into $dir (an absolute folder).
      *
@@ -216,6 +222,8 @@ class Recorder
             'touch' => $screen['touch'],
             'channel' => config('video-demo.recorder.channel'),
             'ignoreHttpsErrors' => (bool) config('video-demo.recorder.ignore_https_errors'),
+            // Sends the browser's requests to the sample database.
+            'cookies' => $this->sandbox ? [[...$this->sandbox->cookie(), 'url' => rtrim((string) config('video-demo.recorder.base_url'), '/').'/']] : [],
         ];
     }
 
@@ -267,16 +275,17 @@ class Recorder
      */
     protected function loginPath(?string $recordAs): ?string
     {
-        $user = RecordAs::resolve($recordAs);
+        // On sample data, the user is the one made in the sample database.
+        $id = $this->sandbox ? $this->sandbox->userId() : RecordAs::resolve($recordAs)?->getAuthIdentifier();
 
-        if (! $user) {
+        if ($id === null) {
             return null;
         }
 
         return URL::temporarySignedRoute(
             'video-demo.studio.recorder-login',
             now()->addMinutes(10),
-            ['user' => $user->getAuthIdentifier()],
+            ['user' => $id],
             absolute: false,
         );
     }

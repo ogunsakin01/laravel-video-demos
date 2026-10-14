@@ -118,10 +118,10 @@ VIDEO_DEMO_FFMPEG=/Users/you/.local/bin/ffmpeg-remotion
 1. **Move to the new version.** While the package is below 1.0, each minor version (0.2, 0.3…) may include breaking changes, so Composer's `^` keeps you on the one you installed: `composer update` won't move `^0.2` to 0.3. Ask for the new one by name:
 
    ```bash
-   composer require ogunsakin01/laravel-video-demos:^0.7
+   composer require ogunsakin01/laravel-video-demos:^0.8
    ```
 
-   Patch releases (0.7.0 to 0.7.1) arrive with a normal `composer update`.
+   Patch releases (0.8.0 to 0.8.1) arrive with a normal `composer update`.
 2. **Restart your queue workers.** A running `php artisan queue:work` keeps the code it loaded when it started, so without a restart videos are still made by the old version, even though the studio pages show the new one:
 
    ```bash
@@ -143,6 +143,7 @@ The studio is where videos are made. It is only registered when `APP_ENV` is `lo
 - **Videos**: every video with its status, length and cost. Tick several to **Publish** or **Unpublish** them together; videos that aren't ready, or are already published at their latest version, are skipped.
 - **New video**: describe the flow, or use **Complete with AI**. Choose the length (a target: captions and pauses stretch or shrink to fit), the versions to record, a style, the model and the effort. The estimated cost updates as you change them.
   - **Record as**: the type of user the video shows the app as, such as Admin or Member, or a guest (signed out). Types come from the way your app models roles: [spatie/laravel-permission](https://github.com/spatie/laravel-permission), Laratrust, Bouncer, a `role_id` or `role`/`type` column on users, or an `is_admin` flag. For the recording, a user of that type is signed in, preferring one with no other roles (so a Member video isn't recorded by someone who is also an admin) and the default user when they qualify. If your app does roles another way, list the types in `recorder.user_types`: `'Admin' => 'admin@example.com'`.
+  - **Record on sample data**: record against a temporary copy of your database, filled with sample data, instead of your own. See [Sample data](#sample-data).
   - **Start page**: search the pages the chosen type of user can open, by title or address, or type any path (`/jobs/5`). The list comes from your GET routes that need no parameters, each opened as that user to keep the ones that return a page; the title is the page's heading. Logout, delete, export and API routes are never opened.
   - **Spending limit**: the most this video may cost ($2 unless you change it, or `limits.max_cost_per_video`). The AI is told its budget, sees how many requests it has left, and stops before a request that would go over. The form warns you if even the lowest estimate is above the limit.
   - **Max steps**: the most steps the plan may have. Fewer steps make a shorter, cheaper plan.
@@ -166,6 +167,31 @@ Gate::define('viewVideoDemoStudio', fn ($user) => $user->isAdmin());
 - **Ideas**: not sure what to make first? The AI reads your routes and suggests the videos your users most need, each with a description, length, start page and style. **Make this video** opens it in the form, filled in. Ideas are saved: **Suggest more** adds new ones without repeating those you have, **Replace all** starts over, and ideas made into videos are marked with a link to the video. It costs about a cent or two.
 - **Examples**: the same short video made in each built-in style, so you can compare them, with **Make one like this** to start one in that style. The videos stream from the package's GitHub repository; nothing is stored in your app. Turn the page off with `VIDEO_DEMO_EXAMPLES=false`.
 - **Requested by users**: searches in your library that found nothing. Click one to start a video.
+
+## Sample data
+
+Your own local data may be empty, or real. Tick **Record on sample data** (or pass `--sample-data`, or `'sample_data' => true` to the facade) and the video is recorded against a database made for it:
+
+1. **A base database, built once.** Your migrations run on a separate SQLite file, then your seeders (`sample_data.seeders`, `DatabaseSeeder` by default), then a user of each type is found or made, the same types **Record as** offers. Users are made with your `UserFactory` when you have one and given the role the way your app records it (spatie, Laratrust, Bouncer, a role column or an admin flag). This happens the first time it is needed, or ahead of time:
+
+   ```bash
+   php artisan video-demo:sample-database           # build it now; --fresh to build it again
+   ```
+
+   It is built again by itself when a migration, seeder or factory changes, so it doesn't go stale.
+2. **A copy for each video.** Copying takes well under a second. The video's own records go into its copy, which is deleted afterwards.
+3. **The AI fills the gaps.** While planning, the AI also gets every route's middleware, the files of your own middleware (including middleware every page runs, such as a "finish your profile" check), your policies and your gates. It reads what decides access to each page in the flow, works out what the user needs (a role, a permission, a verified email, a profile photo, an active subscription) and which records must exist and belong to them, then adds or updates them with your factories and models. It can look at what is already there first. Pages that still fail before recording, and errors from your app while recording, go back to it to fix, within the repair limit.
+4. **Recording again** (free) rebuilds the same records, so the plan's pages find them.
+
+Only the recorder's browser uses the sample data. It sends a cookie the package signs with your app key, and requests carrying it switch every database connection to the video's copy before anything else runs, so sessions, the signed-in user and every query use it; a cache in memory replaces yours, queued jobs run straight away, and mail and broadcasts don't go out. Everyone else's requests, and your own database, are untouched. It only works while the studio is enabled.
+
+What it can't do:
+
+- **Migrations that only run on MySQL or Postgres.** Sample data uses SQLite. Most migrations are portable; one that isn't stops the build with its error, so you can guard it (`if (DB::getDriverName() === 'mysql')`).
+- **Outside services.** Calls your app makes to other services, such as Stripe or an AI API, still go out. Use their test keys locally.
+- **Files.** Uploaded files are not copied; the AI points image columns at files your app already has, or at image URLs.
+- **Octane.** The database is chosen when a request starts the app, which Octane does once per worker; serve the app with Herd, Valet, `php artisan serve` or PHP-FPM while recording.
+- **Slow seeders.** The base database is built once, so a slow build costs time only then. A seeder that fails is reported and the rest of the data is kept.
 
 ## From the command line
 
@@ -282,7 +308,7 @@ The package itself is about 500 KB. The example videos are not part of it: the E
 
 ```bash
 php artisan video-demo:clean --dry-run   # what would be removed, and how much it frees
-php artisan video-demo:clean             # leftover working files: raw recordings, temporary files, files of deleted videos
+php artisan video-demo:clean             # leftover working files: raw recordings, temporary files, files of deleted videos, old sample databases
 php artisan video-demo:clean --browser   # also the Playwright install and its browser (video-demo:install puts them back)
 ```
 
@@ -373,6 +399,7 @@ Everything is in [`config/video-demo.php`](config/video-demo.php), with comments
 | `recorder.login_as` | The user the recorder signs in as by default |
 | `recorder.user_types` | The types of user to record as, when they can't be found from your roles |
 | `recorder.check_pages` | Check pages for errors before planning and recording (on by default) |
+| `sample_data.seeders`, `sample_data.default` | The seeders that fill the [sample database](#sample-data), and whether new videos use it |
 | `queue.connection`, `queue.retry_after` | The queue videos run on; leave the connection empty to use the package's own |
 | `ui.name` (`VIDEO_DEMO_NAME`) | The name on the studio and library pages |
 | `styles` | The styles offered at first |
@@ -381,7 +408,7 @@ Everything is in [`config/video-demo.php`](config/video-demo.php), with comments
 | `studio.gate` | Who may use the studio outside local |
 | `limits` | The default spending limit, and request and repair limits per video |
 | `ui.accent`, `ui.logo`, `ui.font_url` | The look of the studio and library |
-| `ui.favicon` (`VIDEO_DEMO_FAVICON`) | The browser tab icon; your app's own favicon is used when it is empty |
+| `ui.favicon` (`VIDEO_DEMO_FAVICON`) | The browser tab icon: the package's own when empty, `app` for your app's favicon, or an image URL |
 
 ## AI providers
 

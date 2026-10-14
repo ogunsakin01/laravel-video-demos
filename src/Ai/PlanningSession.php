@@ -37,4 +37,9 @@ class PlanningSession
     public int $turns = 0;
 
     public int $repairs = 0;
+
+    /**
+     * The tools for the video's sample database, when it is recorded on sample data.
+     */
+    public ?SampleDataTools $sampleData = null;
 }

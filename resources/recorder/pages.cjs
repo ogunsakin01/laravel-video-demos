@@ -31,6 +31,8 @@ function titleOf(html) {
   const browser = await chromium.launch(job.channel ? { channel: job.channel } : {});
   try {
     const context = await browser.newContext({ ignoreHTTPSErrors: !!job.ignoreHttpsErrors });
+    // Sample data: the cookie sends every request to the video's own database.
+    if (job.cookies?.length) await context.addCookies(job.cookies);
     if (job.loginPath) {
       const page = await context.newPage();
       await page.goto(url(job.loginPath), { waitUntil: 'load' });

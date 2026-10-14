@@ -12,8 +12,11 @@ use Ogunsakin01\VideoDemo\Console\InstallCommand;
 use Ogunsakin01\VideoDemo\Console\ListCommand;
 use Ogunsakin01\VideoDemo\Console\PublishCommand;
 use Ogunsakin01\VideoDemo\Console\RefreshCommand;
+use Ogunsakin01\VideoDemo\Console\SampleDatabaseCommand;
+use Ogunsakin01\VideoDemo\Console\SampleDataCommand;
 use Ogunsakin01\VideoDemo\Console\SuggestCommand;
 use Ogunsakin01\VideoDemo\Library\Manifest;
+use Ogunsakin01\VideoDemo\SampleData\Sandbox;
 
 class VideoDemoServiceProvider extends ServiceProvider
 {
@@ -28,6 +31,10 @@ class VideoDemoServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../config/video-demo.php', 'video-demo');
+
+        // Before anything reads the database, so the whole request uses the sample data.
+        Sandbox::activateFor($this->app);
+
         $this->registerQueueConnection();
 
         $this->app->singleton(Manifest::class);
@@ -62,6 +69,8 @@ class VideoDemoServiceProvider extends ServiceProvider
                 ListCommand::class,
                 PublishCommand::class,
                 RefreshCommand::class,
+                SampleDataCommand::class,
+                SampleDatabaseCommand::class,
                 SuggestCommand::class,
             ]);
         }

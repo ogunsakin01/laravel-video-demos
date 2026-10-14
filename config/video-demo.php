@@ -273,6 +273,39 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Sample Data
+    |--------------------------------------------------------------------------
+    |
+    | With "Record on sample data" ticked, a video is recorded against a
+    | temporary SQLite database instead of the app's own. A base database is
+    | built once (your migrations, then these seeders, then a user of each
+    | type) and copied for each video; it is built again when a migration,
+    | seeder or factory changes. Build it ahead of time with
+    | php artisan video-demo:sample-database. While planning, the AI reads
+    | the routes' middleware, policies and gates and adds whatever else the
+    | flow needs to the video's copy. Only the recorder's browser uses it, and
+    | mail, broadcasts and queued jobs are kept local while it does.
+    |
+    */
+
+    'sample_data' => [
+        // Ticks "Record on sample data" on the new-video form.
+        'default' => (bool) env('VIDEO_DEMO_SAMPLE_DATA', false),
+
+        // The seeders to run first. Empty leaves it all to the AI. Seeders
+        // that are missing are skipped, and one that fails is reported.
+        'seeders' => ['Database\\Seeders\\DatabaseSeeder'],
+
+        // The artisan file that builds the database, in its own PHP process.
+        // Null uses the app's artisan.
+        'artisan' => null,
+
+        // Seconds allowed for building the base database (migrating and seeding).
+        'timeout' => 900,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Devices
     |--------------------------------------------------------------------------
     |
@@ -336,8 +369,9 @@ return [
         // The URL of an image shown next to the name, or null for none.
         'logo' => null,
 
-        // The browser tab icon. Left empty, the app's own favicon is used:
-        // favicon.svg, favicon.ico, favicon.png or apple-touch-icon.png in public/.
+        // The browser tab icon. Left empty, the package's own icon is used.
+        // "app" uses the app's favicon from public/ (favicon.svg, .ico, .png,
+        // .webp, .jpg or apple-touch-icon.png); a URL uses that image.
         'favicon' => env('VIDEO_DEMO_FAVICON'),
 
         // The colour of buttons and highlights. The default near-black turns
