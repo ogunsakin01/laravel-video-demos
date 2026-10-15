@@ -188,8 +188,17 @@
           </div>
 
           <div>
-            <label for="a-prompt">What should the video show?</label>
+            <div class="vd-field-head">
+              <label for="a-prompt">What should the video show?</label>
+              <button type="button" class="vd-btn vd-btn-sm" id="a-improve" @disabled(! $hasKey)>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>
+                <span>Improve with AI</span>
+              </button>
+            </div>
             <textarea id="a-prompt" name="prompt" required maxlength="4000" data-needs-plan>{{ old('prompt', $video->prompt) }}</textarea>
+            <input type="text" id="a-wish" maxlength="1000" placeholder="What should be better? Optional, such as “shorter, and end on the saved rating”" aria-label="What should be better" style="margin-top:8px">
+            <span class="vd-ai-note" id="a-improve-note" aria-live="polite">Improve with AI rewrites the description from how this video went: its plan, the steps that failed and its length. It fills in the form; nothing starts until you press the button below. About a cent or two.</span>
+            <ul class="vd-ai-changes" id="a-improve-changes" hidden></ul>
           </div>
 
           <div>
@@ -389,6 +398,46 @@
 
       const style = document.getElementById('r-style');
       style.addEventListener('change', () => { document.getElementById('r-style-hint').textContent = style.selectedOptions[0]?.dataset.direction || ''; });
+
+      // Improve with AI: fill the form from how this video went. Nothing starts until the form is sent.
+      const improve = document.getElementById('a-improve');
+      const improveLabel = improve.querySelector('span');
+      const note = document.getElementById('a-improve-note');
+      const changes = document.getElementById('a-improve-changes');
+      const money = n => '$' + (n < 0.1 ? n.toFixed(3) : n.toFixed(2));
+      improve.addEventListener('click', async () => {
+        improve.disabled = true;
+        improveLabel.textContent = 'Improving…';
+        improve.setAttribute('aria-busy', 'true');
+        note.removeAttribute('data-error');
+        try {
+          const res = await fetch(@json(route('video-demo.studio.improve', $video)), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': form.elements._token.value },
+            body: JSON.stringify({ wish: document.getElementById('a-wish').value, model: form.elements.model.value }),
+          });
+          const d = await res.json();
+          if (!res.ok) throw new Error(d.error || d.message || 'Something went wrong.');
+          form.elements.prompt.value = d.prompt;
+          if (d.start_path) form.elements.start_path.value = d.start_path;
+          const seconds = document.getElementById('a-seconds');
+          seconds.value = d.target_seconds;
+          form.querySelectorAll('[data-target="a-seconds"]').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.value) === Number(d.target_seconds))));
+          needsPlan();
+          changes.replaceChildren(...d.changes.map(c => Object.assign(document.createElement('li'), { textContent: c })));
+          changes.hidden = d.changes.length === 0;
+          note.textContent = (d.cost_known ? 'Improved by AI for ' + money(d.cost) : 'Improved by AI') + ', with a ' + d.target_seconds + '-second target. Edit anything, then press the button below.';
+          const cost = document.getElementById('vd-cost');
+          if (cost && d.cost_known) cost.textContent = '$' + Number(d.video_cost).toFixed(4);
+        } catch (e) {
+          note.textContent = e.message;
+          note.setAttribute('data-error', '');
+        } finally {
+          improve.disabled = false;
+          improveLabel.textContent = 'Improve with AI';
+          improve.removeAttribute('aria-busy');
+        }
+      });
     })();
   </script>
 

@@ -153,6 +153,31 @@ class VideoController extends Controller
     }
 
     /**
+     * Suggest a better description for making the given video again, from
+     * how its last attempt went. Nothing is started; the form is filled in.
+     */
+    public function improve(Request $request, Video $video, FormAssistant $assistant): JsonResponse
+    {
+        abort_if($video->status->isWorking(), 409, 'This video is still being made.');
+
+        $data = $request->validate([
+            'wish' => ['nullable', 'string', 'max:1000'],
+            'model' => ['required', Rule::in(array_keys(config('video-demo.ai.models')))],
+        ]);
+
+        try {
+            $improved = $assistant->improve($video, (string) ($data['wish'] ?? ''), $data['model']);
+
+            // What the video has cost in all, now including this request.
+            return response()->json([...$improved, 'video_cost' => $video->fresh()->cost]);
+        } catch (Throwable $e) {
+            report($e);
+
+            return response()->json(['error' => $e instanceof PlanningFailed ? $e->getMessage() : 'The AI provider could not be reached. Check your API key and try again.'], 502);
+        }
+    }
+
+    /**
      * Store a new video and queue it to be made.
      */
     public function store(Request $request, CostEstimator $estimator, CodeTools $code): RedirectResponse
@@ -196,6 +221,7 @@ class VideoController extends Controller
             'styles' => VideoStyle::options(),
             'recordAs' => RecordAs::options() + [$video->record_as ?? '' => $video->record_as_label ?: RecordAs::label($video->record_as)],
             'models' => Pricing::options(),
+            'hasKey' => Drivers::anyKey(),
             'queueWarning' => $video->status->isWorking() ? VideoDemoServiceProvider::queueWarning() : null,
         ]);
     }

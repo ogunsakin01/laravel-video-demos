@@ -147,6 +147,8 @@
   .vd-toggle:has(input:focus-visible) { outline: 2px solid var(--vd-strong); outline-offset: 2px; }
   .vd-ai-note { font-size: 12.5px; color: var(--vd-muted-ink); }
   .vd-ai-note[data-error] { color: var(--vd-bad); }
+  .vd-ai-changes { margin: 8px 0 0; padding: 10px 14px 10px 30px; border-radius: var(--vd-radius); background: var(--vd-muted); font-size: 13px; color: var(--vd-ink); }
+  .vd-ai-changes li + li { margin-top: 4px; }
   /* A busy button swaps its icon for a ring spinner. */
   .vd-btn[aria-busy="true"], .vd-btn[aria-busy="true"][disabled] { cursor: progress; opacity: .85; }
   .vd-btn[aria-busy="true"] svg { display: none; }

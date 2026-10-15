@@ -2,6 +2,12 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/). While the version is 0.x, minor releases may include breaking changes; they will be listed here.
 
+## v0.10.1 - 2026-10-15
+
+### Added
+
+- **Improve with AI** in Make it again rewrites the video's description from how it went: its plan, the steps that failed, the pages that didn't work and how long it came out. Optionally say what should be better, such as "shorter, and end on the saved rating". It fills in the description, length and start page, lists each change and why, and turns on a new plan; nothing starts until you press the button. About a cent or two, added to the video's cost.
+
 ## v0.10.0 - 2026-10-14
 
 ### Added

@@ -7,8 +7,8 @@ use RuntimeException;
 
 /**
  * Stands in for Claude in the demo app when no ANTHROPIC_API_KEY is set, so
- * the tours can be recorded at no cost. "Complete with AI" and "Suggest videos"
- * get canned replies; generating a video needs a real key.
+ * the tours can be recorded at no cost. "Complete with AI", "Improve with AI"
+ * and "Suggest videos" get canned replies; generating a video needs a real key.
  */
 class DemoClaude extends Claude
 {
@@ -24,6 +24,20 @@ class DemoClaude extends Claude
         }
 
         usleep(900_000);
+
+        // "Improve with AI" asks for the changes it made.
+        if (isset($params['outputConfig']['format']['schema']['properties']['changes'])) {
+            return $this->reply($params['model'], [
+                'prompt' => 'How a recruiter posts a new job: open Post a job from the top menu, fill in the title, contract and location, and publish it. It ends on the live listing.',
+                'start_path' => '/jobs/create',
+                'target_seconds' => 45,
+                'changes' => [
+                    'Starts on Post a job, so the video skips the dashboard.',
+                    'Names the fields to fill in, so every step is shown.',
+                    'Ends on the live listing, so viewers see the result.',
+                ],
+            ]);
+        }
 
         // "Suggest videos" asks for a list.
         if (isset($params['outputConfig']['format']['schema']['properties']['suggestions'])) {

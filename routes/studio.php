@@ -36,6 +36,7 @@ Route::middleware(AuthorizeStudio::class)->group(function () {
     Route::post('/{video}/regenerate', [VideoController::class, 'regenerate'])->name('regenerate');
     Route::post('/{video}/rerecord', [VideoController::class, 'rerecord'])->name('rerecord');
     Route::post('/{video}/again', [VideoController::class, 'again'])->name('again');
+    Route::post('/{video}/improve', [VideoController::class, 'improve'])->name('improve');
     Route::post('/{video}/retry', [VideoController::class, 'retry'])->name('retry');
     Route::post('/{video}/stop', [VideoController::class, 'stop'])->name('stop');
     Route::post('/{video}/publish', [VideoController::class, 'publish'])->name('publish');
