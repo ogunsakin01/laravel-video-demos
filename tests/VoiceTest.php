@@ -369,7 +369,13 @@ class VoiceTest extends TestCase
     public function test_built_in_tracks_are_offered_and_downloaded_when_first_used(): void
     {
         config(['video-demo.music.builtin' => true, 'video-demo.music.builtin_url' => 'https://cdn.example.com/music']);
-        Http::fake(['cdn.example.com/music/calm.mp3' => Http::response('ID3calm'), 'cdn.example.com/*' => Http::response('', 404)]);
+        Http::fake([
+            'cdn.example.com/music/calm.mp3' => Http::response('ID3calm'),
+            'cdn.example.com/*' => Http::response('', 503),
+            // GitHub, when the first address fails.
+            'raw.githubusercontent.com/*/corporate.mp3' => Http::response('ID3corporate'),
+            'raw.githubusercontent.com/*' => Http::response('', 404),
+        ]);
         $this->upload('brand.wav');
 
         // Your own tracks first, then the built-in ones.
@@ -384,7 +390,9 @@ class VoiceTest extends TestCase
         Http::assertSentCount(1);
         $this->get('/video-demo/studio/music/builtin:calm')->assertOk();
 
-        $this->getJson('/video-demo/studio/music/builtin:upbeat')->assertStatus(502)->assertJsonPath('error', "The built-in track [upbeat] couldn't be downloaded (HTTP 404) from https://cdn.example.com/music/upbeat.mp3.");
+        $this->assertSame('ID3corporate', File::get(Music::local('builtin:corporate')));
+        $this->getJson('/video-demo/studio/music/builtin:upbeat')->assertStatus(502)->assertJsonPath('error', "The built-in track [upbeat] couldn't be downloaded: HTTP 503 from https://cdn.example.com/music; HTTP 404 from ".Music::BUILT_IN_FALLBACK_URL.'.');
+        $this->assertFileDoesNotExist(Music::find('builtin:upbeat')['file'].'.part');
         // Built-in tracks can't be deleted.
         $this->delete('/video-demo/studio/music/builtin:calm');
         $this->assertFileExists($file);

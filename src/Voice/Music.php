@@ -2,6 +2,7 @@
 
 namespace Ogunsakin01\VideoDemo\Voice;
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
@@ -32,6 +33,11 @@ class Music
      * Composer download.
      */
     public const BUILT_IN_URL = 'https://cdn.jsdelivr.net/gh/ogunsakin01/laravel-video-demos@v0.12.0/docs/music';
+
+    /**
+     * Where the built-in tracks are fetched from when the first address fails.
+     */
+    public const BUILT_IN_FALLBACK_URL = 'https://raw.githubusercontent.com/ogunsakin01/laravel-video-demos/v0.12.0/docs/music';
 
     /**
      * Get every track, key => ['label' => …, 'file' => absolute path, 'uploaded' => bool].
@@ -81,13 +87,23 @@ class Music
         }
 
         $name = substr($key, strlen('builtin:'));
-        $url = rtrim((string) config('video-demo.music.builtin_url', self::BUILT_IN_URL), '/')."/$name.mp3";
+        $urls = array_unique([rtrim((string) config('video-demo.music.builtin_url', self::BUILT_IN_URL), '/'), self::BUILT_IN_FALLBACK_URL]);
         File::ensureDirectoryExists(dirname($track['file']));
-        $response = Http::timeout(60)->sink($track['file'].'.part')->get($url);
-        if ($response->failed()) {
+        $problems = [];
+        foreach ($urls as $base) {
+            try {
+                $response = Http::timeout(60)->sink($track['file'].'.part')->get("$base/$name.mp3");
+                if ($response->successful()) {
+                    break;
+                }
+                $problems[] = "HTTP {$response->status()} from $base";
+            } catch (ConnectionException $e) {
+                $problems[] = "no connection to $base";
+            }
             File::delete($track['file'].'.part');
-
-            throw new RuntimeException("The built-in track [$name] couldn't be downloaded (HTTP {$response->status()}) from $url.");
+        }
+        if (! is_file($track['file'].'.part')) {
+            throw new RuntimeException("The built-in track [$name] couldn't be downloaded: ".implode('; ', $problems).'.');
         }
         File::move($track['file'].'.part', $track['file']);
 
