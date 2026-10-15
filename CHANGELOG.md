@@ -2,6 +2,21 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/). While the version is 0.x, minor releases may include breaking changes; they will be listed here.
 
+## v0.12.0 - 2026-10-15
+
+Run `php artisan video-demo:install` after updating, for the new spending table.
+
+### Added
+
+- **A progress bar** on the page of a video being made: how far along it is, as a percentage, and about how long is left, counting down as it goes. It's an estimate from the video's stage, length and versions.
+
+- **Cloud voices.** OpenAI (`gpt-4o-mini-tts`), Gemini (`gemini-3.8-flash-tts`) and ElevenLabs voices join the list when their key is set (`OPENAI_API_KEY`, `GEMINI_API_KEY`, `ELEVENLABS_API_KEY`, or Prism's config). ElevenLabs lists the voices in your account, including your own. They speak in a tone that matches the style's pace. What they cost is added to the video's cost and counts toward its spending limit; a voice that would go over is left out, and the log says so. Prices are in `voice.providers.*.price_per_1k_chars`.
+- **Built-in music.** Four tracks composed for the package, free to use in any video (CC0): Calm, Upbeat, Corporate and Cinematic. Each is downloaded the first time a video uses it and kept; they aren't in the Composer download. `VIDEO_DEMO_BUILT_IN_MUSIC=false` hides them.
+
+### Changed
+
+- **The total spent on AI** now counts every AI request as it happens: planning, Improve with AI, writing the voice-over's lines, cloud voices, Complete with AI and suggesting ideas. It stays the same when a video is deleted, and the videos page keeps it, and each video's status, cost and length, up to date without reloading. What was spent before updating is carried over.
+
 ## v0.11.0 - 2026-10-15
 
 Run `php artisan video-demo:install` after updating, for the new columns.

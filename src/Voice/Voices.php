@@ -2,15 +2,18 @@
 
 namespace Ogunsakin01\VideoDemo\Voice;
 
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
 use Throwable;
 
 /**
- * The voices a video can be narrated in: only the ones that work on this
- * machine right now. Local voices (Kokoro) once video-demo:install-voice has
- * run; the computer's own voice when it has one (macOS "say", Windows speech,
- * espeak-ng on Linux). A voice is stored as "provider:id", such as
- * "kokoro:af_heart" or "system:Samantha".
+ * The voices a video can be narrated in: only the ones that work here right
+ * now. Local voices (Kokoro) once video-demo:install-voice has run; the
+ * computer's own voice when it has one (macOS "say", Windows speech,
+ * espeak-ng on Linux); and OpenAI, Gemini and ElevenLabs voices when their
+ * key is set. A voice is stored as "provider:id", such as "kokoro:af_heart",
+ * "system:Samantha" or "openai:marin".
  */
 class Voices
 {
@@ -46,7 +49,82 @@ class Voices
             $groups["This computer's voice, for drafts"][self::key('system', $id)] = $label;
         }
 
+        foreach (['openai' => 'OpenAI', 'gemini' => 'Gemini', 'elevenlabs' => 'ElevenLabs'] as $provider => $name) {
+            if (! static::providerKey($provider)) {
+                continue;
+            }
+            $voices = $provider === 'elevenlabs' ? static::elevenLabsVoices() : (array) config("video-demo.voice.providers.$provider.voices", []);
+            foreach ($voices as $id => $label) {
+                $groups[sprintf('%s voices, about $%.2f a minute', $name, static::pricePerMinute($provider))][self::key($provider, (string) $id)] = $label;
+            }
+        }
+
         return $groups;
+    }
+
+    /**
+     * Get a provider's API key: from video-demo.voice.providers, or from
+     * Prism's config when the app has set it there.
+     */
+    public static function providerKey(string $provider): ?string
+    {
+        $key = config("video-demo.voice.providers.$provider.key") ?: config("prism.providers.$provider.api_key");
+
+        return is_string($key) && $key !== '' ? $key : null;
+    }
+
+    /**
+     * Get what a voice costs per 1,000 characters spoken, in US dollars; 0 for
+     * the free local and computer voices.
+     */
+    public static function price(?string $key): float
+    {
+        [$provider] = static::parse((string) $key);
+
+        return (float) config("video-demo.voice.providers.$provider.price_per_1k_chars", 0);
+    }
+
+    /**
+     * Get what a provider's voices cost per minute of speech, at about 900
+     * characters a minute.
+     */
+    public static function pricePerMinute(string $provider): float
+    {
+        return static::price("$provider:") * 0.9;
+    }
+
+    /**
+     * Get the voices in the ElevenLabs account, id => name, kept for an hour.
+     * Empty when the account can't be reached.
+     *
+     * @return array<string, string>
+     */
+    public static function elevenLabsVoices(): array
+    {
+        $key = static::providerKey('elevenlabs');
+        if (! $key) {
+            return [];
+        }
+
+        return Cache::remember('video-demo.elevenlabs-voices.'.sha1($key), 3600, function () use ($key) {
+            try {
+                $voices = Http::withHeaders(['xi-api-key' => $key])->timeout(15)
+                    ->get('https://api.elevenlabs.io/v2/voices', ['page_size' => 100, 'sort' => 'name', 'sort_direction' => 'asc'])
+                    ->throw()->json('voices', []);
+            } catch (Throwable) {
+                return [];
+            }
+
+            $list = [];
+            foreach ($voices as $voice) {
+                if (! empty($voice['voice_id'])) {
+                    $kind = ($voice['category'] ?? '') === 'premade' ? '' : ' (yours)';
+                    $list[(string) $voice['voice_id']] = ($voice['name'] ?? $voice['voice_id']).$kind;
+                }
+            }
+
+            return $list;
+        });
     }
 
     /**

@@ -11,7 +11,8 @@
     </div>
     <dl style="margin:0;min-width:180px">
       <dt class="vd-eyebrow">Spent on AI</dt>
-      <dd class="vd-figure" style="margin:0">${{ number_format($totalCost, 2) }}</dd>
+      <dd class="vd-figure" style="margin:0" id="vd-total" aria-live="polite">${{ number_format($totalCost, 2) }}</dd>
+      <dd class="vd-small vd-muted" style="margin:2px 0 0">Every AI request, including Complete with AI and ideas</dd>
     </dl>
   </section>
 
@@ -46,7 +47,7 @@
           </tr></thead>
           <tbody>
             @foreach ($videos as $video)
-              <tr>
+              <tr data-video="{{ $video->id }}" data-working="{{ $video->status->isWorking() ? 1 : 0 }}">
                 <td class="vd-check"><input type="checkbox" name="videos[]" value="{{ $video->id }}" data-row
                   aria-label="Select {{ $video->title ?: \Illuminate\Support\Str::limit($video->prompt, 60) }}"
                   data-ready="{{ $video->status === \Ogunsakin01\VideoDemo\Enums\VideoStatus::Ready ? 1 : 0 }}" data-published="{{ $video->isPublished() ? 1 : 0 }}"></td>
@@ -55,8 +56,8 @@
                   <div class="vd-small vd-muted">{{ $video->updated_at->diffForHumans() }}</div>
                 </td>
                 <td>@include('video-demo::studio.partials.status', ['status' => $video->status])</td>
-                <td class="vd-num vd-mono vd-small">{{ $video->duration_seconds ? gmdate('i:s', (int) round($video->duration_seconds)) : '—' }}</td>
-                <td class="vd-num vd-mono vd-small">${{ number_format($video->cost, 2) }}</td>
+                <td class="vd-num vd-mono vd-small" data-length>{{ $video->duration_seconds ? gmdate('i:s', (int) round($video->duration_seconds)) : '—' }}</td>
+                <td class="vd-num vd-mono vd-small" data-cost>${{ number_format($video->cost, 2) }}</td>
                 <td>
                   @if ($video->isPublished())
                     <span class="vd-pill">{{ $video->visibility === 'public' ? 'Public' : 'Private' }}</span>
@@ -145,4 +146,36 @@
       })();
     </script>
   </x-slot:scripts>
+
+  <script>
+    // Keep the total spent, and videos being made, up to date without reloading.
+    (() => {
+      const total = document.getElementById('vd-total');
+      const rows = [...document.querySelectorAll('tr[data-video]')];
+      const ids = rows.map(r => r.dataset.video).join(',');
+      const money = n => '$' + Number(n).toFixed(2);
+      async function refresh() {
+        let working = false;
+        try {
+          const res = await fetch(@json(route('video-demo.studio.spending')) + '?' + new URLSearchParams({ videos: ids }), { headers: { Accept: 'application/json' } });
+          const d = await res.json();
+          total.textContent = money(d.total);
+          rows.forEach(row => {
+            const v = d.videos[row.dataset.video];
+            if (!v) return;
+            row.querySelector('[data-cost]').textContent = money(v.cost);
+            if (v.length) row.querySelector('[data-length]').textContent = v.length;
+            const status = row.querySelector('[data-status]');
+            status.textContent = v.label;
+            status.className = 'vd-status vd-status-' + v.class;
+            row.dataset.working = v.working ? 1 : 0;
+            working = working || v.working;
+          });
+        } catch (e) {}
+        // Every few seconds while videos are being made; otherwise now and then, for AI used elsewhere.
+        setTimeout(refresh, working ? 4000 : 15000);
+      }
+      setTimeout(refresh, rows.some(r => r.dataset.working === '1') ? 4000 : 15000);
+    })();
+  </script>
 </x-video-demo::layout>

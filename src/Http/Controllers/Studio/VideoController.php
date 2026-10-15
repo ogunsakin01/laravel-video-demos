@@ -21,6 +21,7 @@ use Ogunsakin01\VideoDemo\Enums\VideoStatus;
 use Ogunsakin01\VideoDemo\Jobs\GenerateVideo;
 use Ogunsakin01\VideoDemo\Library\Manifest;
 use Ogunsakin01\VideoDemo\Library\Publisher;
+use Ogunsakin01\VideoDemo\Models\Spend;
 use Ogunsakin01\VideoDemo\Models\Video;
 use Ogunsakin01\VideoDemo\Models\VideoIdea;
 use Ogunsakin01\VideoDemo\Models\VideoRequest;
@@ -31,6 +32,7 @@ use Ogunsakin01\VideoDemo\Recording\Recorder;
 use Ogunsakin01\VideoDemo\Studio\Embeds;
 use Ogunsakin01\VideoDemo\Studio\Examples;
 use Ogunsakin01\VideoDemo\Studio\Pages;
+use Ogunsakin01\VideoDemo\Studio\Progress;
 use Ogunsakin01\VideoDemo\VideoDemo;
 use Ogunsakin01\VideoDemo\VideoDemoServiceProvider;
 use Ogunsakin01\VideoDemo\Voice\Music;
@@ -55,8 +57,29 @@ class VideoController extends Controller
     {
         return view('video-demo::studio.index', [
             'videos' => Video::latest()->get(),
-            'totalCost' => Video::sum('cost'),
+            'totalCost' => Spend::total(),
             'queueWarning' => VideoDemoServiceProvider::queueWarning(),
+        ]);
+    }
+
+    /**
+     * Get the total spent on AI, and the status and cost of the given videos,
+     * for the videos page to keep up to date while videos are being made.
+     */
+    public function spending(Request $request): JsonResponse
+    {
+        $ids = array_slice(array_filter(array_map('intval', explode(',', (string) $request->query('videos', '')))), 0, 200);
+
+        return response()->json([
+            'total' => Spend::total(),
+            'videos' => Video::whereKey($ids)->get(['id', 'status', 'cost', 'duration_seconds'])->mapWithKeys(fn (Video $v) => [$v->id => [
+                'status' => $v->status->value,
+                'label' => $v->status->label(),
+                'class' => $v->status->isWorking() ? 'working' : $v->status->value,
+                'working' => $v->status->isWorking(),
+                'cost' => round($v->cost, 4),
+                'length' => $v->duration_seconds ? gmdate('i:s', (int) round($v->duration_seconds)) : null,
+            ]]),
         ]);
     }
 
@@ -245,6 +268,7 @@ class VideoController extends Controller
             'error' => $video->error,
             'issues' => $video->issues ?? [],
             'stopping' => $video->stop_requested,
+            'progress' => Progress::for($video),
         ]);
     }
 

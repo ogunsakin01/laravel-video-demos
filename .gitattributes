@@ -3,6 +3,7 @@
 *.mp4 binary
 *.jpg binary
 *.gif binary
+*.mp3 binary
 
 # Kept out of the package Composer installs: tests, the demo app and its videos
 /.github export-ignore

@@ -5,6 +5,7 @@ namespace Ogunsakin01\VideoDemo\Tests;
 use Closure;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
@@ -47,6 +48,8 @@ class VoiceTest extends TestCase
             'filesystems.disks.local.root' => $this->root,
             'video-demo.recorder.node_modules' => $this->root.'/recorder/node_modules',
             'video-demo.voice.cache_path' => $this->root.'/model',
+            // Most tests are about your own tracks; one is about the built-in ones.
+            'video-demo.music.builtin' => false,
         ]);
         // No computer's voice, unless a test adds one.
         Voices::flush([]);
@@ -214,7 +217,7 @@ class VoiceTest extends TestCase
         {
             public function __construct(protected ?Closure $fake) {}
 
-            public function speak(string $voice, array $lines, bool $mixable = true): array
+            public function speak(string $voice, array $lines, bool $mixable = true, string $tone = ''): array
             {
                 if ($this->fake) {
                     ($this->fake)();
@@ -363,6 +366,30 @@ class VoiceTest extends TestCase
         $this->get('/video-demo/studio/music/upbeat-corporate')->assertNotFound();
     }
 
+    public function test_built_in_tracks_are_offered_and_downloaded_when_first_used(): void
+    {
+        config(['video-demo.music.builtin' => true, 'video-demo.music.builtin_url' => 'https://cdn.example.com/music']);
+        Http::fake(['cdn.example.com/music/calm.mp3' => Http::response('ID3calm'), 'cdn.example.com/*' => Http::response('', 404)]);
+        $this->upload('brand.wav');
+
+        // Your own tracks first, then the built-in ones.
+        $this->assertSame(['brand', 'builtin:calm', 'builtin:upbeat', 'builtin:corporate', 'builtin:cinematic'], array_keys(Music::options()));
+        $this->assertSame('Calm (built in)', Music::label('builtin:calm'));
+        $this->assertFileDoesNotExist(Music::find('builtin:calm')['file']);
+
+        $file = Music::local('builtin:calm');
+        $this->assertSame('ID3calm', File::get($file));
+        // Downloaded once, then kept.
+        Music::local('builtin:calm');
+        Http::assertSentCount(1);
+        $this->get('/video-demo/studio/music/builtin:calm')->assertOk();
+
+        $this->getJson('/video-demo/studio/music/builtin:upbeat')->assertStatus(502)->assertJsonPath('error', "The built-in track [upbeat] couldn't be downloaded (HTTP 404) from https://cdn.example.com/music/upbeat.mp3.");
+        // Built-in tracks can't be deleted.
+        $this->delete('/video-demo/studio/music/builtin:calm');
+        $this->assertFileExists($file);
+    }
+
     public function test_the_facade_and_the_command_take_a_voice_and_music(): void
     {
         Queue::fake();
@@ -403,6 +430,115 @@ class VoiceTest extends TestCase
         Storage::disk('public')->assertExists($entry['subtitles']);
         $this->assertStringContainsString('<track kind="subtitles"', (string) view('video-demo::components.player', ['slug' => $video->slug, 'area' => 'private'])->render());
         $this->assertNull(app(Manifest::class)->url([...$entry, 'subtitles' => null, 'sources' => []], 'subtitles'));
+    }
+
+    public function test_cloud_voices_are_offered_when_their_key_is_set(): void
+    {
+        $this->assertSame([], Voices::options());
+
+        config(['video-demo.voice.providers.openai.key' => 'sk-test', 'video-demo.voice.providers.elevenlabs.key' => 'xi-test']);
+        Http::fake(['api.elevenlabs.io/v2/voices*' => Http::response(['voices' => [
+            ['voice_id' => 'JBFqnCBsd6RMkjVDRZzb', 'name' => 'George', 'category' => 'premade'],
+            ['voice_id' => 'abc123', 'name' => 'My brand voice', 'category' => 'cloned'],
+        ], 'has_more' => false])]);
+
+        $options = Voices::options();
+        $this->assertSame('Marin, natural', $options['OpenAI voices, about $0.02 a minute']['openai:marin']);
+        $this->assertSame(['elevenlabs:JBFqnCBsd6RMkjVDRZzb' => 'George', 'elevenlabs:abc123' => 'My brand voice (yours)'], $options['ElevenLabs voices, about $0.07 a minute']);
+        $this->assertSame(0.017, Voices::price('openai:marin'));
+        $this->assertSame(0.0, Voices::price('kokoro:af_heart'));
+        // Prism's key works too.
+        config(['prism.providers.gemini.api_key' => 'g-test']);
+        $this->assertSame('g-test', Voices::providerKey('gemini'));
+        Http::assertSent(fn ($r) => $r->hasHeader('xi-api-key', 'xi-test') && str_contains($r->url(), 'page_size=100'));
+    }
+
+    public function test_cloud_voices_speak_each_line_and_count_what_it_costs(): void
+    {
+        config([
+            'video-demo.voice.providers.openai.key' => 'sk-test',
+            'video-demo.voice.providers.gemini.key' => 'g-test',
+            'video-demo.voice.providers.elevenlabs.key' => 'xi-test',
+        ]);
+        $wav = (string) file_get_contents($this->wav($this->root.'/w.wav', 0.5));
+        Http::fake([
+            'api.openai.com/*' => Http::response($wav),
+            'generativelanguage.googleapis.com/*' => Http::response(['steps' => [['content' => [['type' => 'audio', 'data' => base64_encode($wav)]]]]]),
+            'api.elevenlabs.io/*' => Http::response('ID3mp3'),
+        ]);
+        // Clips are converted for mixing with ffmpeg; here they are copied.
+        $speaker = new Speaker(new class extends Encoder
+        {
+            public function toWav(string $input, string $wav): void
+            {
+                File::copy($input, $wav);
+            }
+        });
+
+        $clips = $speaker->speak('openai:marin', ['Open Post a job.'], tone: 'calm, unhurried and reassuring');
+        $this->assertSame(0.5, $clips['Open Post a job.']['seconds']);
+        $this->assertEqualsWithDelta(16 / 1000 * 0.017, $speaker->cost, 0.000001);
+        Http::assertSent(fn ($r) => $r->url() === 'https://api.openai.com/v1/audio/speech' && $r->hasHeader('Authorization', 'Bearer sk-test')
+            && $r['voice'] === 'marin' && $r['model'] === 'gpt-4o-mini-tts' && $r['response_format'] === 'wav' && str_contains($r['instructions'], 'calm, unhurried'));
+
+        // Saved lines aren't spoken, or paid for, twice.
+        $speaker->speak('openai:marin', ['Open Post a job.'], tone: 'calm, unhurried and reassuring');
+        $this->assertSame(0.0, $speaker->cost);
+
+        $this->assertSame(0.5, $speaker->speak('gemini:Kore', ['Publish it.'])['Publish it.']['seconds']);
+        Http::assertSent(fn ($r) => str_contains($r->url(), '/v1beta/interactions') && $r['model'] === 'gemini-3.8-flash-tts'
+            && $r['generation_config']['speech_config'][0]['voice'] === 'Kore' && $r['input'][0]['content'][0]['annotations'][0]['style'] === 'warm, clear and friendly');
+
+        // A sample from ElevenLabs is kept as the MP3 it sends, for the browser to play.
+        $sample = $speaker->speak('elevenlabs:JBFqnCBsd6RMkjVDRZzb', ['Hi.'], mixable: false)['Hi.'];
+        $this->assertStringEndsWith('.mp3', $sample['file']);
+        Http::assertSent(fn ($r) => str_contains($r->url(), '/v1/text-to-speech/JBFqnCBsd6RMkjVDRZzb?output_format=mp3_44100_128') && $r['model_id'] === 'eleven_multilingual_v2');
+    }
+
+    public function test_a_provider_error_is_explained(): void
+    {
+        config(['video-demo.voice.providers.openai.key' => 'sk-bad']);
+        Http::fake(['api.openai.com/*' => Http::response(['error' => ['message' => 'Incorrect API key provided.']], 401)]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage("Openai couldn't speak a line (HTTP 401): Incorrect API key provided.");
+        app(Speaker::class)->speak('openai:marin', ['Hello.']);
+    }
+
+    public function test_a_voice_that_costs_money_stays_within_the_spending_limit(): void
+    {
+        config(['video-demo.voice.providers.openai.key' => 'sk-test', 'video-demo.voice.providers.openai.price_per_1k_chars' => 100.0]);
+        $fakes = $this->fakeMaking();
+        $video = $this->voicedVideo(['voice' => 'openai:marin', 'music' => null, 'max_cost' => 0.5]);
+
+        GenerateVideo::dispatchSync($video, replan: false);
+        $video->refresh();
+
+        $this->assertSame(VideoStatus::Ready, $video->status);
+        $this->assertSame([[]], $fakes['recorder']->voices);
+        $this->assertStringContainsString('The voice-over was left out: at about $4.300 it would take the video past its $0.50 limit.', implode("\n", array_column($video->log, 'message')));
+    }
+
+    public function test_what_a_cloud_voice_costs_is_added_to_the_video(): void
+    {
+        config(['video-demo.voice.providers.openai.key' => 'sk-test']);
+        // The stand-ins first, then a voice that reports what its new lines cost.
+        $this->fakeMaking();
+        $this->app->instance(Speaker::class, new class(new Encoder) extends Speaker
+        {
+            public function speak(string $voice, array $lines, bool $mixable = true, string $tone = ''): array
+            {
+                $this->cost = 0.0123;
+
+                return collect($lines)->mapWithKeys(fn ($l) => [$l => ['file' => "/c/$l.wav", 'seconds' => 1.0]])->all();
+            }
+        });
+        $video = $this->voicedVideo(['voice' => 'openai:marin', 'music' => null, 'cost' => 0.2]);
+
+        GenerateVideo::dispatchSync($video, replan: false);
+
+        $this->assertEqualsWithDelta(0.2123, $video->fresh()->cost, 0.00001);
+        $this->assertContains('The voice-over cost $0.0123', array_column($video->fresh()->log, 'message'));
     }
 
     public function test_clean_can_remove_the_local_voice(): void

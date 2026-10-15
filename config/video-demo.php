@@ -285,7 +285,8 @@ return [
     | Local voices are free and run on this machine; install them with
     | php artisan video-demo:install-voice. The computer's own voice (macOS
     | "say", Windows speech, or espeak-ng on Linux) needs no install and is
-    | meant for drafts. Clips are saved, so recording again costs nothing.
+    | meant for drafts. OpenAI, Gemini and ElevenLabs voices appear when their
+    | key is set. Clips are saved, so recording again costs nothing.
     |
     */
 
@@ -310,6 +311,39 @@ return [
             'bm_george' => 'George, warm (UK)',
             'bm_fable' => 'Fable, storyteller (UK)',
         ],
+
+        // Voices from AI providers, offered when their key is set. The price
+        // is US dollars per 1,000 characters spoken, added to the video's
+        // cost; these are estimates from October 2026, so check your
+        // provider's price list. A minute of speech is about 900 characters.
+        'providers' => [
+            'openai' => [
+                'key' => env('OPENAI_API_KEY'),
+                'model' => 'gpt-4o-mini-tts',
+                'price_per_1k_chars' => 0.017,
+                'voices' => [
+                    'marin' => 'Marin, natural', 'cedar' => 'Cedar, natural', 'coral' => 'Coral, warm',
+                    'sage' => 'Sage, calm', 'ash' => 'Ash, clear', 'nova' => 'Nova, bright',
+                    'onyx' => 'Onyx, deep', 'shimmer' => 'Shimmer, soft',
+                ],
+            ],
+            'gemini' => [
+                'key' => env('GEMINI_API_KEY'),
+                'model' => 'gemini-3.8-flash-tts',
+                'price_per_1k_chars' => 0.015,
+                'voices' => [
+                    'Kore' => 'Kore, firm', 'Puck' => 'Puck, upbeat', 'Charon' => 'Charon, informative',
+                    'Aoede' => 'Aoede, breezy', 'Sulafat' => 'Sulafat, warm', 'Achird' => 'Achird, friendly',
+                    'Iapetus' => 'Iapetus, clear', 'Vindemiatrix' => 'Vindemiatrix, gentle',
+                ],
+            ],
+            // ElevenLabs offers the voices in your account, including your own.
+            'elevenlabs' => [
+                'key' => env('ELEVENLABS_API_KEY'),
+                'model' => env('ELEVENLABS_MODEL', 'eleven_multilingual_v2'),
+                'price_per_1k_chars' => 0.08,
+            ],
+        ],
     ],
 
     'music' => [
@@ -323,6 +357,12 @@ return [
         // Tracks of your own, key => absolute path to an MP3, WAV, M4A, OGG or
         // FLAC file. Tracks uploaded on the Styles page are added to these.
         'tracks' => [],
+
+        // Offer the package's four built-in tracks (calm, upbeat, corporate,
+        // cinematic), composed for it and free to use. Each is downloaded the
+        // first time a video uses it.
+        'builtin' => (bool) env('VIDEO_DEMO_BUILT_IN_MUSIC', true),
+        'builtin_url' => env('VIDEO_DEMO_BUILT_IN_MUSIC_URL', 'https://cdn.jsdelivr.net/gh/ogunsakin01/laravel-video-demos@v0.12.0/docs/music'),
     ],
 
     /*

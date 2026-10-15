@@ -191,6 +191,10 @@
   .vd .vd-check-row { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 500; cursor: pointer; }
   .vd .vd-check-row input { width: 16px; height: 16px; margin: 0; accent-color: var(--vd-accent); }
   .vd input[type=range] { accent-color: var(--vd-accent); }
+  .vd-progress { margin-top: 14px; display: grid; gap: 6px; max-width: 520px; }
+  .vd-progress-track { height: 8px; border-radius: 999px; background: var(--vd-muted); border: 1px solid var(--vd-border); overflow: hidden; }
+  .vd-progress-track span { display: block; height: 100%; background: var(--vd-accent); border-radius: 999px; transition: width .6s ease; }
+  @media (prefers-reduced-motion: reduce) { .vd-progress-track span { transition: none; } }
   .vd-combo { position: relative; }
   .vd-combo-list { position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 4px); max-height: 300px; overflow-y: auto; margin: 0; padding: 4px; list-style: none;
     background: var(--vd-card); border: 1px solid var(--vd-border-strong); border-radius: var(--vd-radius); box-shadow: var(--vd-shadow-lg); }

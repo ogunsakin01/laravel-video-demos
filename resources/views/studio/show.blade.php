@@ -16,6 +16,12 @@
           @endif
         @endif
       </p>
+      @if ($progress = \Ogunsakin01\VideoDemo\Studio\Progress::for($video))
+        <div class="vd-progress" id="vd-progress" data-percent="{{ $progress['percent'] }}" data-remaining="{{ $progress['remaining'] }}">
+          <div class="vd-progress-track" role="progressbar" aria-label="Progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ $progress['percent'] }}"><span style="width:{{ $progress['percent'] }}%"></span></div>
+          <span class="vd-small vd-muted"><strong data-percent>{{ $progress['percent'] }}%</strong> <span data-stage>{{ $progress['stage'] ? ' · '.$progress['stage'] : '' }}</span> · <span data-left></span></span>
+        </div>
+      @endif
     </div>
     @if (in_array($video->status, [\Ogunsakin01\VideoDemo\Enums\VideoStatus::Failed, \Ogunsakin01\VideoDemo\Enums\VideoStatus::Stopped], true))
         @php($hasPlan = ! empty($video->plan['steps']))
@@ -458,6 +464,29 @@
           const status = document.querySelector('#vd-status [data-status]');
           const cost = document.getElementById('vd-cost');
           const time = iso => new Date(iso).toTimeString().slice(0, 8);
+
+          // The progress bar: the server's estimate every couple of seconds, a
+          // countdown in between. It never goes backwards, even when a repair
+          // sends the video back to planning.
+          const bar = document.getElementById('vd-progress');
+          let shown = bar ? Number(bar.dataset.percent) : 0, remaining = bar ? Number(bar.dataset.remaining) : 0;
+          const left = secs => secs < 45 ? 'less than a minute left' : secs < 90 ? 'about a minute left'
+            : secs < 3600 ? `about ${Math.round(secs / 60)} min left` : `about ${Math.floor(secs / 3600)} h ${Math.round((secs % 3600) / 60)} min left`;
+          const paint = () => {
+            if (!bar) return;
+            bar.querySelector('[role=progressbar] span').style.width = shown + '%';
+            bar.querySelector('[role=progressbar]').setAttribute('aria-valuenow', shown);
+            bar.querySelector('[data-percent]').textContent = shown + '%';
+            bar.querySelector('[data-left]').textContent = left(Math.max(0, remaining));
+          };
+          const showProgress = p => {
+            shown = Math.max(shown, p.percent);
+            remaining = p.remaining;
+            if (bar) bar.querySelector('[data-stage]').textContent = p.stage ? ' · ' + p.stage : '';
+            paint();
+          };
+          paint();
+          setInterval(() => { if (remaining > 5) { remaining--; paint(); } }, 1000);
           const tick = async () => {
             try {
               const s = await (await fetch(url, { headers: { Accept: 'application/json' } })).json();
@@ -465,6 +494,7 @@
               const stop = document.querySelector('#vd-stop button');
               if (stop && s.stopping) { stop.disabled = true; stop.textContent = 'Stopping…'; }
               cost.textContent = '$' + Number(s.cost).toFixed(4);
+              if (s.progress) showProgress(s.progress);
               log.replaceChildren(...s.log.map(e => {
                 const li = document.createElement('li');
                 const t = document.createElement('time'); t.textContent = time(e.at);

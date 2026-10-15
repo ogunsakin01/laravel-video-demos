@@ -48,6 +48,8 @@ use Ogunsakin01\VideoDemo\Recording\Recorder;
  * @property ?string $record_as_label
  * @property ?list<array{path: string, problem: string, status: ?int, url: ?string, detail: ?string}> $issues
  * @property bool $stop_requested
+ * @property ?Carbon $status_at
+ * @property ?Carbon $updated_at
  * @property bool $sample_data
  * @property ?list<array<string, mixed>> $sample_records
  * @property ?string $voice
@@ -86,6 +88,7 @@ class Video extends Model
             'sample_data' => 'boolean',
             'sample_records' => 'array',
             'music_volume' => 'float',
+            'status_at' => 'datetime',
         ];
     }
 
@@ -134,6 +137,10 @@ class Video extends Model
     {
         $from = $this->getOriginal('status');
         $this->status = $status;
+        if ($from !== $status) {
+            // For the progress bar: how long it has been in this stage.
+            $this->status_at = now();
+        }
         $message ? $this->addLog($message) : $this->save();
 
         if ($from !== $status) {
@@ -142,10 +149,12 @@ class Video extends Model
     }
 
     /**
-     * Add the tokens and cost of an AI request to the video's totals.
+     * Add the tokens and cost of an AI request to the video's totals, and to
+     * the total spent: plan, improve, narrate or voice.
      */
-    public function addUsage(Usage $usage): void
+    public function addUsage(Usage $usage, string $kind = 'plan'): void
     {
+        Spend::record($kind, $usage->cost, $this->id, $kind === 'voice' ? $this->voice : $this->model);
         $this->input_tokens += $usage->input;
         $this->cache_write_tokens += $usage->cacheWrite;
         $this->cache_read_tokens += $usage->cacheRead;

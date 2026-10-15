@@ -5,6 +5,7 @@ namespace Ogunsakin01\VideoDemo\Ai;
 use Illuminate\Support\Str;
 use Ogunsakin01\VideoDemo\Ai\Drivers\Drivers;
 use Ogunsakin01\VideoDemo\Ai\Drivers\Turn;
+use Ogunsakin01\VideoDemo\Models\Spend;
 use Ogunsakin01\VideoDemo\Models\Video;
 use Ogunsakin01\VideoDemo\Models\VideoIdea;
 use Ogunsakin01\VideoDemo\Models\VideoStyle;
@@ -77,6 +78,8 @@ class Suggester
 
         /** @var Turn $turn */
         $turn = $answer['turn'];
+        // Paid for whatever the answer, so it counts toward the total spent.
+        Spend::record('ideas', $turn->usage->cost, null, $turn->model);
 
         if ($turn->stop === Turn::REFUSAL) {
             throw new PlanningFailed('The model declined to suggest videos.');

@@ -35,6 +35,7 @@ Route::middleware(AuthorizeStudio::class)->group(function () {
 
     Route::post('/bulk', [VideoController::class, 'bulk'])->name('bulk');
     Route::get('/delete', [VideoController::class, 'confirmDelete'])->name('delete');
+    Route::get('/spending', [VideoController::class, 'spending'])->name('spending');
     Route::get('/{video}', [VideoController::class, 'show'])->name('show');
     Route::get('/{video}/status', [VideoController::class, 'status'])->name('status');
     Route::get('/{video}/file/{device}/{kind}', [VideoController::class, 'file'])->whereIn('kind', ['video', 'poster', 'subtitles'])->name('file');

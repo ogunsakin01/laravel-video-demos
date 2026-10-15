@@ -25,7 +25,7 @@ class SoundController extends Controller
 
     /**
      * Speak a short sample in the given voice. It is saved like any line,
-     * so playing it again is instant.
+     * so playing it again is instant, and free for a voice that costs.
      */
     public function sample(Request $request, Speaker $speaker): BinaryFileResponse|JsonResponse
     {
@@ -43,18 +43,22 @@ class SoundController extends Controller
             return response()->json(['error' => $e->getMessage()], 502);
         }
 
-        return response()->file($clip['file'], ['Content-Type' => 'audio/wav', 'Cache-Control' => 'no-store']);
+        return response()->file($clip['file'], ['Content-Type' => str_ends_with($clip['file'], '.mp3') ? 'audio/mpeg' : 'audio/wav', 'Cache-Control' => 'no-store']);
     }
 
     /**
      * Play a music track.
      */
-    public function play(string $key): BinaryFileResponse
+    public function play(string $key): BinaryFileResponse|JsonResponse
     {
-        $track = Music::find($key);
-        abort_unless($track !== null, 404);
+        abort_unless(Music::find($key) !== null, 404);
 
-        return response()->file($track['file'], ['Cache-Control' => 'no-store']);
+        try {
+            // A built-in track is downloaded the first time it is played.
+            return response()->file(Music::local($key), ['Cache-Control' => 'no-store']);
+        } catch (RuntimeException $e) {
+            return response()->json(['error' => $e->getMessage()], 502);
+        }
     }
 
     /**

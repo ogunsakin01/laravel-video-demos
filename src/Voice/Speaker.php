@@ -3,23 +3,43 @@
 namespace Ogunsakin01\VideoDemo\Voice;
 
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Str;
 use Ogunsakin01\VideoDemo\Recording\Encoder;
 use Ogunsakin01\VideoDemo\Recording\Recorder;
 use RuntimeException;
 
 /**
  * Turns a video's voice-over lines into audio clips, one per line, in the
- * chosen voice. Each clip is saved by voice and text, so a line is only
+ * chosen voice: local, the computer's own, or an AI provider's. Each clip is saved by voice and text, so a line is only
  * ever spoken once: recording a plan again costs nothing. Clips are kept as
  * 16-bit stereo WAV at 44.1 kHz, ready to mix.
  */
 class Speaker
 {
     /**
+     * What the last call's new lines cost, in US dollars: 0 for local voices,
+     * and for lines that were already saved.
+     */
+    public float $cost = 0.0;
+
+    /**
      * Create a new speaker instance.
      */
     public function __construct(protected Encoder $encoder) {}
+
+    /**
+     * Get the tone a voice speaks in for a style: calm, warm or upbeat, by its pace.
+     */
+    public static function tone(array $style): string
+    {
+        return match ($style['pace'] ?? 'normal') {
+            'relaxed' => 'calm, unhurried and reassuring',
+            'brisk' => 'upbeat and energetic, but clear',
+            default => 'warm, clear and friendly',
+        };
+    }
 
     /**
      * Speak each line, returning its clip and length, keyed by the line.
@@ -27,21 +47,27 @@ class Speaker
      * With $mixable false the clips are kept as the voice made them, without
      * ffmpeg: browsers play them as they are, which suits a sample.
      *
+     * $tone is how the line is spoken, for voices that take one (OpenAI and
+     * Gemini), such as "calm and unhurried".
+     *
      * @param  list<string>  $lines
      * @return array<string, array{file: string, seconds: float}>
      *
      * @throws RuntimeException When the voice can't be used or fails.
      */
-    public function speak(string $voice, array $lines, bool $mixable = true): array
+    public function speak(string $voice, array $lines, bool $mixable = true, string $tone = 'warm, clear and friendly'): array
     {
         [$provider, $id] = Voices::parse($voice);
+        $this->cost = 0.0;
+        // ElevenLabs sends MP3; a sample is kept as it comes, for the browser to play.
+        $extension = ! $mixable && $provider === 'elevenlabs' ? 'mp3' : 'wav';
         $dir = Recorder::workDir(trim((string) config('video-demo.storage.work_path'), '/').'/voice');
         File::ensureDirectoryExists($dir);
 
         $clips = [];
         $missing = [];
         foreach (array_unique(array_filter(array_map('trim', $lines))) as $text) {
-            $file = "$dir/".($mixable ? '' : 'raw-').sha1("$voice\n$text").'.wav';
+            $file = "$dir/".($mixable ? '' : 'raw-').sha1("$voice\n$tone\n$text").".$extension";
             $clips[$text] = $file;
             if (! is_file($file)) {
                 $missing[$text] = $file;
@@ -55,6 +81,7 @@ class Speaker
                 $spoken = match ($provider) {
                     'kokoro' => $this->kokoro($id, $missing, $raw),
                     'system' => $this->system($id, $missing, $raw),
+                    'openai', 'gemini', 'elevenlabs' => $this->cloud($provider, $id, $missing, $raw, $tone),
                     default => throw new RuntimeException("There is no voice [$voice]."),
                 };
                 foreach ($spoken as $text => $file) {
@@ -65,7 +92,72 @@ class Speaker
             }
         }
 
-        return array_map(fn ($file) => ['file' => $file, 'seconds' => Wav::seconds($file)], $clips);
+        return array_map(fn ($file) => ['file' => $file, 'seconds' => str_ends_with($file, '.wav') ? Wav::seconds($file) : 0.0], $clips);
+    }
+
+    /**
+     * Speak the lines with an AI provider's voice, one request a line, adding
+     * what each costs.
+     *
+     * @param  array<string, string>  $lines
+     * @return array<string, string>
+     */
+    protected function cloud(string $provider, string $id, array $lines, string $dir, string $tone): array
+    {
+        $key = Voices::providerKey($provider) ?? throw new RuntimeException("Set the $provider API key to use its voices.");
+        $model = (string) config("video-demo.voice.providers.$provider.model");
+
+        $out = [];
+        foreach (array_keys($lines) as $i => $text) {
+            $response = match ($provider) {
+                'openai' => Http::withToken($key)->timeout(120)->post('https://api.openai.com/v1/audio/speech', [
+                    'model' => $model, 'input' => $text, 'voice' => $id, 'response_format' => 'wav',
+                    'instructions' => "Speak as the narrator of a short how-to video: $tone.",
+                ]),
+                'gemini' => Http::withHeaders(['x-goog-api-key' => $key])->timeout(120)->post('https://generativelanguage.googleapis.com/v1beta/interactions', [
+                    'model' => $model,
+                    'input' => [['type' => 'user_input', 'content' => [['type' => 'text', 'text' => $text, 'annotations' => [['type' => 'speech_metadata', 'style' => $tone]]]]]],
+                    'response_format' => ['type' => 'audio'],
+                    'generation_config' => ['speech_config' => [['voice' => $id]]],
+                ]),
+                default => Http::withHeaders(['xi-api-key' => $key])->accept('audio/mpeg')->timeout(120)
+                    ->post("https://api.elevenlabs.io/v1/text-to-speech/$id?output_format=mp3_44100_128", ['text' => $text, 'model_id' => $model]),
+            };
+
+            if ($response->failed()) {
+                $said = $response->json('error.message') ?? $response->json('detail.message') ?? $response->json('detail') ?? $response->body();
+                throw new RuntimeException(ucfirst($provider)." couldn't speak a line (HTTP {$response->status()}): ".Str::limit(is_string($said) ? $said : json_encode($said), 300));
+            }
+
+            $audio = $provider === 'gemini' ? $this->geminiAudio((array) $response->json()) : $response->body();
+            $out[$text] = "$dir/$i.".($provider === 'elevenlabs' ? 'mp3' : 'wav');
+            File::put($out[$text], $audio);
+            $this->cost += mb_strlen($text) / 1000 * Voices::price("$provider:$id");
+        }
+
+        return $out;
+    }
+
+    /**
+     * Find the WAV audio in a Gemini Interactions response.
+     *
+     * @throws RuntimeException When there is none.
+     */
+    protected function geminiAudio(array $response): string
+    {
+        $data = null;
+        array_walk_recursive($response, function ($value, $key) use (&$data) {
+            if ($data === null && $key === 'data' && is_string($value) && strlen($value) > 64) {
+                $data = $value;
+            }
+        });
+
+        $audio = $data !== null ? base64_decode($data, true) : false;
+        if ($audio === false || $audio === '') {
+            throw new RuntimeException('Gemini answered without audio.');
+        }
+
+        return $audio;
     }
 
     /**

@@ -68,7 +68,7 @@ class Narrator
 
         /** @var Turn $turn */
         $turn = $answer['turn'];
-        $video->addUsage($turn->usage);
+        $video->addUsage($turn->usage, 'narrate');
         if ($turn->stop === Turn::REFUSAL || empty($answer['data']['lines'])) {
             throw new PlanningFailed('The model did not write a voice-over.');
         }

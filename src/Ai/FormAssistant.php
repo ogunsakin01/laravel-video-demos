@@ -4,6 +4,7 @@ namespace Ogunsakin01\VideoDemo\Ai;
 
 use Ogunsakin01\VideoDemo\Ai\Drivers\Drivers;
 use Ogunsakin01\VideoDemo\Ai\Drivers\Turn;
+use Ogunsakin01\VideoDemo\Models\Spend;
 use Ogunsakin01\VideoDemo\Models\Video;
 
 /**
@@ -54,6 +55,8 @@ class FormAssistant
         /** @var Turn $turn */
         $turn = $answer['turn'];
         $data = $answer['data'];
+        // Paid for whatever the answer, so it counts toward the total spent.
+        Spend::record('complete', $turn->usage->cost, null, $turn->model);
 
         if ($turn->stop === Turn::REFUSAL) {
             throw new PlanningFailed('The model declined to complete this description.');
@@ -115,7 +118,7 @@ class FormAssistant
         /** @var Turn $turn */
         $turn = $answer['turn'];
         $data = $answer['data'];
-        $video->addUsage($turn->usage);
+        $video->addUsage($turn->usage, 'improve');
 
         if ($turn->stop === Turn::REFUSAL) {
             throw new PlanningFailed('The model declined to improve this description.');

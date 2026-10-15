@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Storage;
 use Ogunsakin01\VideoDemo\Ai\Narrator;
 use Ogunsakin01\VideoDemo\Ai\Planner;
 use Ogunsakin01\VideoDemo\Ai\PlanningFailed;
+use Ogunsakin01\VideoDemo\Ai\Usage;
 use Ogunsakin01\VideoDemo\Ai\VideoStopped;
 use Ogunsakin01\VideoDemo\Enums\VideoStatus;
 use Ogunsakin01\VideoDemo\Models\Video;
@@ -234,8 +235,21 @@ class GenerateVideo implements ShouldQueue
             }
 
             $lines = $plan->lines();
+
+            // A voice that costs money mustn't take the video past its spending limit.
+            $estimate = mb_strlen(implode(' ', $lines)) / 1000 * Voices::price($video->voice);
+            if ($estimate > 0 && $video->cost + $estimate > $video->spendLimit()) {
+                $video->addLog(sprintf('The voice-over was left out: at about $%.3f it would take the video past its $%.2f limit.', $estimate, $video->spendLimit()));
+
+                return [$plan, null];
+            }
+
             $video->addLog(sprintf('Speaking the voice-over: %d %s in %s', count($lines), count($lines) === 1 ? 'line' : 'lines', Voices::label($video->voice)));
-            $clips = $speaker->speak((string) $video->voice, $lines);
+            $clips = $speaker->speak((string) $video->voice, $lines, tone: Speaker::tone($video->style ?? []));
+            if ($speaker->cost > 0) {
+                $video->addUsage(new Usage(cost: $speaker->cost), 'voice');
+                $video->addLog(sprintf('The voice-over cost $%.4f', $speaker->cost));
+            }
         } catch (RuntimeException|PlanningFailed $e) {
             $video->addLog("The voice-over couldn't be made, so the video is made without it: ".$e->getMessage());
 
@@ -281,7 +295,7 @@ class GenerateVideo implements ShouldQueue
         try {
             $soundtrack->mix(
                 array_map(fn ($s) => ['file' => $s['file'], 'at' => $s['at']], $spoken),
-                $music ? ['file' => $music['file'], 'volume' => $video->music_volume ?? (float) config('video-demo.music.volume', 0.25)] : null,
+                $music ? ['file' => Music::local((string) $video->music), 'volume' => $video->music_volume ?? (float) config('video-demo.music.volume', 0.25)] : null,
                 $result->seconds,
                 "$dir/sound.wav",
             );
