@@ -2,6 +2,12 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/). While the version is 0.x, minor releases may include breaking changes; they will be listed here.
 
+## v0.10.2 - 2026-10-15
+
+### Fixed
+
+- `video-demo:install` keeps the recorder's files out of your app's git repository. They live in `storage/video-demo/`, which Laravel doesn't ignore (it only ignores the storage folders it makes itself), so a `git add .` could commit about 20 MB of Node packages and deploy them. The install now adds `storage/video-demo/.gitignore`, the way Laravel does for its own folders. Run `php artisan video-demo:install` once to add it to an existing app.
+
 ## v0.10.1 - 2026-10-15
 
 ### Added

@@ -11,7 +11,8 @@ use Throwable;
 /**
  * Sets the package up in one go, and is safe to run again after each
  * upgrade: the config, the package's migrations, Playwright and Chromium for
- * the recorder, the sample database, and a restart of the queue workers.
+ * the recorder, the sample database, and a restart of the queue workers. The
+ * recorder's files are kept out of the app's git repository.
  */
 class InstallCommand extends Command
 {
@@ -43,6 +44,10 @@ class InstallCommand extends Command
     {
         // An existing config is left as it is.
         $this->call('vendor:publish', ['--tag' => 'video-demo-config']);
+
+        // Laravel ignores only the storage folders it makes itself, so keep
+        // the package's tools out of the app's repository and its deploys.
+        $this->ignoreInGit(storage_path('video-demo'));
 
         // Only the package's own migrations: the app's are its own business.
         $this->components->task('Running the package\'s migrations', fn () => $this->callSilently('migrate', [
@@ -76,6 +81,10 @@ class InstallCommand extends Command
         $modules = config('video-demo.recorder.node_modules');
         $dir = dirname($modules);
         File::ensureDirectoryExists($dir);
+        // A recorder installed elsewhere in the app is kept out of git too.
+        if (str_starts_with(realpath($dir) ?: $dir, base_path().'/') && ! str_starts_with($dir, storage_path('video-demo'))) {
+            $this->ignoreInGit($dir);
+        }
         if (! File::exists("$dir/package.json")) {
             File::put("$dir/package.json", json_encode(['private' => true, 'name' => 'video-demo-recorder'], JSON_PRETTY_PRINT));
         }
@@ -129,6 +138,19 @@ class InstallCommand extends Command
         }
         foreach ($base['info']['users'] ?? [] as $type => $user) {
             $this->components->twoColumnDetail("Sample $type user", $user);
+        }
+    }
+
+    /**
+     * Keep a folder out of git with a .gitignore that ignores everything in
+     * it, as Laravel does for its own storage folders. An existing one is
+     * left as it is.
+     */
+    protected function ignoreInGit(string $dir): void
+    {
+        File::ensureDirectoryExists($dir);
+        if (! File::exists("$dir/.gitignore")) {
+            File::put("$dir/.gitignore", "*\n!.gitignore\n");
         }
     }
 

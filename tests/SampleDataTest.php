@@ -382,11 +382,27 @@ class SampleDataTest extends TestCase
                 ->assertSuccessful();
             $this->assertFileExists(config_path('video-demo.php'));
 
+            // The package's tools in storage are kept out of the app's git repository.
+            $this->assertSame("*\n!.gitignore\n", File::get(storage_path('video-demo/.gitignore')));
+
             // Running it again, as after an upgrade, keeps what videos have cost so far.
             $this->artisan('video-demo:install', ['--no-browser' => true, '--no-sample-data' => true])->assertSuccessful();
             $this->assertSame([0.3727, 1200], [$video->fresh()->cost, $video->fresh()->output_tokens]);
         } finally {
-            File::delete(config_path('video-demo.php'));
+            File::delete([config_path('video-demo.php'), storage_path('video-demo/.gitignore')]);
+        }
+    }
+
+    public function test_install_keeps_an_existing_gitignore(): void
+    {
+        File::ensureDirectoryExists(storage_path('video-demo'));
+        File::put(storage_path('video-demo/.gitignore'), "recorder/\n");
+
+        try {
+            $this->artisan('video-demo:install', ['--no-browser' => true, '--no-sample-data' => true])->assertSuccessful();
+            $this->assertSame("recorder/\n", File::get(storage_path('video-demo/.gitignore')));
+        } finally {
+            File::delete([config_path('video-demo.php'), storage_path('video-demo/.gitignore')]);
         }
     }
 
