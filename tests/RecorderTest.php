@@ -69,7 +69,7 @@ class RecorderTest extends TestCase
         $this->assertSame('Fill it in', $result->chapters[0]['title']);
 
         $this->assertGreaterThan(0, $result->trimSeconds);
-        (new Encoder)->encode($result->video, "$this->out/video.mp4", "$this->out/poster.jpg", $result->trimSeconds, Recorder::speed());
+        (new Encoder)->encode($result->video, "$this->out/video.mp4", "$this->out/poster.jpg", $result->trimSeconds, Recorder::speed(), $result->timeline);
         $this->assertGreaterThan(10_000, filesize("$this->out/video.mp4"));
 
         // Played back at 2x: the file is as long as the result says, about
@@ -121,7 +121,7 @@ class RecorderTest extends TestCase
         $this->assertTrue($job['touch']);
         $this->assertSame('dark', $job['style']['theme']);
 
-        (new Encoder)->encode($result->video, "$this->out/mobile.mp4", "$this->out/mobile.jpg", $result->trimSeconds, Recorder::speed());
+        (new Encoder)->encode($result->video, "$this->out/mobile.mp4", "$this->out/mobile.jpg", $result->trimSeconds, Recorder::speed(), $result->timeline);
         // Recorded at the phone's screen size, filling the frame.
         [$width, $height] = getimagesize("$this->out/mobile.jpg");
         $this->assertSame([390, 844], [$width, $height]);
