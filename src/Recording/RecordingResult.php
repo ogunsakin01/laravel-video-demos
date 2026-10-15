@@ -26,6 +26,7 @@ final readonly class RecordingResult
         public ?string $errorFull = null,
         public ?string $screenshot = null,
         public array $browserLog = [],
+        public ?Timeline $timeline = null,
     ) {}
 
     /**
@@ -51,6 +52,7 @@ final readonly class RecordingResult
             $r['errorFull'] ?? null,
             $r['screenshot'] ?? null,
             $r['browserLog'] ?? [],
+            isset($r['timeline']) ? Timeline::fromArray($r['timeline']) : null,
         );
     }
 

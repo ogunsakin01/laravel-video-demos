@@ -39,12 +39,13 @@ class PlanTest extends TestCase
         $plan = $this->plan();
         $before = $plan->estimatedSeconds();
 
-        $longer = $plan->fitTo((int) ceil($before * 1.5));
-        $this->assertEqualsWithDelta($before * 1.5, $longer->estimatedSeconds(), 1.0);
+        $longer = $plan->fitTo((int) ceil($before * 1.2));
+        $this->assertEqualsWithDelta($before * 1.2, $longer->estimatedSeconds(), 1.0);
 
-        // Never stretched past three times, however long the target.
+        // Never stretched past 1.4 times, however long the target: a video a
+        // little short beats one that lingers.
         $capped = $plan->fitTo(600);
-        $this->assertSame(3500 * 3, $capped->steps[0]['ms']);
+        $this->assertSame((int) round(3500 * 1.4), $capped->steps[0]['ms']);
 
         // Actions keep their own speed.
         $this->assertNull($capped->steps[4]['ms']);

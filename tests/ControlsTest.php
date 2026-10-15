@@ -388,7 +388,7 @@ class ControlsTest extends TestCase
         $this->assertSame(1.2, Recorder::speed(1.2));
         $this->assertSame(4.0, Recorder::speed(9));
 
-        $this->get('/video-demo/studio/create')->assertSee('Playback speed')->assertSee('name="speed" value="2"', false)->assertSee('1× real time');
+        $this->get('/video-demo/studio/create')->assertSee('Playback speed')->assertSee('name="speed" value="2"', false)->assertSee('data-speed="1"', false);
 
         $this->post('/video-demo/studio', [
             'style_id' => VideoStyle::options()->first()->id, 'devices' => ['desktop'], 'prompt' => 'How to post a job',

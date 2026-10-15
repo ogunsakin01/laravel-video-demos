@@ -14,7 +14,8 @@ const ATTACK = 0.25;    // seconds for the music to drop before a line
 const RELEASE = 0.6;    // seconds for it to come back after
 const FADE_IN = 1.0;
 const FADE_OUT = 2.0;
-const VOICE_PEAK = 29000; // voices are brought up to this peak, so a quiet voice still sits above the music
+const VOICE_PEAK = 29000; // no voice goes above this peak
+const VOICE_RMS = 6000; // every line is brought to this loudness, so one line isn't louder than the next
 
 // Read the samples of a 16-bit stereo WAV, finding its data among other chunks.
 function readWav(file) {
@@ -59,9 +60,15 @@ try {
     const s = readWav(clip.file);
     const start = Math.max(0, Math.round(clip.at * RATE));
     const length = s.length / 2;
-    let peak = 1;
-    for (let k = 0; k < s.length; k++) peak = Math.max(peak, Math.abs(s[k]));
-    const gain = Math.min(4, VOICE_PEAK / peak);
+    // Loudness from the speech itself (the RMS of the samples above a quiet floor), capped by the peak.
+    let peak = 1, sum = 0, n = 0;
+    for (let k = 0; k < s.length; k++) {
+      const v = Math.abs(s[k]);
+      peak = Math.max(peak, v);
+      if (v > 300) { sum += v * v; n++; }
+    }
+    const rms = n ? Math.sqrt(sum / n) : peak / 4;
+    const gain = Math.min(4, VOICE_RMS / rms, VOICE_PEAK / peak);
     for (let f = 0; f < length && start + f < frames; f++) {
       mix[(start + f) * 2] += s[f * 2] * gain;
       mix[(start + f) * 2 + 1] += s[f * 2 + 1] * gain;

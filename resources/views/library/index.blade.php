@@ -1,5 +1,6 @@
 <x-video-demo::layout :title="$query !== '' ? 'Search' : null" :badge="$area === 'private' ? 'Staff' : null" :home="route('video-demo.'.$area.'.index')">
   <section class="vd-hero">
+    @include('video-demo::partials.art', ['name' => 'book'])
     <div>
       <p class="vd-eyebrow">Help</p>
       <h1>{{ $query !== '' ? 'Videos about “'.$query.'”' : 'How-to videos' }}</h1>
@@ -14,6 +15,7 @@
 
   @if (empty($videos))
     <div class="vd-card vd-empty">
+      @include('video-demo::partials.art', ['name' => 'book', 'class' => 'vd-empty-art'])
       <strong>{{ $query !== '' ? 'No video covers that yet' : 'No videos yet' }}</strong>
       @if ($query !== '' && config('video-demo.library.accept_requests') && ! session('video-demo.requested'))
         <p style="margin:0 0 16px">Ask for one and the team will see it.</p>
@@ -29,7 +31,7 @@
     @php($manifest = app(\Ogunsakin01\VideoDemo\Library\Manifest::class))
     <div class="vd-grid">
       @foreach ($videos as $video)
-        <a class="vd-tile" href="{{ route('video-demo.'.$area.'.show', $video['slug']) }}">
+        <a class="vd-tile vd-lift" href="{{ route('video-demo.'.$area.'.show', $video['slug']) }}">
           <div class="vd-tile-media">
             <img src="{{ $manifest->url($video, 'poster') }}" alt="" loading="lazy">
             <span class="vd-tile-time">{{ gmdate('i:s', (int) round($video['duration'] ?? 0)) }}</span>

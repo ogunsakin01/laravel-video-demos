@@ -15,7 +15,7 @@ class DemoClaude extends Claude
     public function __construct() {}
 
     /**
-     * Answer form completion and suggestion requests with canned replies.
+     * Answer form completion, suggestion and voice-over requests with canned replies.
      */
     public function create(array $params): object
     {
@@ -37,6 +37,18 @@ class DemoClaude extends Claude
                     'Ends on the live listing, so viewers see the result.',
                 ],
             ]);
+        }
+
+        // A voice-over for a plan: lines the way a person talks you through it.
+        if (isset($params['outputConfig']['format']['schema']['properties']['lines'])) {
+            return $this->reply($params['model'], ['lines' => [
+                ['step' => 1, 'say' => "You'll have a job listed in under a minute."],
+                ['step' => 3, 'say' => 'It starts from the top menu.'],
+                ['step' => 5, 'say' => 'Use the words people actually search for.'],
+                ['step' => 7, 'say' => 'Remote opens it up to anyone.'],
+                ['step' => 10, 'say' => "And that's it, it's out."],
+                ['step' => 13, 'say' => 'Easy as that.'],
+            ]]);
         }
 
         // "Suggest videos" asks for a list.

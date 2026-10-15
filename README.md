@@ -52,10 +52,10 @@ ANTHROPIC_API_KEY=sk-ant-...            # or OpenAI, Gemini, a local model…
 APP_URL=https://myapp.test
 ```
 
-Start a worker for the package's own queue, then open `/video-demo/studio`:
+Start the package's workers, then open `/video-demo/studio`:
 
 ```bash
-php artisan queue:work video-demo
+php artisan video-demo:work          # makes 2 videos at once; --workers=4 for more
 ```
 
 The [setup checklist](https://github.com/ogunsakin01/laravel-video-demos/wiki/Setup-Checklist) walks through each step and how to check it. To update later, run `php artisan video-demo:install` again; see [Upgrading](https://github.com/ogunsakin01/laravel-video-demos/wiki/Upgrading).

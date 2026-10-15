@@ -66,11 +66,14 @@ class Recorder
 
         $result = json_decode(File::get("$dir/result.json"), true) ?: [];
 
-        // Lengths and chapter times as they will be in the sped-up video.
-        $result['durationMs'] = ($result['durationMs'] ?? 0) / $speed;
-        $result['chapters'] = array_map(fn ($c) => [...$c, 'at' => round($c['at'] / $speed, 2)], $result['chapters'] ?? []);
-        $result['focus'] = array_map(fn ($f) => [...$f, 't' => round($f['t'] / 1000 / $speed, 3)], $result['focus'] ?? []);
-        $result['starts'] = array_map(fn ($t) => round($t / 1000 / $speed, 3), $result['starts'] ?? []);
+        // Lengths and times as they will be in the finished video: played at its
+        // speed, with the waits on the app cut out.
+        $timeline = Timeline::build((float) ($result['durationMs'] ?? 0), $speed, $result['idle'] ?? [], $result['speaking'] ?? []);
+        $result['timeline'] = $timeline->toArray();
+        $result['durationMs'] = $timeline->seconds() * 1000;
+        $result['chapters'] = array_map(fn ($c) => [...$c, 'at' => round($timeline->at($c['at'] * 1000), 2)], $result['chapters'] ?? []);
+        $result['focus'] = array_map(fn ($f) => [...$f, 't' => $timeline->at($f['t'])], $result['focus'] ?? []);
+        $result['starts'] = array_map(fn ($t) => $timeline->at($t), $result['starts'] ?? []);
         $result['lines'] = array_map(fn ($step) => $step['say'] ?? null, $plan->steps);
 
         return RecordingResult::fromArray($result, $device);
@@ -195,7 +198,7 @@ class Recorder
      */
     public static function speed(?float $speed = null): float
     {
-        return max(0.25, min(4.0, $speed ?: (float) config('video-demo.recorder.speed', 2)));
+        return max(0.25, min(4.0, $speed ?: (float) config('video-demo.recorder.speed', 1)));
     }
 
     /**

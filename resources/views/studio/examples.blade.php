@@ -4,17 +4,18 @@
   </x-slot:nav>
 
   <section class="vd-hero">
+    @include('video-demo::partials.art', ['name' => 'book'])
     <div>
       <p class="vd-eyebrow">Studio</p>
       <h1>Examples</h1>
-      <p class="vd-sub">The same short video, made in each built-in style, so you can compare them. Pick one and "Make one like this" starts a video of your app in that style.</p>
+      <p class="vd-sub">One short video in each built-in style. Pick the one you like and make yours like it.</p>
     </div>
   </section>
 
   <div class="vd-stack">
     @foreach ($examples as $example)
       @php($first = array_key_first($example['versions']))
-      <article class="vd-card vd-split" style="align-items:center" data-example>
+      <article class="vd-card vd-split vd-lift" style="align-items:center" data-example>
         <div class="vd-stack-sm">
           <video class="vd-video" controls preload="none" playsinline data-player
             poster="{{ $example['versions'][$first]['poster'] }}" src="{{ $example['versions'][$first]['video'] }}"

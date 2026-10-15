@@ -174,7 +174,9 @@ final class Plan
             return $this;
         }
 
-        $factor = max(0.5, min(3.0, ($targetSeconds * 1000 - $fixedMs) / $flexibleMs));
+        // Captions are never stretched far past what they need: a video a
+        // little shorter than its target beats one that lingers.
+        $factor = max(0.5, min(1.4, ($targetSeconds * 1000 - $fixedMs) / $flexibleMs));
 
         $steps = array_map(function ($step) use ($factor) {
             if ($this->isFlexible($step)) {

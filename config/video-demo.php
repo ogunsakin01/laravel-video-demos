@@ -265,11 +265,12 @@ return [
         // page stops the video before any AI is spent on it.
         'check_pages' => true,
 
-        // Videos play this many times faster than they were recorded, which
-        // makes clicks and typing snappy. Captions, title cards and pauses
-        // are held longer while recording, so they keep a readable length.
-        // This is the default for new videos; each video can set its own.
-        'speed' => (float) env('VIDEO_DEMO_SPEED', 2),
+        // Videos play this many times faster than they were recorded. At 1
+        // the cursor, typing and scrolling move at a person's pace; time spent
+        // waiting on the app (pages loading) is cut out either way. Captions,
+        // title cards and pauses keep a readable length at any speed. This is
+        // the default for new videos; each video can set its own.
+        'speed' => (float) env('VIDEO_DEMO_SPEED', 1),
     ],
 
     /*
@@ -446,6 +447,10 @@ return [
         // Seconds a job may run before the queue starts it again, for the
         // package's own connection. Keep it longer than your longest video.
         'retry_after' => 7200,
+
+        // How many videos php artisan video-demo:work makes at once. Each
+        // runs its own browser, so more needs more memory and CPU.
+        'workers' => (int) env('VIDEO_DEMO_WORKERS', 2),
     ],
 
     /*

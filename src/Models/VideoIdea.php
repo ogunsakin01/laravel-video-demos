@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property ?string $start_path
  * @property int $target_seconds
  * @property ?string $style
+ * @property ?string $record_as
  * @property ?string $model
  * @property float $cost
  * @property ?int $video_id

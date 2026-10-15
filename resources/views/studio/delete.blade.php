@@ -7,10 +7,11 @@
   @php($used = $videos->filter(fn ($v) => $v->isPublished() || ! empty($embeds[$v->slug])))
 
   <section class="vd-hero">
+    @include('video-demo::partials.art', ['name' => 'bin'])
     <div>
       <p class="vd-eyebrow">Studio</p>
       <h1>Delete {{ $count === 1 ? 'this video' : "these $count videos" }}?</h1>
-      <p class="vd-sub">Their recordings are deleted, and published ones are taken out of the library. This can't be undone. What they cost so far isn't refunded.</p>
+      <p class="vd-sub">Recordings are deleted and taken out of the library. This can't be undone.</p>
     </div>
   </section>
 

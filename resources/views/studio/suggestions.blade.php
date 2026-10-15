@@ -4,10 +4,11 @@
   </x-slot:nav>
 
   <section class="vd-hero">
+    @include('video-demo::partials.art', ['name' => 'bulb'])
     <div>
       <p class="vd-eyebrow">Studio</p>
       <h1>Ideas</h1>
-      <p class="vd-sub">Videos the AI suggests making first, from your app's routes: the flows new users most need. Pick one and it opens in the new-video form, ready to check and generate. Ideas are kept, so you can come back to them.</p>
+      <p class="vd-sub">The videos worth making first, read from your app's routes. Pick one to open it in the form.</p>
     </div>
     <form method="post" action="{{ route('video-demo.studio.suggestions.store') }}" class="vd-actions" id="vd-suggest-form" style="align-items:center">
       @csrf
@@ -32,8 +33,9 @@
 
   @if ($ideas->isEmpty())
     <div class="vd-card vd-empty">
+      @include('video-demo::partials.art', ['name' => 'bulb', 'class' => 'vd-empty-art'])
       <strong>No ideas yet</strong>
-      <p style="margin:0">Click "Suggest videos" and the AI reads your routes and lists the videos worth making first. It takes a few seconds and costs about a cent or two. The ideas are saved here.</p>
+      <p style="margin:0">"Suggest videos" reads your routes and lists the videos worth making first, for whoever each is for. A few seconds, a cent or two.</p>
     </div>
   @else
     <p class="vd-small vd-muted" style="margin:0 0 12px">
@@ -42,7 +44,7 @@
     </p>
     <div class="vd-grid" style="grid-template-columns:repeat(auto-fill,minmax(min(320px,100%),1fr))">
       @foreach ($ideas as $idea)
-        <article class="vd-card vd-stack-sm" style="display:flex;flex-direction:column">
+        <article class="vd-card vd-stack-sm vd-lift" style="display:flex;flex-direction:column">
           <p class="vd-eyebrow" style="margin:0">{{ $idea->video_id ? 'Made into a video' : 'Idea' }}</p>
           <h2 style="margin:0">{{ $idea->title }}</h2>
           <p style="margin:0">{{ $idea->prompt }}</p>
@@ -50,6 +52,7 @@
           <div class="vd-actions" style="margin-top:4px">
             <span class="vd-pill">{{ $styles[$idea->style]->name ?? $idea->style }}</span>
             <span class="vd-pill vd-num">{{ gmdate('i:s', $idea->target_seconds) }}</span>
+            @if ($idea->record_as)<span class="vd-pill">For {{ \Ogunsakin01\VideoDemo\Recording\RecordAs::label($idea->record_as) }}</span>@endif
             @if ($idea->start_path)<span class="vd-pill vd-mono">{{ $idea->start_path }}</span>@endif
           </div>
           <div class="vd-actions" style="margin-top:auto;padding-top:12px">
@@ -62,6 +65,7 @@
                 'start_path' => $idea->start_path,
                 'target_seconds' => $idea->target_seconds,
                 'style' => $idea->style,
+                'record_as' => $idea->record_as,
                 'idea' => $idea->id,
             ])) }}">{{ $idea->video ? 'Make it again' : 'Make this video' }}</a>
             <form method="post" action="{{ route('video-demo.studio.suggestions.destroy', $idea) }}">@csrf @method('delete')

@@ -51,7 +51,7 @@ class SuggestCommand extends Command
 
         foreach ($result['suggestions'] as $i => $s) {
             $this->newLine();
-            $this->line(sprintf('<options=bold>%d. %s</>  <fg=gray>%s · %ds%s</>', $i + 1, $s['title'], $s['style'], $s['target_seconds'], $s['start_path'] ? ' · '.$s['start_path'] : ''));
+            $this->line(sprintf('<options=bold>%d. %s</>  <fg=gray>%s · %ds%s%s</>', $i + 1, $s['title'], $s['style'], $s['target_seconds'], $s['start_path'] ? ' · '.$s['start_path'] : '', $s['record_as'] ? ' · as '.$s['record_as'] : ''));
             $this->line('   '.$s['prompt']);
             $this->line('   <fg=gray>'.$s['why'].'</>');
         }

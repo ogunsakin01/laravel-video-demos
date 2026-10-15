@@ -28,12 +28,9 @@
         <option value="{{ $voice }}" selected>{{ $voice }} (not available here)</option>
       @endif
     </select>
-    <span class="vd-hint">
-      The AI writes a short line for each step and the voice speaks it; each step waits for its line.
-      @unless (\Ogunsakin01\VideoDemo\Voice\Voices::localInstalled())
-        For free, natural voices, run <code>php artisan video-demo:install-voice</code>.
-      @endunless
-    </span>
+    @unless (\Ogunsakin01\VideoDemo\Voice\Voices::localInstalled())
+      <span class="vd-hint">Free natural voices: <code>php artisan video-demo:install-voice</code></span>
+    @endunless
   </div>
   <div>
     <div class="vd-field-head">
@@ -53,7 +50,7 @@
       @if ($tracks === [])
         Add your own tracks on the <a href="{{ route('video-demo.studio.styles.index') }}#music">Styles page</a>.
       @else
-        It fades in and out, and gets quieter while the voice speaks. Add tracks on the <a href="{{ route('video-demo.studio.styles.index') }}#music">Styles page</a>.
+        Quieter under the voice. More tracks on the <a href="{{ route('video-demo.studio.styles.index') }}#music">Styles page</a>.
       @endif
     </span>
   </div>

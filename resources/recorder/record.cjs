@@ -24,6 +24,20 @@ const FIND_TIMEOUT = 8000;
 const focus = [];
 let started = 0;
 
+// Time spent waiting on the app (pages loading, something appearing), in ms
+// since recording started. Most of it is cut from the video, so a click goes
+// straight to its result, as in a fast app.
+const idle = [];
+async function waiting(work) {
+  const from = started ? Date.now() - started : 0;
+  try {
+    return await work();
+  } finally {
+    const to = started ? Date.now() - started : 0;
+    if (started && to - from > 250) idle.push([from, to]);
+  }
+}
+
 // Bring an element into view, note where it is, and outline it if the style asks.
 async function focusOn(page, loc) {
   await scrollTo(page, loc).catch(() => {});
@@ -65,7 +79,7 @@ function describe(t) {
 async function find(page, t) {
   const loc = locate(page, t);
   try {
-    await loc.waitFor({ state: 'visible', timeout: FIND_TIMEOUT });
+    await waiting(() => loc.waitFor({ state: 'visible', timeout: FIND_TIMEOUT }));
   } catch {
     throw new Error(`Could not find a visible element with ${describe(t)}.`);
   }
@@ -75,8 +89,10 @@ async function find(page, t) {
 // Wait for the page to load and its network to go quiet, without failing if it never does:
 // a slow image or script from another site must not stop the video.
 async function settle(page) {
-  await page.waitForLoadState('load', { timeout: 10000 }).catch(() => {});
-  await page.waitForLoadState('networkidle', { timeout: 4000 }).catch(() => {});
+  await waiting(async () => {
+    await page.waitForLoadState('load', { timeout: 10000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 4000 }).catch(() => {});
+  });
 }
 
 async function run(page, step, isLast) {
@@ -85,19 +101,21 @@ async function run(page, step, isLast) {
     case 'goto':
       await wide(page);
       // Only the page itself must arrive; images and scripts get settle()'s grace period.
-      await page.goto(url(step.url), { waitUntil: 'domcontentloaded', timeout: 60000 });
+      await waiting(() => page.goto(url(step.url), { waitUntil: 'domcontentloaded', timeout: 60000 }));
       await settle(page);
       if (/\/login\b/.test(new URL(page.url()).pathname) && !/\/login\b/.test(step.url)) {
         throw new Error(`Opening ${step.url} went to the sign-in page instead. ${job.loginPath ? "The recorder's user may not have access." : 'The recorder is signed out; set video-demo.recorder.login_as.'}`);
       }
-      await pause(page, 700 + extra);
+      // Time to take in the new page before anything moves.
+      await pause(page, 1100 + extra);
       return;
     case 'click': {
       const loc = await find(page, step.target);
       await focusOn(page, loc);
       await click(page, loc);
       await settle(page);
-      await pause(page, 500 + extra);
+      // Time to see what the click did.
+      await pause(page, 900 + extra);
       return;
     }
     case 'hover': {
@@ -153,7 +171,7 @@ async function run(page, step, isLast) {
     case 'wait':
       if (step.target) {
         const loc = locate(page, step.target);
-        await loc.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {
+        await waiting(() => loc.waitFor({ state: 'visible', timeout: 15000 })).catch(() => {
           throw new Error(`Waited 15 seconds for ${describe(step.target)} to appear.`);
         });
       } else {
@@ -216,7 +234,7 @@ async function snapshot(page) {
 
 (async () => {
   // starts: when each step began, in ms since recording started, so voice-over lines can be placed.
-  const result = { ok: false, video: null, durationMs: 0, trimMs: 0, chapters: [], starts: [], focus, failedStep: null, error: null, url: null, title: null, snapshot: null };
+  const result = { ok: false, video: null, durationMs: 0, trimMs: 0, chapters: [], starts: [], focus, failedStep: null, error: null, url: null, title: null, snapshot: null, idle, speaking: [] };
   // For the full error view: the browser's own messages and failed requests, and the page when it failed.
   const browserLog = [];
   const log = (kind, text, extra = {}) => {
@@ -249,7 +267,6 @@ async function snapshot(page) {
       await ctx.close();
     }
 
-    const recordingStarted = Date.now();
     const context = await browser.newContext({ ...common, storageState, recordVideo: { dir: job.outDir, size: job.viewport } });
     // Sample data: the cookie sends every request to the video's own database.
     if (job.cookies?.length) await context.addCookies(job.cookies);
@@ -260,6 +277,8 @@ async function snapshot(page) {
     await context.addInitScript(OVERLAY_JS);
     if (style.highlight) await context.addInitScript(HIGHLIGHT_JS);
     page = await context.newPage();
+    // The video's first frame is the page's: setting up the browser before it isn't in it.
+    const recordingStarted = Date.now();
     // Installed Chrome starts with a shorter window, and its capture only takes
     // the full size after a real navigation. So wait, then navigate to a plain
     // page for anything shown before the first page opens, and cut everything
@@ -290,6 +309,8 @@ async function snapshot(page) {
       if (step.chapter) result.chapters.push({ title: step.chapter, at: (Date.now() - started) / 1000 });
       const stepStarted = Date.now();
       result.starts.push(stepStarted - started);
+      // While a line is spoken, nothing is cut, or the voice would run into the next one.
+      if (step.hold_ms) result.speaking.push([stepStarted - started, stepStarted - started + step.hold_ms]);
       try {
         await run(page, step, i === plan.steps.length - 1);
         // A step with a spoken line lasts until the line is finished.

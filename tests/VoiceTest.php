@@ -21,6 +21,7 @@ use Ogunsakin01\VideoDemo\Recording\Encoder;
 use Ogunsakin01\VideoDemo\Recording\Plan;
 use Ogunsakin01\VideoDemo\Recording\Recorder;
 use Ogunsakin01\VideoDemo\Recording\RecordingResult;
+use Ogunsakin01\VideoDemo\Recording\Timeline;
 use Ogunsakin01\VideoDemo\Tests\Concerns\FakesAnthropic;
 use Ogunsakin01\VideoDemo\VideoDemo;
 use Ogunsakin01\VideoDemo\Voice\Music;
@@ -96,7 +97,7 @@ class VoiceTest extends TestCase
         Voices::flush(['Samantha' => 'Samantha (en US)']);
 
         $options = Voices::options();
-        $this->assertSame(['Local voices, free', "This computer's voice, for drafts"], array_keys($options));
+        $this->assertSame(['Local voices, free', "This computer's voice: robotic, for drafts only"], array_keys($options));
         $this->assertSame('Heart, warm (US)', $options['Local voices, free']['kokoro:af_heart']);
         $this->assertTrue(Voices::available('system:Samantha'));
         $this->assertSame(['No voice', 'Heart, warm (US)', 'kokoro:nobody'], [Voices::label(null), Voices::label('kokoro:af_heart'), Voices::label('kokoro:nobody')]);
@@ -121,7 +122,7 @@ class VoiceTest extends TestCase
         }
 
         $line = $this->wav($this->root.'/line.wav', 1, 8000);
-        $quiet = $this->wav($this->root.'/quiet.wav', 1, 2000);
+        $quiet = $this->wav($this->root.'/quiet.wav', 1, 1000);
         $music = $this->wav($this->root.'/music.wav', 3, 10000);
         File::ensureDirectoryExists($this->root.'/mix');
         File::put($this->root.'/mix/job.json', json_encode(['seconds' => 10, 'out' => $this->root.'/out.wav', 'clips' => [['file' => $line, 'at' => 4], ['file' => $quiet, 'at' => 6]], 'music' => ['file' => $music, 'volume' => 0.25]]));
@@ -137,10 +138,10 @@ class VoiceTest extends TestCase
         $this->assertLessThan(500, $at(0.02));
         $this->assertEqualsWithDelta(2500, $at(3.5 - 0.5), 30);
         $this->assertLessThan(200, $at(9.98));
-        // A line is brought up to a clear level, with the music a quarter as loud under it.
-        $this->assertEqualsWithDelta(29000 + 625, $at(4.5), 60);
+        // Every line is brought to the same loudness (a loud one down), with the music a quarter as loud under it.
+        $this->assertEqualsWithDelta(6000 + 625, $at(4.5), 60);
         // A very quiet one is raised at most four times, so noise isn't blown up.
-        $this->assertEqualsWithDelta(8000 + 625, $at(6.5), 60);
+        $this->assertEqualsWithDelta(4000 + 625, $at(6.5), 60);
         $this->assertEqualsWithDelta(2500, $at(7.75), 30);
     }
 
@@ -255,7 +256,7 @@ class VoiceTest extends TestCase
         {
             public int $sound = 0;
 
-            public function encode(string $webm, string $mp4, string $poster, float $trimSeconds = 0, float $speed = 1): void
+            public function encode(string $webm, string $mp4, string $poster, float $trimSeconds = 0, float $speed = 1, ?Timeline $timeline = null): void
             {
                 File::put($mp4, 'mp4');
                 File::put($poster, 'jpg');
@@ -304,7 +305,7 @@ class VoiceTest extends TestCase
         $this->assertSame(0.25, $mix['music']['volume']);
         $this->assertSame(1, $fakes['encoder']->sound);
         $this->assertStringContainsString("00:00:00.650 --> 00:00:02.650\nOpen the jobs page.", Storage::disk('local')->get($video->workFile('desktop', 'subtitles')));
-        $this->assertContains('Speaking the voice-over: 2 lines in kokoro:af_heart', array_column($video->log, 'message'));
+        $this->assertContains('Speaking the voice-over: 2 lines in Heart, warm (US)', array_column($video->log, 'message'));
         $this->assertSame(2500, $video->plan['steps'][0]['voice_ms']);
     }
 
@@ -495,12 +496,19 @@ class VoiceTest extends TestCase
 
         $this->assertSame(0.5, $speaker->speak('gemini:Kore', ['Publish it.'])['Publish it.']['seconds']);
         Http::assertSent(fn ($r) => str_contains($r->url(), '/v1beta/interactions') && $r['model'] === 'gemini-3.8-flash-tts'
-            && $r['generation_config']['speech_config'][0]['voice'] === 'Kore' && $r['input'][0]['content'][0]['annotations'][0]['style'] === 'warm, clear and friendly');
+            && $r['generation_config']['speech_config'][0]['voice'] === 'Kore' && str_starts_with($r['input'][0]['content'][0]['annotations'][0]['style'], 'warm, clear and friendly, like a person talking'));
 
         // A sample from ElevenLabs is kept as the MP3 it sends, for the browser to play.
         $sample = $speaker->speak('elevenlabs:JBFqnCBsd6RMkjVDRZzb', ['Hi.'], mixable: false)['Hi.'];
         $this->assertStringEndsWith('.mp3', $sample['file']);
         Http::assertSent(fn ($r) => str_contains($r->url(), '/v1/text-to-speech/JBFqnCBsd6RMkjVDRZzb?output_format=mp3_44100_128') && $r['model_id'] === 'eleven_multilingual_v2');
+
+        // Each line hears the ones around it, so the voice-over flows as one.
+        $speaker->speak('elevenlabs:JBFqnCBsd6RMkjVDRZzb', ['Your jobs live here.', 'Pick the draft.', 'Done.'], mixable: false);
+        Http::assertSent(fn ($r) => ($r['text'] ?? null) === 'Pick the draft.' && $r['previous_text'] === 'Your jobs live here.' && $r['next_text'] === 'Done.');
+        Http::assertSent(fn ($r) => ($r['text'] ?? null) === 'Your jobs live here.' && ! isset($r['previous_text']));
+        $speaker->speak('openai:marin', ['First.', 'Second.']);
+        Http::assertSent(fn ($r) => ($r['input'] ?? null) === 'Second.' && str_contains($r['instructions'], 'follows straight on from: "First."') && str_contains($r['instructions'], 'not an announcer'));
     }
 
     public function test_a_provider_error_is_explained(): void
@@ -563,5 +571,13 @@ class VoiceTest extends TestCase
         $this->artisan('video-demo:clean', ['--voice' => true])->assertSuccessful();
         $this->assertFalse(Voices::localInstalled());
         $this->assertDirectoryDoesNotExist($this->root.'/model');
+    }
+
+    public function test_a_local_voice_keeps_its_name_where_it_is_not_installed(): void
+    {
+        config(['video-demo.recorder.node_modules' => '/nowhere']);
+
+        $this->assertSame('Heart, warm (US)', Voices::label('kokoro:af_heart'));
+        $this->assertSame('openai:nobody', Voices::label('openai:nobody'));
     }
 }

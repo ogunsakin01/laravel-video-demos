@@ -4,6 +4,7 @@
   </x-slot:nav>
 
   <section class="vd-hero">
+    @include('video-demo::partials.art', ['name' => 'play'])
     <div>
       <p class="vd-eyebrow">How-to · {{ gmdate('i:s', (int) round($video['duration'] ?? 0)) }}</p>
       <h1>{{ $video['title'] }}</h1>

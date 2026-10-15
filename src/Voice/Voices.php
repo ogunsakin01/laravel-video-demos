@@ -46,7 +46,7 @@ class Voices
         }
 
         foreach (static::systemVoices() as $id => $label) {
-            $groups["This computer's voice, for drafts"][self::key('system', $id)] = $label;
+            $groups["This computer's voice: robotic, for drafts only"][self::key('system', $id)] = $label;
         }
 
         foreach (['openai' => 'OpenAI', 'gemini' => 'Gemini', 'elevenlabs' => 'ElevenLabs'] as $provider => $name) {
@@ -154,7 +154,12 @@ class Voices
             return 'No voice';
         }
 
-        return static::all()[$key] ?? $key;
+        // A local voice keeps its name on machines where it isn't installed.
+        [$provider, $id] = static::parse($key);
+
+        return static::all()[$key]
+            ?? ($provider === 'kokoro' ? ((array) config('video-demo.voice.kokoro_voices', []))[$id] ?? null : null)
+            ?? $key;
     }
 
     /**

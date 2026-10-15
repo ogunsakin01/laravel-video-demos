@@ -2,6 +2,31 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/). While the version is 0.x, minor releases may include breaking changes; they will be listed here.
 
+## v0.14.0 - 2026-10-15
+
+Run `php artisan video-demo:install` after updating, for the new column. Videos now play at 1× by default: if you published the config, change `'speed' => (float) env('VIDEO_DEMO_SPEED', 2)` to 1, or set `VIDEO_DEMO_SPEED=1`.
+
+### Added
+
+- **Several videos at once.** `php artisan video-demo:work` runs two queue workers for the package's queue (`--workers=N`, or `VIDEO_DEMO_WORKERS`), restarts any that stop, and stops them all on Ctrl+C. A video handed to two workers at once (the database queue on SQLite can do this) is made once, and is no longer marked failed by the second.
+- **Ideas know who each video is for.** Each idea picks the type of user it should be recorded as (admin, member, guest and so on), from your roles and every route's middleware, shows it on the card, and fills it in when you make the video. `video-demo:suggest --json` includes it as `record_as`.
+
+### Changed
+
+- **More natural timing.** Waiting on your app (pages loading, the network settling after a click, something appearing) is cut out of the video, except while the voice-over speaks, so a click goes straight to its result. The cursor moves in a slight arc over a time that suits the distance and rests a moment before clicking, and each click and page change gets a beat to be seen. With the waits cut, videos play at 1× by default, so the cursor and typing move at a person's pace. Captions are no longer stretched to more than 1.4 times their length to reach a target: a video a little short beats one that lingers.
+- **Voice-overs that sound less like AI.** The lines are written the way a colleague talks you through a screen: contractions, varied lengths, no stock phrases ("Here's how", "seamless"), each following on from the last, and silence where nothing needs saying. OpenAI and ElevenLabs voices hear the lines around each one, so the narration flows instead of restarting every line, and every line is levelled to the same loudness. The computer's own voices are labelled robotic, for drafts only.
+- **New look.** The new-video and Make it again forms are in short sections, with the less-used settings under "More options", explanations behind a "?" instead of under every field, switches, a preview of the style's colours and a live summary of the video. Pages arrive with gentle motion (sections rising in, lists following item by item, line art drawing itself on), and empty states have line art too. Motion is off for people who ask for less.
+
+### Fixed
+
+- The first second or so of every recording was cut off: the start of the video file was measured from before the browser's capture began.
+- A local voice keeps its name ("Heart, warm (US)") on a machine where it isn't installed, instead of showing its key.
+- When the AI writes no voice-over, the log says why it stopped and what it answered.
+
+### Breaking
+
+- Apps that extend `Encoder::encode()` need its new last parameter, `?Timeline $timeline = null`.
+
 ## v0.13.0 - 2026-10-15
 
 Run `php artisan video-demo:install` after updating, for the new column.

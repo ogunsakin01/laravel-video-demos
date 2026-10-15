@@ -6,7 +6,9 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\MaxAttemptsExceededException;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 use Ogunsakin01\VideoDemo\Ai\Narrator;
@@ -69,6 +71,9 @@ class GenerateVideo implements ShouldQueue
 
         // Allow time for planning, then for recording and encoding each version.
         $this->timeout = (int) max(1800, 900 + count($video->deviceList()) * max(600, $video->target_seconds * 12));
+
+        // Queued afresh: a lock left by a worker that was killed mid-video mustn't hold this one back.
+        Cache::lock($this->lockKey())->forceRelease();
     }
 
     /**
@@ -83,6 +88,13 @@ class GenerateVideo implements ShouldQueue
      */
     public function handle(Planner $planner, Recorder $recorder, Encoder $encoder, Narrator $narrator, Speaker $speaker, Soundtrack $soundtrack): void
     {
+        // Some queues (the database queue on SQLite, say) can hand the same
+        // video to two workers at once. The second one leaves it alone.
+        $lock = Cache::lock($this->lockKey(), $this->timeout + 300);
+        if (! $lock->get()) {
+            return;
+        }
+
         try {
             $this->make($planner, $recorder, $encoder, $narrator, $speaker, $soundtrack);
         } catch (VideoStopped $e) {
@@ -93,7 +105,17 @@ class GenerateVideo implements ShouldQueue
             $this->video->update(['error' => $e->getMessage(), 'error_details' => ErrorReport::for($this->video, $e, $this->appErrors)]);
 
             throw $e;
+        } finally {
+            $lock->release();
         }
+    }
+
+    /**
+     * Get the name of the lock held while the video is being made.
+     */
+    protected function lockKey(): string
+    {
+        return 'video-demo:making:'.$this->video->getKey();
     }
 
     /**
@@ -210,7 +232,7 @@ class GenerateVideo implements ShouldQueue
         foreach ($results as $device => $result) {
             $mp4 = $work->path($video->workFile($device));
             $poster = $work->path($video->workFile($device, 'poster'));
-            $encoder->encode($result->video, $mp4, $poster, $result->trimSeconds, $video->playbackSpeed());
+            $encoder->encode($result->video, $mp4, $poster, $result->trimSeconds, $video->playbackSpeed(), $result->timeline);
 
             // Styles with zoom move a camera in on each step; the video stays as it is if that fails.
             if (! empty($video->style['zoom']) && $result->focus !== []) {
@@ -464,6 +486,16 @@ class GenerateVideo implements ShouldQueue
      */
     public function failed(Throwable $e): void
     {
+        // The same video handed to a second worker while the first makes it:
+        // the queue gives up on the copy, but the video is fine.
+        if ($e instanceof MaxAttemptsExceededException) {
+            $probe = Cache::lock($this->lockKey(), 5);
+            if (! $probe->get()) {
+                return;
+            }
+            $probe->release();
+        }
+
         $this->video->refresh();
         $this->video->stop_requested = false;
         $this->video->error = $e->getMessage();

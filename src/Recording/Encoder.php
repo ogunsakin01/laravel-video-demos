@@ -25,19 +25,76 @@ class Encoder
      * $trimSeconds (in recording time) cuts the browser's start-up from the
      * beginning; $speed plays the recording back that many times faster.
      */
-    public function encode(string $webm, string $mp4, string $poster, float $trimSeconds = 0, float $speed = 1): void
+    public function encode(string $webm, string $mp4, string $poster, float $trimSeconds = 0, float $speed = 1, ?Timeline $timeline = null): void
     {
         $ffmpeg = config('video-demo.recorder.ffmpeg', 'ffmpeg');
         $speed = max($speed, 0.1);
 
-        $this->run([$ffmpeg, '-y', '-v', 'error',
-            // Squeezes the timestamps, so frames play $speed times faster.
-            '-itsscale', number_format(1 / $speed, 6, '.', ''),
-            '-i', $webm, '-ss', number_format($trimSeconds / $speed, 2, '.', ''), '-r', (string) self::FPS,
-            '-c:v', 'libx264', '-crf', '26', '-preset', 'slow', '-pix_fmt', 'yuv420p',
-            '-movflags', '+faststart', '-an', $mp4]);
+        if ($timeline?->hasCuts()) {
+            $this->encodeCut($webm, $mp4, $trimSeconds, $timeline);
+        } else {
+            $this->run([$ffmpeg, '-y', '-v', 'error',
+                // Squeezes the timestamps, so frames play $speed times faster.
+                '-itsscale', number_format(1 / $speed, 6, '.', ''),
+                '-i', $webm, '-ss', number_format($trimSeconds / $speed, 2, '.', ''),
+                // Ends where the recording did, before the browser closed.
+                ...($timeline ? ['-t', number_format($timeline->seconds(), 2, '.', '')] : []),
+                '-r', (string) self::FPS,
+                '-c:v', 'libx264', '-crf', '26', '-preset', 'slow', '-pix_fmt', 'yuv420p',
+                '-movflags', '+faststart', '-an', $mp4]);
+        }
 
         $this->poster($mp4, $poster);
+    }
+
+    /**
+     * Encode only the parts the timeline keeps: each part is cut out at its
+     * own pace, the parts are joined, and the whole is played at the timeline's
+     * speed. Uses no filters, so any ffmpeg build works.
+     */
+    protected function encodeCut(string $webm, string $mp4, float $trimSeconds, Timeline $timeline): void
+    {
+        $ffmpeg = config('video-demo.recorder.ffmpeg', 'ffmpeg');
+        $dir = dirname($mp4).'/parts-'.pathinfo($mp4, PATHINFO_FILENAME);
+        File::ensureDirectoryExists($dir);
+        $list = [];
+
+        try {
+            foreach ($timeline->keep as $i => [$from, $to]) {
+                $part = sprintf('%s/%03d.mp4', $dir, $i);
+                $this->run([$ffmpeg, '-y', '-v', 'error',
+                    '-ss', number_format($trimSeconds + $from / 1000, 3, '.', ''), '-i', $webm,
+                    '-t', number_format(($to - $from) / 1000, 3, '.', ''), '-r', (string) self::FPS,
+                    '-c:v', 'libx264', '-crf', '16', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', '-an', $part]);
+                $list[] = "file '".str_replace("'", "'\\''", $part)."'";
+            }
+            File::put("$dir/parts.txt", implode("\n", $list)."\n");
+
+            $this->run([$ffmpeg, '-y', '-v', 'error',
+                '-itsscale', number_format(1 / $timeline->speed, 6, '.', ''),
+                '-f', 'concat', '-safe', '0', '-i', "$dir/parts.txt", '-r', (string) self::FPS,
+                '-c:v', 'libx264', '-crf', '26', '-preset', 'slow', '-pix_fmt', 'yuv420p',
+                '-movflags', '+faststart', '-an', $mp4]);
+        } finally {
+            File::deleteDirectory($dir);
+        }
+    }
+
+    /**
+     * Get a media file's length in seconds, from its header, or null when
+     * the file doesn't say.
+     */
+    public function duration(string $file): ?float
+    {
+        if (! is_file($file)) {
+            return null;
+        }
+        $result = Process::run([config('video-demo.recorder.ffmpeg', 'ffmpeg'), '-hide_banner', '-i', $file]);
+        if (! preg_match('/Duration: (\d+):(\d+):(\d+(?:\.\d+)?)/', $result->errorOutput().$result->output(), $m)) {
+            return null;
+        }
+
+        return $m[1] * 3600 + $m[2] * 60 + (float) $m[3];
     }
 
     /**

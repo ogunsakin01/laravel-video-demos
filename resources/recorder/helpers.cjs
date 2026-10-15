@@ -5,7 +5,7 @@ const CURSOR_JS = `
 (() => {
   if (window.__demoCursor) return;
   const c = document.createElement('div');
-  c.style.cssText = 'position:fixed;z-index:2147483647;left:0;top:0;width:22px;height:22px;margin:-4px 0 0 -4px;pointer-events:none;transition:transform .7s cubic-bezier(.2,.7,.2,1);transform:translate(640px,420px)';
+  c.style.cssText = 'position:fixed;z-index:2147483647;left:0;top:0;width:22px;height:22px;margin:-4px 0 0 -4px;pointer-events:none;transform:translate(640px,420px)';
   c.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24"><path d="M4 2l16 9-7 2-3 7z" fill="#111" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/></svg>';
   const ring = document.createElement('div');
   ring.style.cssText = 'position:fixed;z-index:2147483646;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;background:rgba(17,17,17,.18);pointer-events:none;opacity:0;transform:scale(.4);transition:opacity .35s, transform .35s';
@@ -18,10 +18,27 @@ const CURSOR_JS = `
   document.body ? add() : document.addEventListener('DOMContentLoaded', add);
   // Re-attach after the document is replaced in the same window (page.setContent).
   const attach = () => { if (!c.isConnected && document.body) add(); };
+  let at = { x: 640, y: 420 };
   window.__demoCursor = {
-    move(x, y) { attach(); c.style.transform = 'translate(' + x + 'px,' + y + 'px)'; },
+    // Moves the way a hand does: a slight arc, quick to start and slowing as it
+    // arrives, over a time that grows with the distance. Returns that time in ms.
+    move(x, y) {
+      attach();
+      const dx = x - at.x, dy = y - at.y, dist = Math.hypot(dx, dy);
+      const ms = dist < 4 ? 0 : Math.round(Math.min(1100, Math.max(420, 300 + dist * 0.55)));
+      // The arc bends to one side by up to 8% of the distance, the same way each time for the same move.
+      const bend = (((Math.round(at.x + y) % 7) - 3) / 3) * 0.08;
+      const mid = { x: at.x + dx / 2 - dy * bend, y: at.y + dy / 2 + dx * bend };
+      const t = p => 'translate(' + p.x + 'px,' + p.y + 'px)';
+      if (ms) c.animate([{ transform: t(at) }, { transform: t(mid), offset: 0.55 }, { transform: t({ x, y }) }], { duration: ms, easing: 'cubic-bezier(.3,.1,.2,1)' });
+      c.style.transform = t({ x, y });
+      at = { x, y };
+      return ms;
+    },
     click(x, y) {
       attach();
+      // The pointer dips as it presses, and a ring shows where.
+      c.animate([{ transform: c.style.transform }, { transform: c.style.transform + ' scale(.82)' }, { transform: c.style.transform }], { duration: 220, easing: 'ease-out' });
       ring.style.left = x + 'px'; ring.style.top = y + 'px';
       ring.style.opacity = '1'; ring.style.transform = 'scale(1)';
       setTimeout(() => { ring.style.opacity = '0'; ring.style.transform = 'scale(.4)'; }, 350);
@@ -238,8 +255,10 @@ async function glide(page, locator) {
   await scrollTo(page, locator);
   const box = await locator.boundingBox();
   const x = box.x + box.width / 2, y = box.y + box.height / 2;
-  await page.evaluate(([x, y]) => window.__demoCursor && window.__demoCursor.move(x, y), [x, y]);
-  await pause(page, 800);
+  const ms = await page.evaluate(([x, y]) => (window.__demoCursor ? window.__demoCursor.move(x, y) : 0), [x, y]);
+  // Arrive, then rest a moment on the target, as a person does before clicking.
+  await page.waitForTimeout(ms);
+  await pause(page, 220);
   return { x, y };
 }
 

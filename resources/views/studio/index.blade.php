@@ -4,10 +4,11 @@
   </x-slot:nav>
 
   <section class="vd-hero">
+    @include('video-demo::partials.art', ['name' => 'clapper'])
     <div>
       <p class="vd-eyebrow">Studio</p>
       <h1>Videos</h1>
-      <p class="vd-sub">Describe a flow in your app and AI records a walkthrough of it. Publish the ones you like to the library.</p>
+      <p class="vd-sub">Describe a flow; the AI records it. Publish the ones you like.</p>
     </div>
     <dl style="margin:0;min-width:180px">
       <dt class="vd-eyebrow">Spent on AI</dt>
@@ -20,6 +21,7 @@
     <div class="vd-card vd-card-flush vd-scroll">
       @if ($videos->isEmpty())
         <div class="vd-empty">
+          @include('video-demo::partials.art', ['name' => 'clapper', 'class' => 'vd-empty-art'])
           <strong>No videos yet</strong>
           <p style="margin:0 0 16px">Describe a flow and the AI will plan and record it.</p>
           <div class="vd-actions" style="justify-content:center">

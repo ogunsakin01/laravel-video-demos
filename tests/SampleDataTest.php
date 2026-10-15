@@ -318,7 +318,7 @@ class SampleDataTest extends TestCase
         ])->assertRedirect();
         $this->assertTrue(Video::firstOrFail()->sample_data);
 
-        $this->get('/video-demo/studio/create')->assertSee('Record on sample data');
+        $this->get('/video-demo/studio/create')->assertSee('Sample data')->assertSee('name="sample_data" value="1"', false);
         $this->assertTrue(app(VideoDemo::class)->make('x', ['sample_data' => true])->sample_data);
 
         // Sample data is the default, in the shipped config and so for the form, the facade and the CLI.

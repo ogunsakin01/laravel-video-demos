@@ -4,10 +4,11 @@
   </x-slot:nav>
 
   <section class="vd-hero">
+    @include('video-demo::partials.art', ['name' => 'spark'])
     <div>
       <p class="vd-eyebrow">Studio</p>
       <h1>New video</h1>
-      <p class="vd-sub">The AI model reads your app's code, plans the walkthrough, and it is recorded in a browser against this local copy.</p>
+      <p class="vd-sub">Describe a flow. The AI plans it from your code, and a browser records it.</p>
     </div>
   </section>
 
@@ -22,163 +23,197 @@
   <form method="post" action="{{ route('video-demo.studio.store') }}" class="vd-split" id="vd-form">
     @csrf
     @if ($defaults['idea'])<input type="hidden" name="idea" value="{{ $defaults['idea'] }}">@endif
-    <div class="vd-card vd-stack">
-      <div>
-        <div class="vd-field-head">
-          <label for="prompt">What should the video show?</label>
-          <button type="button" class="vd-btn vd-btn-sm" id="vd-complete" @disabled(! $hasKey)>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>
-            <span>Complete with AI</span>
-          </button>
+    <div class="vd-card">
+      <section class="vd-section">
+        <div class="vd-section-head"><span class="vd-section-num">1</span><h2 class="vd-section-title">What should it show?</h2></div>
+        <div class="vd-field">
+          <div class="vd-field-head">
+            <label for="prompt">Description</label>
+            <button type="button" class="vd-btn vd-btn-sm" id="vd-complete" @disabled(! $hasKey)>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>
+              <span>Complete with AI</span>
+            </button>
+          </div>
+          <textarea id="prompt" name="prompt" required maxlength="4000" placeholder="“Approve a holiday request” is enough">{{ old('prompt', $defaults['prompt']) }}</textarea>
+          <span class="vd-ai-note" id="vd-complete-note" aria-live="polite">A few words are enough. Complete with AI writes the rest, or suggests a video when it's empty.</span>
+          @error('prompt')<span class="vd-error">{{ $message }}</span>@enderror
         </div>
-        <textarea id="prompt" name="prompt" required maxlength="4000" placeholder="A few words are enough, such as “approve holiday request”. Complete with AI writes the rest.">{{ old('prompt', $defaults['prompt']) }}</textarea>
-        <span class="vd-ai-note" id="vd-complete-note" aria-live="polite">Describe the flow the way your users would ask about it. Leave it empty and Complete with AI suggests a video.</span>
-        @error('prompt')<span class="vd-error">{{ $message }}</span>@enderror
-      </div>
 
-      <div>
-        <span class="vd-label" id="vd-length-label">Length</span>
-        <input type="hidden" id="target_seconds" name="target_seconds" value="{{ old('target_seconds', $defaults['target_seconds']) }}">
-        <div class="vd-segments" role="group" aria-labelledby="vd-length-label">
-          @foreach ([30 => '30 sec', 60 => '1 min', 90 => '1½ min', 120 => '2 min', 180 => '3 min'] as $seconds => $label)
-            @if ($seconds <= config('video-demo.limits.max_seconds', 300))
-              <button type="button" class="vd-segment" data-seconds="{{ $seconds }}">{{ $label }}</button>
-            @endif
-          @endforeach
+        <div class="vd-field">
+          <span class="vd-label" id="vd-length-label">Length</span>
+          <input type="hidden" id="target_seconds" name="target_seconds" value="{{ old('target_seconds', $defaults['target_seconds']) }}">
+          <div class="vd-segments" role="group" aria-labelledby="vd-length-label">
+            @foreach ([30 => '30 sec', 60 => '1 min', 90 => '1½ min', 120 => '2 min', 180 => '3 min'] as $seconds => $label)
+              @if ($seconds <= config('video-demo.limits.max_seconds', 300))
+                <button type="button" class="vd-segment" data-seconds="{{ $seconds }}">{{ $label }}</button>
+              @endif
+            @endforeach
+          </div>
         </div>
-        <span class="vd-hint">A target. Captions and pauses stretch or shrink to land close to it.</span>
-      </div>
 
-      <div>
-        <span class="vd-label" id="vd-speed-label">Playback speed</span>
-        <input type="hidden" id="speed" name="speed" value="{{ old('speed', $defaults['speed']) }}">
-        <div class="vd-segments" role="group" aria-labelledby="vd-speed-label">
-          @foreach (['1' => '1× real time', '1.25' => '1.25×', '1.5' => '1.5×', '2' => '2×', '3' => '3×'] as $value => $label)
-            <button type="button" class="vd-segment" data-speed="{{ $value }}">{{ $label }}</button>
-          @endforeach
+        <div class="vd-field">
+          <div class="vd-label-line"><span class="vd-label" id="vd-devices-label">Versions</span>
+            <details class="vd-tip"><summary aria-label="About versions">?</summary><div class="vd-tip-body">The AI writes one plan; it is recorded on each screen you pick. Extra versions add recording time on this machine, not AI cost.</div></details>
+          </div>
+          @include('video-demo::studio.partials.devices', ['devices' => $devices, 'selected' => old('devices', $defaults['devices'])])
+          @error('devices')<span class="vd-error">Choose at least one version.</span>@enderror
         </div>
-        <span class="vd-hint">How much faster the video plays than it was recorded. Clicks and typing speed up; captions and title cards are held longer, so they stay readable.</span>
-        @error('speed')<span class="vd-error">{{ $message }}</span>@enderror
-      </div>
+      </section>
 
-      <div>
-        <span class="vd-label" id="vd-devices-label">Versions</span>
-        @include('video-demo::studio.partials.devices', ['devices' => $devices, 'selected' => old('devices', $defaults['devices'])])
-        <span class="vd-hint">The AI writes one plan for all of them. Each extra version only adds recording time on this machine.</span>
-        @error('devices')<span class="vd-error">Choose at least one version.</span>@enderror
-      </div>
+      <section class="vd-section">
+        <div class="vd-section-head"><span class="vd-section-num">2</span><h2 class="vd-section-title">Who, and where?</h2></div>
+        <div class="vd-row">
+          <div class="vd-field">
+            <div class="vd-label-line"><label for="record_as">Record as</label>
+              <details class="vd-tip"><summary aria-label="About record as">?</summary><div class="vd-tip-body">
+                @if (collect(array_keys($recordAs))->contains(fn ($k) => str_starts_with((string) $k, 'type:')))
+                  The video shows what this type of user sees: each role has its own menus and pages. A user of that type is signed in for the recording.
+                @else
+                  No user types were found in your app's roles. List them in <code>video-demo.recorder.user_types</code> to choose between them here.
+                @endif
+              </div></details>
+            </div>
+            <select id="record_as" name="record_as">
+              @foreach ($recordAs as $value => $label)
+                <option value="{{ $value }}" @selected((string) old('record_as', $defaults['record_as']) === (string) $value)>{{ $label }}</option>
+              @endforeach
+            </select>
+            @error('record_as')<span class="vd-error">{{ $message }}</span>@enderror
+          </div>
 
-      <div>
-        <div class="vd-field-head">
-          <label for="style_id">Style</label>
-          <a class="vd-small vd-muted" href="{{ route('video-demo.studio.styles.index') }}">Manage styles</a>
+          <div class="vd-field">
+            <label for="start_path">Start page <span class="vd-optional">optional</span></label>
+            <div class="vd-combo">
+              <input type="text" id="start_path" name="start_path" value="{{ old('start_path', $defaults['start_path']) }}" placeholder="Search, or type /jobs/5"
+                role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="vd-pages" autocomplete="off" spellcheck="false">
+              <ul class="vd-combo-list" id="vd-pages" role="listbox" aria-label="Pages" hidden></ul>
+            </div>
+            <span class="vd-hint" id="vd-pages-note">Click to list the pages this user can open.</span>
+            @error('start_path')<span class="vd-error">{{ $message }}</span>@enderror
+          </div>
         </div>
-        <select id="style_id" name="style_id" data-defaults-for="sound">
-          @foreach ($styles as $style)
-            <option value="{{ $style->id }}" data-direction="{{ $style->direction }}" data-voice="{{ $style->voice }}" data-music="{{ $style->music }}" @selected((int) old('style_id', $styles->firstWhere('key', $defaults['style'])?->id ?? $styles->first()->id) === $style->id)>{{ $style->name }}</option>
-          @endforeach
-        </select>
-        <span class="vd-hint" id="vd-style-hint"></span>
-        @error('style_id')<span class="vd-error">{{ $message }}</span>@enderror
-      </div>
 
-      @include('video-demo::studio.partials.sound', ['prefix' => 'new', 'voice' => old('voice', $defaults['voice']), 'music' => old('music', $defaults['music']), 'volume' => null])
-
-      <div>
-        <label for="title">Title <span class="vd-optional">optional</span></label>
-        <input type="text" id="title" name="title" value="{{ old('title', $defaults['title']) }}" maxlength="160" placeholder="The AI suggests one">
-      </div>
-
-      <div>
-        <label for="record_as">Record as</label>
-        <select id="record_as" name="record_as">
-          @foreach ($recordAs as $value => $label)
-            <option value="{{ $value }}" @selected((string) old('record_as', $defaults['record_as']) === (string) $value)>{{ $label }}</option>
-          @endforeach
-        </select>
-        <span class="vd-hint">
-          @if (collect(array_keys($recordAs))->contains(fn ($k) => str_starts_with((string) $k, 'type:')))
-            The video shows what this type of user sees: each role has its own menus and pages. A user of that type is signed in for the recording.
-          @else
-            No user types were found in your app's roles. List them in <code>video-demo.recorder.user_types</code> to choose between them here.
-          @endif
-        </span>
-        @error('record_as')<span class="vd-error">{{ $message }}</span>@enderror
-      </div>
-
-      <div class="vd-stack-sm">
-        <input type="hidden" name="sample_data" value="0">
-        <label class="vd-check-row"><input type="checkbox" name="sample_data" value="1" @checked(old('sample_data', $defaults['sample_data']))> Record on sample data</label>
-        <span class="vd-hint">Records against a temporary copy of your database instead of your own data. Your migrations and seeders fill it, a user of this type is made, and the AI reads the pages' middleware, policies and gates to add whatever else the flow needs. Adds a little to the AI cost; it is deleted afterwards.</span>
-        @error('sample_data')<span class="vd-error">{{ $message }}</span>@enderror
-      </div>
-
-      <div>
-        <label for="start_path">Start page <span class="vd-optional">optional</span></label>
-        <div class="vd-combo">
-          <input type="text" id="start_path" name="start_path" value="{{ old('start_path', $defaults['start_path']) }}" placeholder="Search your pages, or type a path such as /jobs/5"
-            role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="vd-pages" autocomplete="off" spellcheck="false">
-          <ul class="vd-combo-list" id="vd-pages" role="listbox" aria-label="Pages" hidden></ul>
+        <div class="vd-field">
+          <input type="hidden" name="sample_data" value="0">
+          <label class="vd-toggle vd-toggle-wide">
+            <input type="checkbox" name="sample_data" value="1" @checked(old('sample_data', $defaults['sample_data']))>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5.5" rx="7.5" ry="2.5"/><path d="M4.5 5.5v13c0 1.4 3.4 2.5 7.5 2.5s7.5-1.1 7.5-2.5v-13M4.5 12c0 1.4 3.4 2.5 7.5 2.5s7.5-1.1 7.5-2.5"/></svg>
+            <span class="vd-toggle-text"><span class="vd-toggle-name">Sample data</span><span class="vd-toggle-size">A throwaway copy of your database, filled for the video. Yours is never touched.</span></span>
+            <span class="vd-switch" aria-hidden="true"></span>
+          </label>
+          @error('sample_data')<span class="vd-error">{{ $message }}</span>@enderror
         </div>
-        <span class="vd-hint" id="vd-pages-note">The pages this user can open are listed when you click the field.</span>
-        @error('start_path')<span class="vd-error">{{ $message }}</span>@enderror
-      </div>
+      </section>
 
-      <hr class="vd-divider">
-
-      <div class="vd-row">
-        <div>
-          <label for="model">Model</label>
-          <select id="model" name="model">
-            @foreach ($models as $id => $label)
-              <option value="{{ $id }}" data-note="{{ $modelNotes[$id] ?? '' }}" data-effort="{{ \Ogunsakin01\VideoDemo\Ai\Drivers\Drivers::supportsEffort($id) ? '1' : '0' }}" @selected(old('model', $defaults['model']) === $id)>{{ $label }}</option>
+      <section class="vd-section">
+        <div class="vd-section-head"><span class="vd-section-num">3</span><h2 class="vd-section-title">Look and sound</h2></div>
+        <div class="vd-field">
+          <div class="vd-field-head">
+            <label for="style_id">Style</label>
+            <a class="vd-small vd-muted" href="{{ route('video-demo.studio.styles.index') }}">Manage styles</a>
+          </div>
+          <select id="style_id" name="style_id" data-defaults-for="sound">
+            @foreach ($styles as $style)
+              <option value="{{ $style->id }}" data-direction="{{ $style->direction }}" data-voice="{{ $style->voice }}" data-music="{{ $style->music }}" data-accent="{{ $style->accent }}" data-theme="{{ $style->theme }}" @selected((int) old('style_id', $styles->firstWhere('key', $defaults['style'])?->id ?? $styles->first()->id) === $style->id)>{{ $style->name }}</option>
             @endforeach
           </select>
-          <span class="vd-hint" id="vd-model-note"></span>
+          <div class="vd-swatch" aria-hidden="true"><span class="vd-swatch-frame" id="vd-swatch-frame"><span id="vd-swatch-bar"></span></span><span id="vd-style-hint" style="min-width:0"></span></div>
+          @error('style_id')<span class="vd-error">{{ $message }}</span>@enderror
         </div>
-        <div>
-          <label for="effort">Effort</label>
-          <select id="effort" name="effort">
-            @foreach ($efforts as $effort)
-              <option value="{{ $effort }}" @selected(old('effort', $defaults['effort']) === $effort)>{{ ucfirst($effort) }}</option>
-            @endforeach
-          </select>
-        </div>
-        <div>
-          <label for="visibility">Library</label>
-          <select id="visibility" name="visibility">
-            <option value="public" @selected(old('visibility') !== 'private')>Public</option>
-            <option value="private" @selected(old('visibility') === 'private')>Private (staff)</option>
-          </select>
-        </div>
-      </div>
 
-      <div class="vd-row">
-        <div>
-          <label for="max_cost">Spending limit <span class="vd-optional">US $</span></label>
-          <input type="number" id="max_cost" name="max_cost" step="0.01" min="0.01" max="100" inputmode="decimal" value="{{ old('max_cost', $defaults['max_cost']) }}">
-          <span class="vd-hint">The AI plans within it and stops before going over.</span>
-          @error('max_cost')<span class="vd-error">{{ $message }}</span>@enderror
-        </div>
-        <div>
-          <label for="max_steps">Max steps <span class="vd-optional">optional</span></label>
-          <input type="number" id="max_steps" name="max_steps" min="3" max="250" inputmode="numeric" value="{{ old('max_steps', $defaults['max_steps']) }}" placeholder="No limit">
-          <span class="vd-hint">Fewer steps make a shorter, cheaper plan.</span>
-          @error('max_steps')<span class="vd-error">{{ $message }}</span>@enderror
-        </div>
-      </div>
+        @include('video-demo::studio.partials.sound', ['prefix' => 'new', 'voice' => old('voice', $defaults['voice']), 'music' => old('music', $defaults['music']), 'volume' => null])
+      </section>
+
+      <section class="vd-section">
+        <details class="vd-more" @if ($errors->hasAny(['max_cost', 'max_steps', 'speed', 'title'])) open @endif>
+          <summary>More options <small>speed, model, spending limit, title</small></summary>
+          <div class="vd-field">
+            <div class="vd-label-line"><span class="vd-label" id="vd-speed-label">Playback speed</span>
+              <details class="vd-tip"><summary aria-label="About playback speed">?</summary><div class="vd-tip-body">At 1× the cursor, typing and scrolling move at a person's pace. Faster speeds play those quicker; captions and title cards stay readable either way. Waiting on your app is cut out at any speed.</div></details>
+            </div>
+            <input type="hidden" id="speed" name="speed" value="{{ old('speed', $defaults['speed']) }}">
+            <div class="vd-segments" role="group" aria-labelledby="vd-speed-label">
+              @foreach (['1' => '1×', '1.25' => '1.25×', '1.5' => '1.5×', '2' => '2×', '3' => '3×'] as $value => $label)
+                <button type="button" class="vd-segment" data-speed="{{ $value }}">{{ $label }}</button>
+              @endforeach
+            </div>
+            @error('speed')<span class="vd-error">{{ $message }}</span>@enderror
+          </div>
+
+          <div class="vd-row">
+            <div class="vd-field">
+              <label for="model">Model</label>
+              <select id="model" name="model">
+                @foreach ($models as $id => $label)
+                  <option value="{{ $id }}" data-note="{{ $modelNotes[$id] ?? '' }}" data-effort="{{ \Ogunsakin01\VideoDemo\Ai\Drivers\Drivers::supportsEffort($id) ? '1' : '0' }}" @selected(old('model', $defaults['model']) === $id)>{{ $label }}</option>
+                @endforeach
+              </select>
+              <span class="vd-hint" id="vd-model-note"></span>
+            </div>
+            <div class="vd-field">
+              <label for="effort">Effort</label>
+              <select id="effort" name="effort">
+                @foreach ($efforts as $effort)
+                  <option value="{{ $effort }}" @selected(old('effort', $defaults['effort']) === $effort)>{{ ucfirst($effort) }}</option>
+                @endforeach
+              </select>
+            </div>
+          </div>
+
+          <div class="vd-row">
+            <div class="vd-field">
+              <div class="vd-label-line"><label for="max_cost">Spending limit <span class="vd-optional">US $</span></label>
+                <details class="vd-tip"><summary aria-label="About the spending limit">?</summary><div class="vd-tip-body">The AI is told its budget, plans within it and stops before going over.</div></details>
+              </div>
+              <input type="number" id="max_cost" name="max_cost" step="0.01" min="0.01" max="100" inputmode="decimal" value="{{ old('max_cost', $defaults['max_cost']) }}">
+              @error('max_cost')<span class="vd-error">{{ $message }}</span>@enderror
+            </div>
+            <div class="vd-field">
+              <label for="max_steps">Max steps <span class="vd-optional">optional</span></label>
+              <input type="number" id="max_steps" name="max_steps" min="3" max="250" inputmode="numeric" value="{{ old('max_steps', $defaults['max_steps']) }}" placeholder="No limit">
+              @error('max_steps')<span class="vd-error">{{ $message }}</span>@enderror
+            </div>
+          </div>
+
+          <div class="vd-row">
+            <div class="vd-field">
+              <label for="title">Title <span class="vd-optional">optional</span></label>
+              <input type="text" id="title" name="title" value="{{ old('title', $defaults['title']) }}" maxlength="160" placeholder="The AI suggests one">
+            </div>
+            <div class="vd-field">
+              <label for="visibility">Library</label>
+              <select id="visibility" name="visibility">
+                <option value="public" @selected(old('visibility') !== 'private')>Public</option>
+                <option value="private" @selected(old('visibility') === 'private')>Private (staff)</option>
+              </select>
+            </div>
+          </div>
+        </details>
+      </section>
     </div>
 
     <aside class="vd-card vd-stack vd-sticky" aria-live="polite">
+      <div>
+        <p class="vd-eyebrow">Your video</p>
+        <ul class="vd-recipe" id="vd-recipe">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span data-recipe="length"></span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 20h8M12 16v4"/></svg><span data-recipe="versions"></span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><span data-recipe="who"></span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 0 0 0 18c1.5 0 2-1 2-2s-1-2 0-3 3-1 4-1c2 0 3-2 3-4 0-4.5-4-8-9-8z"/></svg><span data-recipe="style"></span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V6l11-2v12"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg><span data-recipe="sound"></span></li>
+        </ul>
+      </div>
+      <hr class="vd-divider" style="margin:0">
       <div>
         <p class="vd-eyebrow">Estimated AI cost</p>
         <div class="vd-figure" id="vd-estimate">—</div>
         <div class="vd-small vd-muted" id="vd-estimate-note">&nbsp;</div>
       </div>
       <div class="vd-small vd-error" id="vd-limit-warn" hidden></div>
-      <p class="vd-small vd-muted" style="margin:0">Charged to your AI provider's key. Pages are checked for errors before any AI is used. Recording and encoding run on this machine and cost nothing. You can stop a video at any time.</p>
       <button class="vd-btn vd-btn-primary vd-btn-block" type="submit" @disabled(! $hasKey)>Generate video</button>
-      <p class="vd-small vd-muted" style="margin:0">Needs a queue worker:<br><code>php artisan queue:work {{ config('video-demo.queue.connection') ?: 'video-demo' }}{{ config('video-demo.queue.connection') ? ' --queue='.config('video-demo.queue.name') : '' }}</code></p>
+      <div class="vd-field vd-small vd-muted">Recording is free and runs here. Stop it any time.
+        <details class="vd-tip"><summary aria-label="About costs and the queue">?</summary><div class="vd-tip-body">Charged to your AI provider's key. Pages are checked for errors before any AI is used. Videos are made by a queue worker: <code>php artisan video-demo:work</code> makes several at once.</div></details>
+      </div>
     </aside>
   </form>
 
@@ -244,7 +279,8 @@
               note.textContent = 'This model has no prices in config/video-demo.php, so its cost can\'t be shown.';
               return;
             }
-            out.textContent = money(e.low) + ' – ' + money(e.high);
+            const text = money(e.low) + ' – ' + money(e.high);
+            if (out.textContent !== text) { out.textContent = text; out.classList.remove('vd-pop'); void out.offsetWidth; out.classList.add('vd-pop'); }
             note.textContent = 'Most likely about ' + money(e.expected) + ', over roughly ' + e.turns + ' requests.';
             last = e;
             checkLimit();
@@ -372,7 +408,13 @@
         // Show what the chosen style asks the AI model to do.
         const styleSelect = form.elements.style_id;
         const styleHint = document.getElementById('vd-style-hint');
-        const showStyle = () => { styleHint.textContent = styleSelect.selectedOptions[0]?.dataset.direction || ''; };
+        const swatch = document.getElementById('vd-swatch-frame'), swatchBar = document.getElementById('vd-swatch-bar');
+        const showStyle = () => {
+          const o = styleSelect.selectedOptions[0];
+          styleHint.textContent = o?.dataset.direction || '';
+          swatch.style.background = o?.dataset.theme === 'dark' ? '#171717' : '#faf8f3';
+          swatchBar.style.background = o?.dataset.accent || '#171717';
+        };
         styleSelect.addEventListener('change', showStyle);
         showStyle();
 
@@ -404,6 +446,31 @@
             complete.removeAttribute('aria-busy');
           }
         });
+
+        // "Your video": a live summary of what is being set up.
+        const recipe = document.getElementById('vd-recipe');
+        const put = (key, text) => {
+          const el = recipe.querySelector(`[data-recipe="${key}"]`);
+          if (el.textContent === text) return;
+          el.textContent = text;
+          el.title = text;
+          el.classList.remove('vd-changed'); void el.offsetWidth; el.classList.add('vd-changed');
+        };
+        const optionText = el => el?.selectedOptions[0]?.textContent.trim() || '';
+        function summarise() {
+          const length = form.querySelector('[data-seconds][aria-pressed=true]');
+          put('length', (length ? length.textContent.trim() : seconds.value + ' sec') + ' at ' + speed.value + '×');
+          const versions = [...form.querySelectorAll('input[name="devices[]"]:checked')].map(i => i.closest('label').querySelector('.vd-toggle-name').textContent.trim());
+          put('versions', versions.length ? versions.join(', ') : 'No version chosen');
+          put('who', optionText(form.elements.record_as) + (form.querySelector('input[type=checkbox][name=sample_data]').checked ? ', sample data' : ', your data'));
+          put('style', optionText(styleSelect) + ' style');
+          const voice = form.elements.voice.value ? optionText(form.elements.voice) : 'No voice';
+          const music = form.elements.music.value ? optionText(form.elements.music) : 'no music';
+          put('sound', voice + ', ' + music.charAt(0).toLowerCase() + music.slice(1));
+        }
+        form.addEventListener('change', summarise);
+        form.addEventListener('click', e => { if (e.target.closest('.vd-segment')) setTimeout(summarise); });
+        summarise();
       })();
     </script>
   </x-slot:scripts>

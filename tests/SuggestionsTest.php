@@ -60,6 +60,32 @@ class SuggestionsTest extends TestCase
             ->assertSee('How an admin invites a colleague.</textarea>', false);
     }
 
+    public function test_each_idea_is_for_the_type_of_user_who_does_it(): void
+    {
+        config(['video-demo.recorder.user_types' => ['Admin' => 'admin@example.com', 'Member' => 'member@example.com']]);
+        $this->suggestions(1, [
+            ['title' => 'Invite a teammate', 'prompt' => 'How an admin invites a colleague.', 'why' => 'Teams grow.', 'start_path' => '/team', 'target_seconds' => 45, 'style' => 'quick', 'record_as' => 'type:admin'],
+            ['title' => 'Join the waitlist', 'prompt' => 'How a visitor joins.', 'why' => 'First step.', 'start_path' => '/join', 'target_seconds' => 30, 'style' => 'quick', 'record_as' => 'guest'],
+            ['title' => 'Edit your profile', 'prompt' => 'How a member edits it.', 'why' => 'Often asked.', 'start_path' => '', 'target_seconds' => 30, 'style' => 'quick', 'record_as' => 'type:owner'],
+        ]);
+
+        $this->post('/video-demo/studio/ideas')->assertRedirect();
+
+        // The model is told the user types, and sees every route's middleware to tell who can open what.
+        $body = $this->request(1)['body'];
+        $this->assertStringContainsString("<user_types>\n- guest: Guest (signed out)\n- type:admin: Admin\n- type:member: Member\n</user_types>", $body['messages'][0]['content']);
+        $this->assertStringContainsString('<routes>', $body['messages'][0]['content']);
+        $this->assertSame(['guest', 'type:admin', 'type:member'], $body['output_config']['format']['schema']['properties']['suggestions']['items']['properties']['record_as']['enum']);
+
+        // Only types the app has are kept.
+        $this->assertSame(['type:admin', 'guest', null], VideoIdea::orderBy('id')->pluck('record_as')->all());
+
+        $this->get('/video-demo/studio/ideas')
+            ->assertSee('For Admin')
+            ->assertSee('record_as=type%3Aadmin', false);
+        $this->get('/video-demo/studio/create?prompt=x&record_as=type%3Aadmin')->assertSee('<option value="type:admin" selected', false);
+    }
+
     public function test_suggest_command_prints_json_for_agents(): void
     {
         $this->suggestions(1, [['title' => 'Invite a teammate', 'prompt' => 'How an admin invites a colleague.', 'why' => 'Teams grow.', 'start_path' => '/team', 'target_seconds' => 45, 'style' => 'quick']]);

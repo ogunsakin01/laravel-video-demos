@@ -2,6 +2,7 @@
 
 namespace Ogunsakin01\VideoDemo\Ai;
 
+use Illuminate\Support\Str;
 use Ogunsakin01\VideoDemo\Ai\Drivers\Drivers;
 use Ogunsakin01\VideoDemo\Ai\Drivers\Turn;
 use Ogunsakin01\VideoDemo\Models\Video;
@@ -37,7 +38,7 @@ class Narrator
         }
 
         $answer = $this->drivers->for($video->model)->structured(
-            system: 'You write the voice-over for a short how-to video of a web app. A narrator speaks one line during a step while the viewer watches it happen. Write in the style\'s tone, in plain words the app\'s users use. Each line is one short sentence, under 15 words, that adds to what is on screen rather than reading the caption out. Narrate the steps that matter; leave routine ones silent. Lines must not run into each other, so keep them short.',
+            system: "You write the voice-over for a short how-to video of a web app. A narrator speaks one line during a step while the viewer watches it happen, in the style's tone.\n".VoiceLines::GUIDE,
             prompt: (new Redactor)->redact(implode("\n\n", array_filter([
                 "<video>\n{$video->prompt}\n</video>",
                 ! empty($video->style['direction']) ? "<style name=\"{$video->style['name']}\">\n{$video->style['direction']}\n</style>" : null,
@@ -70,7 +71,7 @@ class Narrator
         $turn = $answer['turn'];
         $video->addUsage($turn->usage, 'narrate');
         if ($turn->stop === Turn::REFUSAL || empty($answer['data']['lines'])) {
-            throw new PlanningFailed('The model did not write a voice-over.');
+            throw new PlanningFailed('The model did not write a voice-over'.($turn->stop ? " (it stopped: {$turn->stop})" : '').'.'.(trim($turn->text) !== '' ? ' It answered: '.Str::limit(trim($turn->text), 300) : ''));
         }
 
         $data = $plan->toArray();

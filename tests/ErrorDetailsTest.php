@@ -3,6 +3,8 @@
 namespace Ogunsakin01\VideoDemo\Tests;
 
 use Closure;
+use Illuminate\Queue\MaxAttemptsExceededException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
@@ -143,5 +145,24 @@ class ErrorDetailsTest extends TestCase
 
         $sandbox->delete();
         $this->assertFileDoesNotExist($path.'.errors.json');
+    }
+
+    public function test_a_video_handed_to_two_workers_is_made_once_and_not_marked_failed(): void
+    {
+        $video = Video::create(['prompt' => 'x', 'target_seconds' => 30, 'model' => 'claude-sonnet-5-5', 'effort' => 'medium', 'status' => VideoStatus::Recording]);
+        $job = new GenerateVideo($video);
+
+        // Another worker is making it.
+        $lock = Cache::lock('video-demo:making:'.$video->id, 60);
+        $this->assertTrue($lock->get());
+
+        $this->app->call([$job, 'handle']);
+        $job->failed(new MaxAttemptsExceededException('attempted too many times'));
+        $this->assertSame(VideoStatus::Recording, $video->fresh()->status);
+
+        // Once it is free, a real failure still counts.
+        $lock->release();
+        $job->failed(new MaxAttemptsExceededException('attempted too many times'));
+        $this->assertSame(VideoStatus::Failed, $video->fresh()->status);
     }
 }

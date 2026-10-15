@@ -9,6 +9,7 @@ use Ogunsakin01\VideoDemo\Models\Spend;
 use Ogunsakin01\VideoDemo\Models\Video;
 use Ogunsakin01\VideoDemo\Models\VideoIdea;
 use Ogunsakin01\VideoDemo\Models\VideoStyle;
+use Ogunsakin01\VideoDemo\Recording\RecordAs;
 
 /**
  * Suggests which videos to make first, from the app's routes, each ready to open in the new-video form.
@@ -17,6 +18,11 @@ use Ogunsakin01\VideoDemo\Models\VideoStyle;
 class Suggester
 {
     /**
+     * How the configured default user is named to the model.
+     */
+    protected const DEFAULT_USER = 'default';
+
+    /**
      * Create a new suggester instance.
      */
     public function __construct(protected Drivers $drivers, protected CodeTools $code) {}
@@ -24,7 +30,7 @@ class Suggester
     /**
      * Ask the model for new video ideas and store them, or replace the unused ones when $replace is true.
      *
-     * @return array{suggestions: list<array{id: int, title: string, prompt: string, why: string, start_path: ?string, target_seconds: int, style: string}>, cost: float, cost_known: bool, model: string, at: string}
+     * @return array{suggestions: list<array{id: int, title: string, prompt: string, why: string, start_path: ?string, target_seconds: int, style: string, record_as: ?string}>, cost: float, cost_known: bool, model: string, at: string}
      */
     public function suggest(?string $model = null, bool $replace = false): array
     {
@@ -38,17 +44,19 @@ class Suggester
         $maxSeconds = (int) config('video-demo.limits.max_seconds', 300);
         $styles = VideoStyle::options();
         $notes = trim((string) config('video-demo.ai.notes'));
+        $users = $this->userTypes();
         $made = Video::query()->latest()->limit(50)->get()->map(fn (Video $v) => '- '.($v->title ?: $v->prompt))->implode("\n");
 
         $answer = $this->drivers->for($model)->structured(
             system: 'You plan a set of short how-to videos for a web app, the ones its users most need: getting started, the core tasks, and things people get stuck on. Read the routes to see what the app does. Suggest videos the routes show are possible; do not invent features. Describe each the way a user would ask about it, in one or two plain sentences: who does it, where it starts and what it ends with.',
             prompt: implode("\n\n", array_filter([
                 'Suggest up to 8 videos, most useful first.',
+                "<user_types>\n".collect($users)->map(fn ($label, $key) => "- $key: $label")->implode("\n")."\n</user_types>\nPick the type of user each video is for: the one who does this task in the app. The routes' middleware (auth, guest, role:…, can:…, admin and the like) shows who can open each page; pages without auth are open to guests. When several types can do it, pick the one the task is meant for, not the most powerful.",
                 "<styles>\n".$styles->map(fn (VideoStyle $s) => "- {$s->key}: {$s->name}. {$s->direction}")->implode("\n")."\n</styles>\nPick the style that suits each video, by its key.",
                 $made !== '' ? "<videos_already_made>\n$made\n</videos_already_made>\nDon't suggest these again." : null,
                 $kept->isNotEmpty() ? "<ideas_already_suggested>\n".$kept->map(fn ($t) => "- $t")->implode("\n")."\n</ideas_already_suggested>\nSuggest different videos from these." : null,
                 $notes !== '' ? "<notes_from_the_developer>\n$notes\n</notes_from_the_developer>" : null,
-                "<routes>\n".$this->code->routeList()."\n</routes>",
+                "<routes>\n".$this->code->routeList(allMiddleware: true)."\n</routes>",
             ])),
             schema: [
                 'type' => 'object',
@@ -64,8 +72,9 @@ class Suggester
                                 'start_path' => ['type' => 'string', 'description' => 'The path the video starts on, such as /dashboard; empty if unsure'],
                                 'target_seconds' => ['type' => 'integer', 'description' => "Suggested length in seconds, 30 to $maxSeconds"],
                                 'style' => ['type' => 'string', 'enum' => $styles->pluck('key')->values()->all()],
+                                'record_as' => ['type' => 'string', 'enum' => array_keys($users), 'description' => 'The type of user the video is recorded as'],
                             ],
-                            'required' => ['title', 'prompt', 'why', 'start_path', 'target_seconds', 'style'],
+                            'required' => ['title', 'prompt', 'why', 'start_path', 'target_seconds', 'style', 'record_as'],
                             'additionalProperties' => false,
                         ],
                     ],
@@ -92,6 +101,8 @@ class Suggester
             'start_path' => str_starts_with((string) ($s['start_path'] ?? ''), '/') ? $s['start_path'] : null,
             'target_seconds' => max(10, min($maxSeconds, (int) ($s['target_seconds'] ?? 60))),
             'style' => $styles->contains('key', $s['style'] ?? null) ? $s['style'] : $styles->first()?->key,
+            // The default user is the form's own default, so it isn't kept.
+            'record_as' => isset($users[$s['record_as'] ?? '']) && $s['record_as'] !== self::DEFAULT_USER ? $s['record_as'] : null,
         ], $answer['data']['suggestions'] ?? []), fn ($s) => $s['prompt'] !== ''));
 
         $seen = $kept->map(fn ($t) => Str::lower(trim($t)))->all();
@@ -119,5 +130,25 @@ class Suggester
             'model' => $turn->model,
             'at' => now()->toIso8601String(),
         ];
+    }
+
+    /**
+     * Get the types of user a video can be recorded as, key => what to tell
+     * the model about it, with the role behind it when there is one.
+     *
+     * @return array<string, string>
+     */
+    protected function userTypes(): array
+    {
+        $types = RecordAs::types();
+        $users = [];
+        foreach (RecordAs::options() as $key => $label) {
+            $type = str_starts_with($key, RecordAs::TYPE) ? ($types[substr($key, strlen(RecordAs::TYPE))] ?? []) : [];
+            // A configured type names a user, not a role.
+            $role = ($type['via'] ?? '') !== 'configured' ? ($type['role'] ?? null) : null;
+            $users[$key === '' ? self::DEFAULT_USER : $key] = $label.($role ? " (role \"$role\")" : '');
+        }
+
+        return $users;
     }
 }

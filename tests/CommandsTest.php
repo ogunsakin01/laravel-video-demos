@@ -4,6 +4,7 @@ namespace Ogunsakin01\VideoDemo\Tests;
 
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Ogunsakin01\VideoDemo\Enums\VideoStatus;
@@ -14,6 +15,7 @@ use Ogunsakin01\VideoDemo\Recording\Encoder;
 use Ogunsakin01\VideoDemo\Recording\Plan;
 use Ogunsakin01\VideoDemo\Recording\Recorder;
 use Ogunsakin01\VideoDemo\Recording\RecordingResult;
+use Ogunsakin01\VideoDemo\Recording\Timeline;
 use Ogunsakin01\VideoDemo\Tests\Concerns\FakesAnthropic;
 
 /**
@@ -106,7 +108,7 @@ class CommandsTest extends TestCase
         {
             public array $speeds = [];
 
-            public function encode(string $webm, string $mp4, string $poster, float $trimSeconds = 0, float $speed = 1): void
+            public function encode(string $webm, string $mp4, string $poster, float $trimSeconds = 0, float $speed = 1, ?Timeline $timeline = null): void
             {
                 $this->speeds[] = $speed;
                 File::put($mp4, 'mp4');
@@ -153,5 +155,16 @@ class CommandsTest extends TestCase
         $this->assertFalse($video->fresh()->isPublished());
 
         $this->artisan('video-demo:publish', ['video' => 'missing'])->assertFailed();
+    }
+
+    public function test_work_runs_several_workers_on_the_package_queue(): void
+    {
+        Process::fake();
+
+        $this->artisan('video-demo:work', ['--workers' => 3, '--stop-when-empty' => true])
+            ->expectsOutputToContain('Making up to 3 videos at once')
+            ->assertSuccessful();
+
+        Process::assertRanTimes(fn ($process) => str_contains(implode(' ', (array) $process->command), 'queue:work video-demo --queue=video-demo --stop-when-empty'), 3);
     }
 }

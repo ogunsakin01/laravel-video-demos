@@ -66,8 +66,11 @@ class Speaker
 
         $clips = [];
         $missing = [];
-        foreach (array_unique(array_filter(array_map('trim', $lines))) as $text) {
-            $file = "$dir/".($mixable ? '' : 'raw-').sha1("$voice\n$tone\n$text").".$extension";
+        $order = array_values(array_unique(array_filter(array_map('trim', $lines))));
+        foreach ($order as $i => $text) {
+            // Cloud voices hear the lines around each one, so those are part of what makes a clip.
+            $around = in_array($provider, ['openai', 'elevenlabs'], true) ? "\n".($order[$i - 1] ?? '')."\n".($order[$i + 1] ?? '') : '';
+            $file = "$dir/".($mixable ? '' : 'raw-').sha1("$voice\n$tone\n$text$around").".$extension";
             $clips[$text] = $file;
             if (! is_file($file)) {
                 $missing[$text] = $file;
@@ -81,7 +84,7 @@ class Speaker
                 $spoken = match ($provider) {
                     'kokoro' => $this->kokoro($id, $missing, $raw),
                     'system' => $this->system($id, $missing, $raw),
-                    'openai', 'gemini', 'elevenlabs' => $this->cloud($provider, $id, $missing, $raw, $tone),
+                    'openai', 'gemini', 'elevenlabs' => $this->cloud($provider, $id, $missing, $raw, $tone, $order),
                     default => throw new RuntimeException("There is no voice [$voice]."),
                 };
                 foreach ($spoken as $text => $file) {
@@ -97,31 +100,43 @@ class Speaker
 
     /**
      * Speak the lines with an AI provider's voice, one request a line, adding
-     * what each costs.
+     * what each costs. Each request hears the lines before and after it where
+     * the provider allows, so the voice-over flows as one, rather than every
+     * line starting afresh like an announcement.
      *
      * @param  array<string, string>  $lines
+     * @param  list<string>  $order  Every line of the voice-over, in order.
      * @return array<string, string>
      */
-    protected function cloud(string $provider, string $id, array $lines, string $dir, string $tone): array
+    protected function cloud(string $provider, string $id, array $lines, string $dir, string $tone, array $order = []): array
     {
+        $manner = 'like a person talking a colleague through their screen: relaxed and natural, with small pauses, not an announcer or an advert';
         $key = Voices::providerKey($provider) ?? throw new RuntimeException("Set the $provider API key to use its voices.");
         $model = (string) config("video-demo.voice.providers.$provider.model");
 
         $out = [];
         foreach (array_keys($lines) as $i => $text) {
+            $at = array_search($text, $order, true);
+            $before = $at === false ? '' : ($order[$at - 1] ?? '');
+            $after = $at === false ? '' : ($order[$at + 1] ?? '');
             $response = match ($provider) {
                 'openai' => Http::withToken($key)->timeout(120)->post('https://api.openai.com/v1/audio/speech', [
                     'model' => $model, 'input' => $text, 'voice' => $id, 'response_format' => 'wav',
-                    'instructions' => "Speak as the narrator of a short how-to video: $tone.",
+                    'instructions' => "Speak as the narrator of a short how-to video, $manner. Tone: $tone."
+                        .($before !== '' ? " This line follows straight on from: \"$before\"" : ' This is the first line.'),
                 ]),
                 'gemini' => Http::withHeaders(['x-goog-api-key' => $key])->timeout(120)->post('https://generativelanguage.googleapis.com/v1beta/interactions', [
                     'model' => $model,
-                    'input' => [['type' => 'user_input', 'content' => [['type' => 'text', 'text' => $text, 'annotations' => [['type' => 'speech_metadata', 'style' => $tone]]]]]],
+                    'input' => [['type' => 'user_input', 'content' => [['type' => 'text', 'text' => $text, 'annotations' => [['type' => 'speech_metadata', 'style' => "$tone, $manner"]]]]]],
                     'response_format' => ['type' => 'audio'],
                     'generation_config' => ['speech_config' => [['voice' => $id]]],
                 ]),
                 default => Http::withHeaders(['xi-api-key' => $key])->accept('audio/mpeg')->timeout(120)
-                    ->post("https://api.elevenlabs.io/v1/text-to-speech/$id?output_format=mp3_44100_128", ['text' => $text, 'model_id' => $model]),
+                    ->post("https://api.elevenlabs.io/v1/text-to-speech/$id?output_format=mp3_44100_128", array_filter([
+                        'text' => $text, 'model_id' => $model,
+                        // ElevenLabs carries the intonation across from the lines around it.
+                        'previous_text' => $before, 'next_text' => $after,
+                    ], fn ($v) => $v !== '')),
             };
 
             if ($response->failed()) {

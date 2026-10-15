@@ -16,6 +16,7 @@ use Ogunsakin01\VideoDemo\Console\RefreshCommand;
 use Ogunsakin01\VideoDemo\Console\SampleDatabaseCommand;
 use Ogunsakin01\VideoDemo\Console\SampleDataCommand;
 use Ogunsakin01\VideoDemo\Console\SuggestCommand;
+use Ogunsakin01\VideoDemo\Console\WorkCommand;
 use Ogunsakin01\VideoDemo\Library\Manifest;
 use Ogunsakin01\VideoDemo\SampleData\Sandbox;
 
@@ -74,6 +75,7 @@ class VideoDemoServiceProvider extends ServiceProvider
                 SampleDataCommand::class,
                 SampleDatabaseCommand::class,
                 SuggestCommand::class,
+                WorkCommand::class,
             ]);
         }
     }

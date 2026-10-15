@@ -8,10 +8,11 @@
   </x-slot:nav>
 
   <section class="vd-hero">
+    @include('video-demo::partials.art', ['name' => 'palette'])
     <div>
       <p class="vd-eyebrow">Studio</p>
       <h1>Styles</h1>
-      <p class="vd-sub">How the AI writes each video and how its title cards and captions look. The first ones come from the <code>styles</code> section of <code>config/video-demo.php</code>.</p>
+      <p class="vd-sub">How the AI writes each video, and how its cards and captions look.</p>
     </div>
   </section>
 

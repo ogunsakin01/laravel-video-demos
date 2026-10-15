@@ -74,6 +74,7 @@
     opacity: .14; }
   @media (prefers-color-scheme: dark) { .vd-hero::after { filter: invert(1); opacity: .12; } }
   .vd-hero > * { position: relative; z-index: 1; }
+  .vd-hero > .vd-hero-art + * { flex: 1 1 260px; min-width: 0; }
   .vd-eyebrow { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .08em; color: var(--vd-muted-ink); margin: 0 0 4px; }
   .vd h1 { font-size: 26px; line-height: 1.2; letter-spacing: -.025em; font-weight: 600; color: var(--vd-strong); margin: 0; }
   @media (min-width: 640px) { .vd h1 { font-size: 30px; } }
@@ -191,6 +192,85 @@
   .vd .vd-check-row { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 500; cursor: pointer; }
   .vd .vd-check-row input { width: 16px; height: 16px; margin: 0; accent-color: var(--vd-accent); }
   .vd input[type=range] { accent-color: var(--vd-accent); }
+  /* Motion. Pages arrive gently: sections rise into place one after another,
+     lists follow item by item, and figures pop when they change. Solid
+     colours only. Everything is still for people who ask for less motion. */
+  @keyframes vd-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  @keyframes vd-fade-in { from { opacity: 0; } }
+  @keyframes vd-pop { 40% { transform: scale(1.06); } }
+  @keyframes vd-draw { to { stroke-dashoffset: 0; } }
+  @keyframes vd-float { 50% { transform: translateY(-4px); } }
+  .vd-main > .vd-wrap > *, .vd-rise { animation: vd-rise .5s cubic-bezier(.2,.7,.2,1) both; }
+  .vd-main > .vd-wrap > :nth-child(2) { animation-delay: .06s; }
+  .vd-main > .vd-wrap > :nth-child(3) { animation-delay: .12s; }
+  .vd-main > .vd-wrap > :nth-child(n+4) { animation-delay: .18s; }
+  .vd-grid > *, .vd-stagger > * { animation: vd-rise .45s cubic-bezier(.2,.7,.2,1) both; }
+  .vd-table tbody tr { animation: vd-fade-in .4s ease-out both; }
+  @for ($i = 2; $i <= 12; $i++)
+  .vd-grid > :nth-child({{ $i }}), .vd-stagger > :nth-child({{ $i }}) { animation-delay: {{ ($i - 1) * 45 }}ms; }
+  .vd-table tbody tr:nth-child({{ $i }}) { animation-delay: {{ ($i - 1) * 30 }}ms; }
+  @endfor
+  .vd-pop { animation: vd-pop .4s cubic-bezier(.2,.7,.2,1); }
+  .vd-btn { transition: background-color .15s, border-color .15s, transform .12s, box-shadow .15s; }
+  .vd-btn:active:not([disabled]) { transform: translateY(1px) scale(.98); }
+  .vd-segment { transition: background-color .15s, color .15s, box-shadow .15s; }
+  .vd-lift { transition: transform .2s cubic-bezier(.2,.7,.2,1), box-shadow .2s, border-color .2s; }
+  .vd-lift:hover { transform: translateY(-3px); box-shadow: var(--vd-shadow-lg); border-color: var(--vd-border-strong); }
+  /* Line art beside page titles, drawing itself on. */
+  .vd-hero-art { flex: none; width: 76px; height: 76px; color: var(--vd-strong); animation: vd-float 6s ease-in-out 1.6s infinite; }
+  .vd-hero-art :is(path, rect, circle, polyline, line) { stroke-dasharray: 220; stroke-dashoffset: 220; animation: vd-draw 1.4s cubic-bezier(.4,0,.2,1) .15s forwards; }
+  .vd-art-accent { color: var(--vd-accent); }
+  .vd-hero-art .vd-art-dot { stroke-dasharray: none; stroke-dashoffset: 0; animation: vd-fade-in .6s ease-out 1.2s both; }
+  @media (max-width: 640px) { .vd-hero-art { width: 56px; height: 56px; } }
+  @media (prefers-reduced-motion: reduce) {
+    .vd *, .vd *::before, .vd *::after { animation-duration: .01ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+    .vd-hero-art :is(path, rect, circle, polyline, line) { stroke-dashoffset: 0; }
+  }
+
+  /* Forms in sections: a number, a title, then a few fields. */
+  .vd-section { display: grid; gap: 18px; min-width: 0; }
+  .vd-section + .vd-section { border-top: 1px solid var(--vd-border); padding-top: 22px; margin-top: 22px; }
+  .vd-section-head { display: flex; align-items: center; gap: 10px; }
+  .vd-section-num { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--vd-accent); color: var(--vd-accent-ink); display: grid; place-items: center; font: 600 12px/1 var(--vd-font); }
+  .vd .vd-section-title { font-size: 16px; margin: 0; }
+  .vd-field { position: relative; min-width: 0; }
+  /* "?" beside a label: the longer explanation, only when asked for. */
+  .vd-label-line { display: flex; align-items: center; gap: 2px; margin-bottom: 6px; }
+  .vd .vd-label-line > :is(label, .vd-label) { margin: 0; }
+  .vd-tip { display: inline-block; vertical-align: 1px; margin-left: 4px; }
+  .vd .vd-tip > summary { list-style: none; display: inline-grid; place-items: center; width: 17px; height: 17px; border-radius: 50%; border: 1px solid var(--vd-border-strong);
+    font: 600 10.5px/1 var(--vd-font); color: var(--vd-muted-ink); cursor: pointer; transition: background-color .15s, color .15s; }
+  .vd .vd-tip > summary::-webkit-details-marker { display: none; }
+  .vd .vd-tip > summary::after { content: none; }
+  .vd .vd-tip[open] > summary, .vd .vd-tip > summary:hover { background: var(--vd-strong); border-color: var(--vd-strong); color: var(--vd-card); }
+  .vd-tip-body { position: absolute; left: 0; right: 0; z-index: 6; margin-top: 8px; padding: 12px 14px; border-radius: var(--vd-radius); background: var(--vd-strong); color: var(--vd-card);
+    font: 400 12.5px/1.55 var(--vd-font); box-shadow: var(--vd-shadow-lg); animation: vd-rise .2s ease-out both; max-width: 520px; }
+  .vd-tip-body code { color: inherit; background: rgb(255 255 255 / .12); }
+  .vd-toggle.vd-toggle-wide { padding: 12px 14px; }
+  .vd-more { border: 1px dashed var(--vd-border-strong); border-radius: var(--vd-radius-lg); padding: 0 16px; }
+  .vd .vd-more > summary { list-style: none; display: flex; align-items: center; gap: 8px; padding: 13px 0; cursor: pointer; font-weight: 500; color: var(--vd-strong); }
+  .vd .vd-more > summary::-webkit-details-marker { display: none; }
+  .vd .vd-more > summary::after { content: ""; margin-left: auto; width: 8px; height: 8px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg); transition: transform .2s; }
+  .vd .vd-more[open] > summary::after { transform: rotate(-135deg); }
+  .vd .vd-more > summary small { font-weight: 400; color: var(--vd-faint-ink); }
+  @media (max-width: 640px) { .vd .vd-more > summary small { display: none; } }
+  .vd-more[open] { padding-bottom: 16px; }
+  .vd-more[open] > :not(summary) { animation: vd-rise .3s ease-out both; }
+  .vd-more > * + :not(summary) { margin-top: 16px; }
+  /* A style's look, previewed beside its menu. */
+  .vd-swatch { display: flex; align-items: center; gap: 10px; margin-top: 8px; padding: 8px 10px; border-radius: var(--vd-radius); background: var(--vd-muted); font-size: 12.5px; color: var(--vd-muted-ink); }
+  .vd-swatch-frame { flex: none; width: 46px; height: 30px; border-radius: 5px; border: 1px solid var(--vd-border-strong); display: grid; place-items: end start; padding: 4px; transition: background-color .25s; }
+  .vd-swatch-frame span { display: block; width: 22px; height: 5px; border-radius: 3px; transition: background-color .25s; }
+  /* The live summary of the video being set up. */
+  .vd-recipe { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-size: 13px; }
+  .vd-recipe li { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .vd-recipe svg { flex: none; width: 16px; height: 16px; color: var(--vd-muted-ink); }
+  .vd-recipe span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--vd-strong); }
+  .vd-recipe span.vd-changed { animation: vd-pop .35s ease-out; }
+  /* Empty states: line art and a sentence. */
+  .vd-empty-art { display: block; margin: 0 auto 12px; width: 72px; height: 72px; color: var(--vd-strong); }
+  .vd-empty-art :is(path, rect, circle) { stroke-dasharray: 220; stroke-dashoffset: 220; animation: vd-draw 1.4s ease-out .2s forwards; }
+  .vd-empty-art .vd-art-dot { stroke-dasharray: none; stroke-dashoffset: 0; }
   /* The full error view, laid out like Laravel's error page. */
   .vd-modal { width: min(1100px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); padding: 0; border: 1px solid var(--vd-border); border-radius: var(--vd-radius-lg);
     background: var(--vd-paper); color: var(--vd-ink); box-shadow: var(--vd-shadow-lg); overflow: auto; }
@@ -294,16 +374,16 @@
   .vd-steps li { counter-increment: step; display: grid; grid-template-columns: 28px 64px minmax(0, 1fr); gap: 8px; padding: 8px 0; border-top: 1px solid var(--vd-border); }
   .vd-steps li::before { content: counter(step); color: var(--vd-faint-ink); font: 12px/1.7 var(--vd-mono); }
   .vd-steps code { justify-self: start; }
-  .vd details summary { cursor: pointer; font-weight: 600; color: var(--vd-strong); list-style: none; display: flex; align-items: center; justify-content: space-between; }
-  .vd details summary::-webkit-details-marker { display: none; }
-  .vd details summary::after { content: "+"; font: 18px/1 var(--vd-mono); color: var(--vd-muted-ink); }
-  .vd details[open] summary::after { content: "−"; }
+  .vd details > summary { cursor: pointer; font-weight: 600; color: var(--vd-strong); list-style: none; display: flex; align-items: center; justify-content: space-between; }
+  .vd details > summary::-webkit-details-marker { display: none; }
+  .vd details > summary::after { content: "+"; font: 18px/1 var(--vd-mono); color: var(--vd-muted-ink); }
+  .vd details[open] > summary::after { content: "−"; }
 
   /* Media */
   .vd-video { width: 100%; aspect-ratio: 16 / 10; border-radius: var(--vd-radius-lg); background: #0e0e0d; display: block; border: 1px solid var(--vd-border); }
   .vd-empty { text-align: center; padding: 56px 20px; color: var(--vd-muted-ink); }
   .vd-empty strong { display: block; color: var(--vd-strong); font-size: 15px; margin-bottom: 4px; }
-  .vd-tile { display: block; text-decoration: none; border-radius: var(--vd-radius-lg); overflow: hidden; background: var(--vd-card); border: 1px solid var(--vd-border); box-shadow: var(--vd-shadow); transition: border-color .15s, box-shadow .15s; }
+  .vd-tile { display: block; text-decoration: none; border-radius: var(--vd-radius-lg); overflow: hidden; background: var(--vd-card); border: 1px solid var(--vd-border); box-shadow: var(--vd-shadow); transition: border-color .2s, box-shadow .2s, transform .2s cubic-bezier(.2,.7,.2,1); }
   .vd-tile:hover { border-color: var(--vd-border-strong); box-shadow: var(--vd-shadow-lg); }
   .vd-tile-media { position: relative; }
   .vd-tile img { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; display: block; background: var(--vd-muted); border-bottom: 1px solid var(--vd-border); }
