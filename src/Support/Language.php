@@ -93,6 +93,20 @@ final class Language
     }
 
     /**
+     * Get a language's name in that language, such as "Français", for a
+     * list viewers pick their language from. Its English name without intl.
+     */
+    public static function native(?string $code): string
+    {
+        $code = self::normalize($code);
+        if ($code !== null && extension_loaded('intl') && is_string($name = Locale::getDisplayName($code, $code)) && $name !== $code) {
+            return mb_convert_case(mb_substr($name, 0, 1), MB_CASE_UPPER).mb_substr($name, 1);
+        }
+
+        return self::name($code);
+    }
+
+    /**
      * Determine if two codes are the same language, whatever their regions.
      */
     public static function same(?string $a, ?string $b): bool

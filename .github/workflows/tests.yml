@@ -93,13 +93,13 @@ jobs:
       - name: Install ffmpeg
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
 
-      - name: Install Playwright and Chromium
-        # The same Playwright version video-demo:install uses
+      - name: Install Playwright, Chromium and the GIF encoder
+        # The same versions video-demo:install uses
         run: |
           mkdir -p "$RUNNER_TEMP/recorder"
           cd "$RUNNER_TEMP/recorder"
           npm init -y > /dev/null
-          npm install --no-audit --no-fund playwright@1.64.0
+          npm install --no-audit --no-fund playwright@1.64.0 gifenc@1.0.3
           npx playwright install --with-deps chromium
 
       - name: Install dependencies

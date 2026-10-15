@@ -12,10 +12,15 @@
     </div>
     <dl style="margin:0;min-width:180px">
       <dt class="vd-eyebrow">Spent on AI</dt>
-      <dd class="vd-figure" style="margin:0" id="vd-total" aria-live="polite">${{ number_format($totalCost, 2) }}</dd>
+      <dd class="vd-figure" style="margin:0" id="vd-total" aria-live="polite">${{ number_format($totalCost, $totalCost < 1 ? 4 : 2) }}</dd>
       <dd class="vd-small vd-muted" style="margin:2px 0 0">Every AI request, including Complete with AI and ideas</dd>
     </dl>
   </section>
+
+  @include('video-demo::studio.partials.worker-warning')
+  @if ($queueWarning)
+    <div class="vd-flash vd-flash-warn" role="status">{{ $queueWarning }}</div>
+  @endif
 
   <div class="vd-split">
     <div class="vd-card vd-card-flush vd-scroll">
@@ -55,11 +60,11 @@
                   data-ready="{{ $video->status === \Ogunsakin01\VideoDemo\Enums\VideoStatus::Ready ? 1 : 0 }}" data-published="{{ $video->isPublished() ? 1 : 0 }}"></td>
                 <td>
                   <a href="{{ route('video-demo.studio.show', $video) }}">{{ $video->title ?: \Illuminate\Support\Str::limit($video->prompt, 60) }}</a>
-                  <div class="vd-small vd-muted">{{ $video->updated_at->diffForHumans() }}</div>
+                  <div class="vd-small vd-muted">{{ $video->updated_at->diffForHumans() }}@if ($video->source_video_id) · {{ \Ogunsakin01\VideoDemo\Support\Language::name($video->languageCode()) }} version @endif</div>
                 </td>
-                <td>@include('video-demo::studio.partials.status', ['status' => $video->status])</td>
+                <td>@include('video-demo::studio.partials.status', ['status' => $video->status])@if ($video->isBroken()) <a class="vd-pill" style="color:var(--vd-bad);border-color:currentColor" href="{{ route('video-demo.studio.show', $video) }}#vd-check" title="{{ $video->verify_result['error'] ?? '' }}">Broken</a>@endif</td>
                 <td class="vd-num vd-mono vd-small" data-length>{{ $video->duration_seconds ? gmdate('i:s', (int) round($video->duration_seconds)) : '—' }}</td>
-                <td class="vd-num vd-mono vd-small" data-cost>${{ number_format($video->cost, 2) }}</td>
+                <td class="vd-num vd-mono vd-small" data-cost>${{ number_format($video->cost, $video->cost < 1 ? 4 : 2) }}</td>
                 <td>
                   @if ($video->isPublished())
                     <span class="vd-pill">{{ $video->visibility === 'public' ? 'Public' : 'Private' }}</span>
@@ -79,6 +84,11 @@
       <h2>Requested by users</h2>
       <p class="vd-small vd-muted" id="vd-requests-note" style="margin:0 0 8px">Loading…</p>
       <ul class="vd-log" id="vd-requests"></ul>
+      <div id="vd-searches" hidden>
+        <h2 style="margin-top:18px">Searched for, nothing found</h2>
+        <p class="vd-small vd-muted" style="margin:0 0 8px" data-note></p>
+        <ul class="vd-log"></ul>
+      </div>
     </aside>
   </div>
 
@@ -146,6 +156,30 @@
           note.textContent = 'Could not load requests.';
         }
       })();
+
+      // Library searches that found no video, when the app counts them.
+      (async () => {
+        const box = document.getElementById('vd-searches');
+        const create = @json(route('video-demo.studio.create'));
+        try {
+          const data = await (await fetch(@json(route('video-demo.studio.stats')), { headers: { Accept: 'application/json' } })).json();
+          if (data.error || !(data.searches || []).length) return;
+          box.querySelector('[data-note]').textContent = `In the last ${data.days} days, in ${data.source === 'local' ? 'this app' : data.source}. Pick one to start a video.`;
+          const list = box.querySelector('ul');
+          for (const s of data.searches.slice(0, 12)) {
+            const li = document.createElement('li');
+            const a = document.createElement('a');
+            a.href = create + '?prompt=' + encodeURIComponent(s.query);
+            a.textContent = s.query;
+            const n = document.createElement('span');
+            n.className = 'vd-muted';
+            n.textContent = ' · ' + s.count + (s.count === 1 ? ' search' : ' searches');
+            li.append(a, n);
+            list.appendChild(li);
+          }
+          box.hidden = false;
+        } catch {}
+      })();
     </script>
   </x-slot:scripts>
 
@@ -155,7 +189,8 @@
       const total = document.getElementById('vd-total');
       const rows = [...document.querySelectorAll('tr[data-video]')];
       const ids = rows.map(r => r.dataset.video).join(',');
-      const money = n => '$' + Number(n).toFixed(2);
+      // Small amounts to a hundredth of a cent, so a cheap request doesn't show as $0.00.
+      const money = n => '$' + Number(n).toFixed(Number(n) < 1 ? 4 : 2);
       async function refresh() {
         let working = false;
         try {

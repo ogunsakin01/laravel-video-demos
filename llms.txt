@@ -24,7 +24,14 @@ php artisan video-demo:generate "Show off posting a job" --style=ad --publish --
 php artisan video-demo:list --json
 php artisan video-demo:publish post-a-job [--unpublish]
 php artisan video-demo:refresh        # re-record published videos from their saved plans, no AI cost
+php artisan video-demo:verify --json  # check published videos still work (no recording, no AI); exits non-zero when one is broken
+php artisan video-demo:verify --changed=origin/main --json  # only videos made from code that differs from the ref (for CI)
+php artisan video-demo:verify --fix   # new plan for each broken video, recorded and republished
+php artisan video-demo:translate post-a-job fr es --publish --json  # the same video in other languages, from its plan
+php artisan video-demo:export post-a-job --format=gif --out=docs/post-a-job.gif  # gif, square or vertical (9:16)
 ```
+
+`verify` needs the studio enabled (it signs in through it) and the app running at `APP_URL`; in CI set `VIDEO_DEMO_STUDIO=true`. Each video's result is kept in `verify_result` (`ok`, `device`, `step`, `action`, `error`, `url`), and `Ogunsakin01\VideoDemo\Events\VideoBroke` fires for a broken one.
 
 `generate` options: `--title`, `--length` (seconds), `--style` (clean, quick, detailed, showcase, ad, spotlight, promo, or a custom style), `--devices` (desktop, tv, tablet, mobile), `--model`, `--effort` (Claude only), `--start` (a path), `--private`, `--max-cost` (spending limit in dollars), `--max-steps`, `--speed` (0.25 to 4; 1 is real time), `--as` (a user type such as `admin`, `guest`, or a user id or email), `--own-data` (record on the app's own local data instead of sample data, the default), `--voice` (a voice-over, such as `kokoro:af_heart`; `none` for none), `--music` (a music track's key), `--language` (such as `fr` or `pt-BR`; the language of the app's pages by default), `--publish`, `--queue`, `--json`. It waits for the video, prints an estimated cost first, and exits non-zero with an `error` on failure; broken pages found before recording are listed under `issues`. The full error (stack trace with code, the failed step with a screenshot, the browser's errors and failed requests, and the app's own exceptions on sample data) is kept in the video's `error_details` and shown by **View full error** on its studio page.
 
@@ -38,6 +45,11 @@ use Ogunsakin01\VideoDemo\Facades\VideoDemo;
 $video = VideoDemo::make('How a manager approves leave', ['style' => 'spotlight', 'as' => 'manager', 'max_cost' => 0.5, 'speed' => 1.5]);
 VideoDemo::publish($video);
 VideoDemo::library(); VideoDemo::search('leave'); VideoDemo::pages(as: 'manager'); VideoDemo::checkPages(['/leave']);
+VideoDemo::verify($video);                    // ['ok' => false, 'step' => 3, 'device' => 'mobile', 'error' => '…'] when it no longer works
+VideoDemo::updatePlan($video, ['steps' => [...]]); VideoDemo::rerecord($video);  // edit the plan by hand, record it free
+VideoDemo::translate($video, 'fr');           // a linked video in French, made from the plan
+VideoDemo::export($video, 'vertical');        // path of a gif, square or vertical copy
+VideoDemo::forPage('jobs.create');            // published videos that show a page (route name or path)
 ```
 
 `Ogunsakin01\VideoDemo\Events\VideoStatusChanged` fires when a video's status changes. `php artisan video-demo:clean` frees disk space.
@@ -47,6 +59,9 @@ VideoDemo::library(); VideoDemo::search('leave'); VideoDemo::pages(as: 'manager'
 ```blade
 <x-video-demo::player slug="post-a-job" />
 <x-video-demo::player slug="post-a-job" device="mobile" />
+<x-video-demo::player slug="post-a-job" collapsible />  {{-- a slim bar that opens into the video and minimises again --}}
+<x-video-demo::player slug="post-a-job" language="fr" />  {{-- by default, the version in the page's language when there is one --}}
+<x-video-demo::help />  {{-- in a layout: "Videos for this page", the published videos that show the current route; nothing when none --}}
 <x-video-demo::search placeholder="How do I…" />
 ```
 
@@ -55,10 +70,14 @@ Library pages: `/help/videos` (public) and `/admin/videos` (private videos too).
 ## Key facts
 
 - Configuration: `config/video-demo.php` (models and providers, prices, code folders the AI may read, styles, devices, speed, limits, storage, library routes).
+- Plans can be edited by hand on a video's studio page; recording an edited plan is free, and a new AI plan starts from the edits.
+- Videos in other languages are separate videos linked by `source_video_id`, made from the original's plan (the AI translates only the words; targets are found again with the app in that language). The recorder sends the language in a `video_demo_locale` cookie, which the package turns into the app's locale where the studio is enabled.
+- Styles can add a logo in a corner of every frame and an end card after the last step.
+- `VIDEO_DEMO_STATS=true` in production counts plays, quarters watched and library searches that found nothing (daily totals only, no cookies or IPs). The studio reads them from `GET {private prefix}/api/stats` with `library.requests_token`.
 - Videos play at 2x the recorded speed by default, and each video can set its own (1x real time to 3x in the studio); captions and title cards are held longer so they stay readable.
 - Styles set the AI's direction and the look of cards and captions; "ad" has animated abstract line art, and "spotlight" records the app in dark mode, zooms in on each step and highlights it; "promo" does the same with big two-line headline cards and captions (art "headline"), a brisk pace and upbeat music.
 - Secrets in code and pages are redacted before anything is sent to the AI. The AI can only read folders in `ai.code.paths`.
-- "Where to put it" on a finished video's studio page (`POST /video-demo/studio/{video}/spots`, queued as `FindSpots`): opens the pages the video visits as its user, the AI picks two or three sections to show it in, and each is screenshotted with a player card in place on desktop and mobile. Results are in the video's `spots` column: `items` with `path`, `label`, `why`, `position`, `shots` and `code` (`file` and `line` of the view, when found).
+- "Where to put it" on a finished video's studio page (`POST /video-demo/studio/{video}/spots`, queued as `FindSpots`): opens the pages the video visits as its user, the AI picks two or three sections, and the real collapsible player is put in each and checked not to upset the layout (no sideways scrolling, nothing beside it squeezed or pushed, not clipped or covered), minimised and open, on desktop and mobile, trying other positions when one fails. Results are in the video's `spots` column: `items` with `path`, `label`, `why`, `position`, `fits`, `problems`, `shots` (per screen, `closed` and `open`) and `code` (`file`, `line`, `exact`, and an `excerpt` with the tag in place).
 - Plan steps can reach into iframes (embedded payment fields). CAPTCHAs, SMS codes and social logins can't be automated.
 - Each video records its actual AI cost and has a spending limit (default `limits.max_cost_per_video`, $0.50, or `VIDEO_DEMO_MAX_COST`): the AI is told its budget and stops before going over. A video can be stopped from the studio at any time.
 - The default model is the cheapest one marked `reliable` whose provider has a key (Claude Sonnet 5.5); `VIDEO_DEMO_MODEL` overrides it.

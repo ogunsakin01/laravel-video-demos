@@ -21,6 +21,13 @@ class CodeTools
     protected Redactor $redactor;
 
     /**
+     * The files read since the last takeReadFiles(), relative to the app's root.
+     *
+     * @var array<string, true>
+     */
+    protected array $read = [];
+
+    /**
      * Create a new code tools instance.
      */
     public function __construct(protected ?string $root = null, ?Redactor $redactor = null)
@@ -101,6 +108,20 @@ class CodeTools
     }
 
     /**
+     * Get the files read since the last call, relative to the app's root, so
+     * a video knows the code it was planned from.
+     *
+     * @return list<string>
+     */
+    public function takeReadFiles(): array
+    {
+        $files = array_keys($this->read);
+        $this->read = [];
+
+        return $files;
+    }
+
+    /**
      * Get how many secrets the tool calls hid since the last check.
      */
     public function hiddenSecrets(): int
@@ -177,6 +198,7 @@ class CodeTools
     {
         $file = $this->resolve($path);
         $max = (int) config('video-demo.ai.code.max_file_bytes', 60_000);
+        $this->read[$this->relative($file)] = true;
 
         $lines = file($file, FILE_IGNORE_NEW_LINES) ?: [];
         $out = '';

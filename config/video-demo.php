@@ -65,6 +65,12 @@ return [
         // Let visitors ask for a video when a search finds nothing.
         'accept_requests' => true,
 
+        // Count how the videos are watched: plays, how far viewers get, and
+        // library searches that found nothing. Only daily totals are kept,
+        // with no cookies, IP addresses or user ids. The studio shows them
+        // on each video's page, read from production with requests_token.
+        'stats' => (bool) env('VIDEO_DEMO_STATS', false),
+
         // Lets the studio on your machine fetch those requests from production.
         // It is sent as a bearer token. Leave it empty to turn the endpoint off.
         'requests_token' => env('VIDEO_DEMO_REQUESTS_TOKEN'),

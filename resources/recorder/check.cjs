@@ -28,6 +28,7 @@ async function describeError(page) {
     const context = await browser.newContext({
       viewport: job.viewport, hasTouch: !!job.touch,
       isMobile: !!job.touch && job.viewport.width < 600, ignoreHTTPSErrors: !!job.ignoreHttpsErrors,
+      ...(job.locale ? { locale: job.locale } : {}),
     });
     // Sample data: the cookie sends every request to the video's own database.
     if (job.cookies?.length) await context.addCookies(job.cookies);

@@ -11,17 +11,22 @@ use Ogunsakin01\VideoDemo\Ai\Pricing;
 use Ogunsakin01\VideoDemo\Ai\Suggester;
 use Ogunsakin01\VideoDemo\Enums\VideoStatus;
 use Ogunsakin01\VideoDemo\Jobs\GenerateVideo;
+use Ogunsakin01\VideoDemo\Jobs\TranslateVideo;
 use Ogunsakin01\VideoDemo\Library\Manifest;
 use Ogunsakin01\VideoDemo\Library\Publisher;
 use Ogunsakin01\VideoDemo\Models\Video;
 use Ogunsakin01\VideoDemo\Models\VideoIdea;
 use Ogunsakin01\VideoDemo\Models\VideoStyle;
 use Ogunsakin01\VideoDemo\Recording\Devices;
+use Ogunsakin01\VideoDemo\Recording\Exporter;
+use Ogunsakin01\VideoDemo\Recording\Plan;
 use Ogunsakin01\VideoDemo\Recording\RecordAs;
 use Ogunsakin01\VideoDemo\Recording\Recorder;
+use Ogunsakin01\VideoDemo\Recording\Verifier;
 use Ogunsakin01\VideoDemo\Studio\Embeds;
 use Ogunsakin01\VideoDemo\Studio\Pages;
 use Ogunsakin01\VideoDemo\Support\Language;
+use Ogunsakin01\VideoDemo\Support\Routes;
 use Ogunsakin01\VideoDemo\Voice\Music;
 use Ogunsakin01\VideoDemo\Voice\Voices;
 use RuntimeException;
@@ -261,6 +266,136 @@ class VideoDemo
     }
 
     /**
+     * Make a video in another language from this one's plan, as a video of
+     * its own, linked to it: the AI translates the titles, captions,
+     * chapters and voice-over (about a cent), the steps are checked with the
+     * app in that language, and the plan is recorded without planning again.
+     * The player and library show it to viewers in that language.
+     *
+     * Options: voice (one that speaks the language; the original's when it
+     * does, else none) and queue (false makes it now, in this process).
+     * Throws InvalidArgumentException for a bad language or voice.
+     *
+     * @param  array{voice?: ?string, queue?: bool}  $options
+     */
+    public function translate(Video $video, string $language, array $options = []): Video
+    {
+        if ($video->source_video_id) {
+            throw new InvalidArgumentException('This video is itself a translation. Translate the original instead.');
+        }
+        if ($video->status->isWorking() || empty($video->plan['steps'])) {
+            throw new InvalidArgumentException('Only a video with a finished plan can be translated.');
+        }
+        $code = Language::normalize($language) ?? throw new InvalidArgumentException("[$language] isn't a language code. Use one such as fr, es or pt-BR.");
+        if (Language::same($code, $video->languageCode())) {
+            throw new InvalidArgumentException('The video is already in '.Language::name($video->languageCode()).'.');
+        }
+        if ($existing = $video->translations()->get()->first(fn (Video $t) => Language::same($t->languageCode(), $code))) {
+            throw new InvalidArgumentException('There is already a '.Language::name($existing->languageCode())." version: {$existing->slug}. Make it again from its own page.");
+        }
+
+        $voice = array_key_exists('voice', $options) ? ($options['voice'] ?: null) : ($video->voice && Voices::speaks($video->voice, $code) ? $video->voice : null);
+        if ($voice && ! Voices::available($voice)) {
+            throw new InvalidArgumentException("The voice [$voice] isn't available here.");
+        }
+        if ($voice && ! Voices::speaks($voice, $code)) {
+            throw new InvalidArgumentException(Voices::label($voice)." doesn't speak ".Language::name($code).'. Choose one that does, or no voice.');
+        }
+
+        $translation = Video::create([
+            // Settings left empty take the columns' defaults.
+            ...array_filter($video->only(['prompt', 'start_path', 'target_seconds', 'model', 'effort', 'visibility', 'style', 'devices', 'max_cost', 'max_steps', 'speed', 'record_as', 'record_as_label', 'sample_data', 'sample_records', 'music', 'music_volume']), fn ($v) => $v !== null),
+            'slug' => Video::uniqueSlug($video->slug.'-'.strtolower($code)),
+            'title' => null,
+            'plan' => $video->plan,
+            'language' => $code,
+            'voice' => $voice,
+            'source_video_id' => $video->id,
+            'status' => VideoStatus::Queued,
+        ]);
+        $translation->addLog(sprintf('Queued: the %s version of "%s"', Language::name($code), $video->title ?: $video->slug));
+
+        if ($options['queue'] ?? true) {
+            TranslateVideo::dispatch($translation);
+        } else {
+            TranslateVideo::dispatchSync($translation);
+        }
+
+        return $translation->fresh() ?? $translation;
+    }
+
+    /**
+     * Replace a video's plan with one edited by hand, such as a caption
+     * reworded or a step removed. Nothing is recorded: call rerecord() to
+     * record it again, at no AI cost. Throws InvalidArgumentException, listing
+     * the problems, when the plan can't be recorded.
+     *
+     * Each step has an action (see Plan::ACTIONS) and the fields it needs:
+     * url for goto, target for click, hover, check, type and select, value
+     * for type, select and press, title for caption and card. Any step may
+     * have text, ms, chapter, say (its voice-over line) and only_on.
+     *
+     * @param  array{title?: ?string, summary?: ?string, steps: array<int, array<string, mixed>>}  $plan
+     */
+    public function updatePlan(Video $video, array $plan): Video
+    {
+        if ($video->status->isWorking()) {
+            throw new RuntimeException('This video is still being made.');
+        }
+
+        $edited = Plan::fromArray([
+            'title' => $plan['title'] ?? $video->plan['title'] ?? '',
+            'summary' => $plan['summary'] ?? $video->plan['summary'] ?? '',
+            'steps' => array_map(Plan::clean(...), array_values($plan['steps'])),
+        ]);
+        if ($problems = $edited->problems($video->max_steps)) {
+            throw new InvalidArgumentException(implode(' ', $problems));
+        }
+
+        $video->update(['plan' => [...$edited->toArray(), 'chapters' => $video->plan['chapters'] ?? []], 'plan_edited_at' => now()]);
+        $video->addLog(sprintf('Plan edited by hand: %d steps', count($edited->steps)));
+
+        return $video;
+    }
+
+    /**
+     * Check that a video's plan still works in the app, without recording it
+     * and at no AI cost. The result is saved on the video; ok is false, with
+     * the step, device and error, when it no longer works.
+     *
+     * @return array{status: string, ok: bool, checked: list<string>, device: ?string, step: ?int, action: ?string, error: ?string, url: ?string, issues: list<array<string, mixed>>, screenshot: bool}
+     */
+    public function verify(Video $video): array
+    {
+        if ($video->status->isWorking()) {
+            throw new RuntimeException('This video is still being made.');
+        }
+
+        return app(Verifier::class)->verify($video);
+    }
+
+    /**
+     * Make a copy of a finished video in another format, now, and get the
+     * file's full path: "gif" (for READMEs, changelogs and emails),
+     * "square" or "vertical" (9:16 MP4s with the title above the app, for
+     * social posts). $device picks the version it is made from. Costs no AI.
+     */
+    public function export(Video $video, string $format, ?string $device = null): string
+    {
+        if ($video->status->isWorking()) {
+            throw new RuntimeException('This video is still being made.');
+        }
+
+        $file = app(Exporter::class)->export($video, $format, $device);
+        $video->forceFill(['exports' => [...($video->exports ?? []), $format => [
+            'status' => 'ready', 'device' => $device ?? $video->primaryDevice(), 'version' => $video->version, 'at' => now()->toIso8601String(),
+            'bytes' => Storage::disk(config('video-demo.storage.work_disk'))->size($file),
+        ]]])->save();
+
+        return Storage::disk(config('video-demo.storage.work_disk'))->path($file);
+    }
+
+    /**
      * Publish a ready video to the library.
      */
     public function publish(Video $video): Video
@@ -345,6 +480,26 @@ class VideoDemo
     public function search(string $query, string $area = 'public'): array
     {
         return $this->manifest->search($query, $area);
+    }
+
+    /**
+     * Get the published videos that show a page: by its route's name (such
+     * as "jobs.create"), its path (such as "/jobs/3"), or the current
+     * request's route when left out. Videos that start there come first.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function forPage(?string $route = null, string $area = 'public'): array
+    {
+        if ($route !== null && str_starts_with($route, '/')) {
+            $match = Routes::match($route);
+
+            return $this->manifest->forRoute($match?->getName(), $match?->uri() ?? $route, $area);
+        }
+
+        return $route !== null
+            ? $this->manifest->forRoute($route, null, $area)
+            : $this->manifest->forRoute(request()->route()?->getName(), request()->route()?->uri(), $area);
     }
 
     /**

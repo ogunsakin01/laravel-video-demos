@@ -5,11 +5,14 @@ namespace Ogunsakin01\VideoDemo\Ai;
 use Illuminate\Support\Str;
 use Ogunsakin01\VideoDemo\Ai\Drivers\Drivers;
 use Ogunsakin01\VideoDemo\Ai\Drivers\Turn;
+use Ogunsakin01\VideoDemo\Library\Stats;
 use Ogunsakin01\VideoDemo\Models\Spend;
 use Ogunsakin01\VideoDemo\Models\Video;
 use Ogunsakin01\VideoDemo\Models\VideoIdea;
+use Ogunsakin01\VideoDemo\Models\VideoRequest;
 use Ogunsakin01\VideoDemo\Models\VideoStyle;
 use Ogunsakin01\VideoDemo\Recording\RecordAs;
+use Throwable;
 
 /**
  * Suggests which videos to make first, from the app's routes, each ready to open in the new-video form.
@@ -46,6 +49,7 @@ class Suggester
         $notes = trim((string) config('video-demo.ai.notes'));
         $users = $this->userTypes();
         $made = Video::query()->latest()->limit(50)->get()->map(fn (Video $v) => '- '.($v->title ?: $v->prompt))->implode("\n");
+        $asked = $this->askedFor();
 
         $answer = $this->drivers->for($model)->structured(
             system: 'You plan a set of short how-to videos for a web app, the ones its users most need: getting started, the core tasks, and things people get stuck on. Read the routes to see what the app does. Suggest videos the routes show are possible; do not invent features. Describe each the way a user would ask about it, in one or two plain sentences: who does it, where it starts and what it ends with.',
@@ -56,6 +60,7 @@ class Suggester
                 $made !== '' ? "<videos_already_made>\n$made\n</videos_already_made>\nDon't suggest these again." : null,
                 $kept->isNotEmpty() ? "<ideas_already_suggested>\n".$kept->map(fn ($t) => "- $t")->implode("\n")."\n</ideas_already_suggested>\nSuggest different videos from these." : null,
                 $notes !== '' ? "<notes_from_the_developer>\n$notes\n</notes_from_the_developer>" : null,
+                $asked !== '' ? (new Redactor)->redact("<what_users_looked_for>\n$asked\n</what_users_looked_for>")."\nUsers asked for these in the help library, or searched for them and found no video. Put videos that answer them first, where the routes show the app can do it." : null,
                 "<routes>\n".$this->code->routeList(allMiddleware: true)."\n</routes>",
             ])),
             schema: [
@@ -130,6 +135,28 @@ class Suggester
             'model' => $turn->model,
             'at' => now()->toIso8601String(),
         ];
+    }
+
+    /**
+     * Get what users asked for in the library and searches that found no
+     * video, one per line, most asked first. Empty when there are none or
+     * production can't be reached.
+     */
+    protected function askedFor(): string
+    {
+        $lines = VideoRequest::where('status', 'open')->latest()->limit(20)->pluck('question')->map(fn ($q) => '- asked: '.Str::limit($q, 200))->all();
+
+        if (Stats::enabled() || config('video-demo.studio.production_url')) {
+            try {
+                foreach (array_slice(app(Stats::class)->fetch()['searches'] ?? [], 0, 20) as $search) {
+                    $lines[] = '- searched '.$search['count'].'×: '.$search['query'];
+                }
+            } catch (Throwable) {
+                // Ideas don't need them.
+            }
+        }
+
+        return implode("\n", $lines);
     }
 
     /**

@@ -2,6 +2,7 @@
 
 namespace Ogunsakin01\VideoDemo\SampleData;
 
+use Closure;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\File;
@@ -68,6 +69,44 @@ class Sandbox
 
         $sandbox = new self($path);
         $sandbox->info = [...$sandbox->info, 'seeded' => $base['info']['seeded'] ?? [], 'warnings' => $base['info']['warnings'] ?? []];
+
+        return $sandbox;
+    }
+
+    /**
+     * Create a video's sandbox and set it up: the user it is recorded as,
+     * and with $addRecords the records the AI added for its plan, so its
+     * pages find them. What happens is passed to $log, a line at a time.
+     *
+     * @param  Closure(string): void  $log
+     *
+     * @throws RuntimeException When the database can't be made.
+     */
+    public static function prepareFor(Video $video, bool $addRecords, Closure $log): self
+    {
+        $sandbox = static::create($video);
+
+        try {
+            $info = $sandbox->prepare($video->record_as);
+            foreach ($info['warnings'] as $warning) {
+                $log($warning);
+            }
+            $log($info['user']
+                ? 'Sample database ready. Signed in as '.($info['user']['email'] ?? 'user #'.$info['user']['id'])
+                : 'Sample database ready');
+
+            if ($addRecords && ($records = $video->sample_records)) {
+                $failed = array_filter($sandbox->seed($records), fn ($r) => ! ($r['ok'] ?? false));
+                $log(sprintf('Added back the %d sample records the AI made', count($records) - count($failed)));
+                foreach ($failed as $result) {
+                    $log("A sample record ({$result['what']}) could not be added back: {$result['error']}");
+                }
+            }
+        } catch (Throwable $e) {
+            $sandbox->delete();
+
+            throw $e;
+        }
 
         return $sandbox;
     }

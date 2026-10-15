@@ -4,11 +4,23 @@
   It plays the version that suits the viewer's screen (mobile, tablet, desktop
   or TV, whichever were recorded). device="mobile" always plays that version.
   area="private" also finds private videos. Renders nothing if the video isn't published.
+
+  collapsible shows a slim "how-to video" bar that opens into the video and
+  can be minimised again, so it fits into a page without taking it over. It
+  starts minimised (add open to start it open) and remembers each viewer's
+  choice. It takes its colours from your page.
+
+  A video made in other languages plays in the language of the page (the
+  app's locale) when there is a version in it. language="fr" picks one;
+  :language="false" always plays the video as named.
 --}}
-@props(['slug', 'area' => 'public', 'device' => null])
+@props(['slug', 'area' => 'public', 'device' => null, 'collapsible' => false, 'open' => false, 'language' => null])
 @php
   $manifest = app(\Ogunsakin01\VideoDemo\Library\Manifest::class);
   $video = $manifest->find($slug, $area);
+  if ($video && $language !== false) {
+      $video = $manifest->localized($video, $language ?? app()->getLocale(), $area);
+  }
   if ($video) {
       $sources = collect(\Ogunsakin01\VideoDemo\Library\Manifest::sources($video))
           ->map(fn ($s, $key) => [
@@ -18,15 +30,18 @@
               'width' => $s['width'], 'height' => $s['height'],
           ]);
       $first = $sources[$device] ?? $sources->first();
+      // Where the player counts plays, when the app turns that on.
+      $stats = \Ogunsakin01\VideoDemo\Library\Stats::enabled() && \Illuminate\Support\Facades\Route::has("video-demo.$area.events")
+          ? route("video-demo.$area.events", $video['slug'], false)
+          : null;
   }
 @endphp
 @if ($video)
-  <video {{ $attributes->except('style')->merge(['class' => 'vd-video', 'controls' => true, 'preload' => 'metadata', 'playsinline' => true]) }}
-    data-vd-sources='@json($sources)' @if ($device) data-vd-device="{{ $device }}" @endif
-    poster="{{ $first['poster'] }}" src="{{ $first['video'] }}" title="{{ $video['title'] }}"
-    style="{{ $attributes->get('style', 'width:100%;border-radius:12px;background:#0e0e0d;display:block;max-height:82vh') }};aspect-ratio:{{ $first['width'] }}/{{ $first['height'] }}">
-    @if ($first['subtitles'])<track kind="subtitles" srclang="{{ $video['language'] ?? 'en' }}" label="Captions" src="{{ $first['subtitles'] }}">@endif
-  </video>
+  @if ($collapsible)
+    @include('video-demo::partials.collapsible-player', ['slug' => $slug, 'title' => $video['title'], 'seconds' => $video['duration'] ?? 0, 'open' => $open, 'attributes' => $attributes, 'video' => $video, 'sources' => $sources, 'first' => $first, 'device' => $device])
+  @else
+    @include('video-demo::partials.player-video', ['attributes' => $attributes, 'video' => $video, 'sources' => $sources, 'first' => $first, 'device' => $device])
+  @endif
   @once
     <script>
       // Play the recorded version closest to this screen: phone, tablet, desktop or TV.
@@ -50,6 +65,24 @@
       document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('video[data-vd-sources]').forEach(el => {
           window.videoDemoShow(el, window.videoDemoPick(JSON.parse(el.dataset.vdSources), el.dataset.vdDevice));
+        });
+        // Counts a play and each quarter reached, once per page view, when the app turns stats on.
+        document.querySelectorAll('video[data-vd-stats]').forEach(el => {
+          const sent = new Set();
+          const send = event => {
+            if (sent.has(event) || !navigator.sendBeacon) return;
+            sent.add(event);
+            const body = new FormData();
+            body.append('event', event);
+            body.append('_token', el.dataset.vdToken || '');
+            navigator.sendBeacon(el.dataset.vdStats, body);
+          };
+          el.addEventListener('play', () => send('play'));
+          el.addEventListener('timeupdate', () => {
+            const done = el.duration ? el.currentTime / el.duration : 0;
+            [25, 50, 75].forEach(q => { if (done >= q / 100) send(String(q)); });
+          });
+          el.addEventListener('ended', () => send('100'));
         });
       });
     </script>

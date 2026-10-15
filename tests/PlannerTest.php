@@ -136,6 +136,9 @@ class PlannerTest extends TestCase
         $perTurn = (10 * 4 + 5_000 * 4 * 1.25 + 20_000 * 0.20 + 1_000 * 20) / 1_000_000;
         $this->assertEqualsWithDelta($perTurn * 4, $video->fresh()->cost, 0.0001);
         $this->assertSame(4 * 20_000, $video->fresh()->cache_read_tokens);
+
+        // The code it read is noted, so video-demo:verify --changed knows the video depends on it.
+        $this->assertSame(['resources/views/jobs/create.blade.php'], $video->fresh()->source_files);
     }
 
     public function test_sends_plain_requests_for_models_without_fallbacks(): void

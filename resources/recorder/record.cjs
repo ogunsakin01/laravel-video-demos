@@ -4,6 +4,8 @@
 // link, the window size and where to write the recording. Writes result.json
 // next to the recording: ok, how long it ran, and on failure the step that
 // failed, the error and what was on the page (so the AI model can fix the plan).
+// With job.dryRun, the plan is played as fast as it goes, with nothing recorded
+// and no cursor, captions or cards, to check that every step still works.
 const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
@@ -15,7 +17,8 @@ const plan = JSON.parse(fs.readFileSync(job.planPath, 'utf8'));
 // viewers must read (captions, cards, pauses) is held this much longer now.
 const SPEED = job.speed || 1;
 const style = Object.assign({ theme: 'light', accent: '#171717', captions: 'bottom', pace: 'normal', speed: SPEED }, job.style || {});
-setPace(style.pace);
+const DRY = !!job.dryRun;
+setPace(DRY ? 'instant' : style.pace);
 const FIND_TIMEOUT = 8000;
 
 // Where each step happened, for styles that zoom in on it while encoding:
@@ -182,6 +185,8 @@ async function run(page, step, isLast) {
       await pause(page, extra);
       return;
     case 'caption':
+      // A check only needs the steps that use the app.
+      if (DRY) return;
       await wide(page);
       await page.evaluate(([t, s, n]) => window.__demoOverlay.caption(t, s, n), [step.title, step.text || '', ++headlines]);
       await pause(page, (step.ms || 3000) * SPEED);
@@ -191,6 +196,7 @@ async function run(page, step, isLast) {
       await pause(page, 350 * SPEED);
       return;
     case 'card':
+      if (DRY) return;
       await wide(page);
       await page.evaluate(([t, s, n]) => window.__demoOverlay.card(t, s, n), [step.title, step.text || '', ++headlines]);
       await pause(page, (step.ms || 3500) * SPEED);
@@ -199,6 +205,7 @@ async function run(page, step, isLast) {
       await pause(page, 450 * SPEED);
       return;
     case 'pause':
+      if (DRY) return;
       await pause(page, (step.ms || 1500) * SPEED);
       return;
     default:
@@ -255,6 +262,8 @@ async function snapshot(page) {
       // Record the app in light or dark mode, for apps that follow the system setting.
       ...(style.app_theme === 'dark' || style.app_theme === 'light' ? { colorScheme: style.app_theme } : {}),
       ignoreHTTPSErrors: !!job.ignoreHttpsErrors,
+      // A video in another language opens the app in that language.
+      ...(job.locale ? { locale: job.locale } : {}),
     };
 
     // Sign in first, outside the recording.
@@ -269,15 +278,17 @@ async function snapshot(page) {
       await ctx.close();
     }
 
-    const context = await browser.newContext({ ...common, storageState, recordVideo: { dir: job.outDir, size: job.viewport } });
+    const context = await browser.newContext({ ...common, storageState, ...(DRY ? {} : { recordVideo: { dir: job.outDir, size: job.viewport } }) });
     // Sample data: the cookie sends every request to the video's own database.
     if (job.cookies?.length) await context.addCookies(job.cookies);
     await context.addInitScript(`window.__demoStyle = ${JSON.stringify(style)};`);
     // Touch screens show where a finger taps instead of a cursor.
     if (job.touch) await context.addInitScript('window.__demoTouch = true;');
-    await context.addInitScript(CURSOR_JS);
-    await context.addInitScript(OVERLAY_JS);
-    if (style.highlight) await context.addInitScript(HIGHLIGHT_JS);
+    if (!DRY) {
+      await context.addInitScript(CURSOR_JS);
+      await context.addInitScript(OVERLAY_JS);
+      if (style.highlight) await context.addInitScript(HIGHLIGHT_JS);
+    }
     page = await context.newPage();
     // The video's first frame is the page's: setting up the browser before it isn't in it.
     const recordingStarted = Date.now();
@@ -285,10 +296,10 @@ async function snapshot(page) {
     // the full size after a real navigation. So wait, then navigate to a plain
     // page for anything shown before the first page opens, and cut everything
     // before that from the video.
-    await page.waitForTimeout(600);
+    if (!DRY) await page.waitForTimeout(600);
     const blank = `<html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="margin:0;background:${style.theme === 'dark' ? '#171717' : '#faf8f3'}"></body></html>`;
     await page.goto('data:text/html,' + encodeURIComponent(blank));
-    await page.waitForTimeout(400);
+    if (!DRY) await page.waitForTimeout(400);
     started = Date.now();
     // A new page is shown whole: the camera pulls back the moment it opens.
     page.on('framenavigated', frame => { if (frame === page.mainFrame()) focus.push({ t: Date.now() - started, wide: true }); });

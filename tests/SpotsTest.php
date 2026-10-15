@@ -65,7 +65,8 @@ class SpotsTest extends TestCase
             public function mapPages(array $paths, ?string $recordAs = null): array
             {
                 $this->mapped = $paths;
-                $section = fn ($id, $kind, $heading, $selector) => ['id' => $id, 'selector' => $selector, 'kind' => $kind, 'heading' => $heading, 'text' => $heading.' and more', 'box' => ['x' => 0, 'y' => 100 * $id, 'w' => 800, 'h' => 300]];
+                $section = fn ($id, $kind, $heading, $selector) => ['id' => $id, 'selector' => $selector, 'kind' => $kind, 'tag' => in_array($kind, ['panel', 'empty state'], true) ? 'div' : $kind, 'classes' => [],
+                    'heading' => $heading, 'text' => $heading.' and more', 'box' => ['x' => 0, 'y' => 100 * $id, 'w' => 800, 'h' => 300]];
 
                 return ['pages' => [
                     ['path' => '/jobs', 'title' => 'Open jobs', 'sections' => [$section(1, 'header', '', 'body > header'), $section(2, 'main', 'Open jobs', 'body > main'), $section(3, 'section', 'Listings', 'main > section')]],
@@ -73,19 +74,24 @@ class SpotsTest extends TestCase
                 ], 'failed' => []];
             }
 
-            public function shootSpots(array $spots, array $card, string $outDir, array $screens = ['desktop', 'mobile'], ?string $recordAs = null): array
+            public function shootSpots(array $spots, string $html, string $outDir, array $screens = ['desktop', 'mobile'], ?string $recordAs = null, string $accent = '#e5693d'): array
             {
-                $this->shot = compact('spots', 'card', 'screens');
+                $this->shot = compact('spots', 'html', 'screens');
                 File::ensureDirectoryExists($outDir);
-                $shots = [];
+                $results = [];
                 foreach ($spots as $i => $spot) {
+                    $shots = [];
                     foreach ($screens as $screen) {
-                        File::put($file = "$outDir/".($i + 1)."-$screen.jpg", 'jpg');
-                        $shots[] = ['spot' => $i, 'screen' => $screen, 'file' => $file];
+                        foreach (['closed', 'open'] as $state) {
+                            File::put($shots[$screen][$state] = "$outDir/".($i + 1)."-$screen-$state.jpg", 'jpg');
+                        }
                     }
+                    // The jobs page's main squeezes its sidebar on phones, whatever the position.
+                    $problems = $spot['path'] === '/jobs' ? [['screen' => 'mobile', 'state' => 'open', 'problem' => 'It changes the width of “Tips”.']] : [];
+                    $results[] = ['found' => true, 'position' => $spot['positions'][0], 'ok' => $problems === [], 'problems' => $problems, 'shots' => $shots];
                 }
 
-                return ['shots' => $shots, 'missing' => []];
+                return $results;
             }
         };
         $this->app->instance(Recorder::class, $recorder);
@@ -97,7 +103,7 @@ class SpotsTest extends TestCase
     {
         $recorder = $this->fakeRecorder();
         File::ensureDirectoryExists(base_path('resources/views/jobs'));
-        File::put(base_path('resources/views/jobs/create.blade.php'), "<x-layout>\n  <form>\n    <h2>Job details</h2>\n  </form>\n</x-layout>\n");
+        File::put(base_path('resources/views/jobs/create.blade.php'), "<x-layout>\n  <p>Intro</p>\n  <form method=\"post\">\n    <h2>Job details</h2>\n    <input name=\"title\">\n  </form>\n</x-layout>\n");
         $this->startFakeAnthropic();
         try {
             $this->respond(1, [['type' => 'text', 'text' => json_encode(['spots' => [
@@ -116,24 +122,45 @@ class SpotsTest extends TestCase
             $this->assertSame(['/jobs', '/jobs/create'], $recorder->mapped);
             // A section that isn't on the page is dropped; beside a whole page's main, the card goes inside it.
             $this->assertSame([['/jobs/create', 'before', 'main > form'], ['/jobs', 'top', 'body > main']], array_map(fn ($s) => [$s['path'], $s['position'], $s['selector']], $spots['items']));
-            $this->assertSame(['desktop' => '1-desktop.jpg', 'mobile' => '1-mobile.jpg'], $spots['items'][0]['shots']);
-            $this->assertSame(['file' => 'resources/views/jobs/create.blade.php', 'line' => 3, 'text' => '<h2>Job details</h2>'], $spots['items'][0]['code']);
-            $this->assertSame(['title' => 'Post a job', 'length' => '1:02'], array_intersect_key($recorder->shot['card'], array_flip(['title', 'length'])));
+            // Positions to try, picked one first; inside only, for a whole page's main.
+            $this->assertSame([['before', 'top', 'after'], ['top']], array_column($recorder->shot['spots'], 'positions'));
+            $this->assertSame(['desktop' => ['closed' => '1-desktop-closed.jpg', 'open' => '1-desktop-open.jpg'], 'mobile' => ['closed' => '1-mobile-closed.jpg', 'open' => '1-mobile-open.jpg']], $spots['items'][0]['shots']);
+            // The layout check is kept with each spot.
+            $this->assertSame([true, false], array_column($spots['items'], 'fits'));
+            $this->assertSame('It changes the width of “Tips”.', $spots['items'][1]['problems'][0]['problem']);
+            // The real collapsible player, with the video's title and length, is what goes on the page.
+            $this->assertStringContainsString('data-vd-collapsible="'.$video->slug.'"', $recorder->shot['html']);
+            $this->assertStringContainsString('How-to video · 1:02', $recorder->shot['html']);
+            $this->assertStringContainsString('data:image/jpeg;base64,', $recorder->shot['html']);
+            // Pasted just above the form's opening tag, with the code around it.
+            $tag = '<x-video-demo::player slug="'.$video->slug.'" collapsible />';
+            $code = $spots['items'][0]['code'];
+            $this->assertSame(['resources/views/jobs/create.blade.php', 3, true], [$code['file'], $code['line'], $code['exact']]);
+            $this->assertSame([[1, '<x-layout>', false], [2, '  <p>Intro</p>', false], [3, '  '.$tag, true], [4, '  <form method="post">', false], [5, '    <h2>Job details</h2>', false], [6, '    <input name="title">', false]],
+                array_map(fn ($l) => [$l['n'], $l['text'], $l['added']], $code['excerpt']));
 
             // The model saw the sections, and its cost went on the video and the ledger.
             $sent = $this->request(1)['body']['messages'][0]['content'];
             $this->assertStringContainsString('<page path="/jobs/create" title="Post a job">', $sent);
             $this->assertStringContainsString('[1] form "Job details"', $sent);
+            // Its cost is the video's, in the total spent, and shown with the spots.
             $this->assertGreaterThan(0, $video->fresh()->cost);
+            $this->assertEqualsWithDelta($video->fresh()->cost, $spots['cost'], 0.000001);
             $this->assertSame(1, Spend::where('kind', 'spots')->where('video_id', $video->id)->count());
+            $this->assertEqualsWithDelta($spots['cost'], Spend::total(), 0.000001);
+            $this->get('/video-demo/studio')->assertSee('$'.number_format(Spend::total(), 4), false);
 
             // The studio shows each spot, its screenshots and the tag to paste.
             $this->get("/video-demo/studio/{$video->id}")
                 ->assertSee('Where to put it')->assertSee('Above the job form')->assertSee('Recruiters land here when they start a listing.')
-                ->assertSee('resources/views/jobs/create.blade.php:3')
-                ->assertSee('&lt;x-video-demo::player slug=&quot;'.$video->slug.'&quot; /&gt;', false)
-                ->assertSee('Suggest again');
-            $this->get("/video-demo/studio/{$video->id}/spots/1-mobile.jpg")->assertOk();
+                ->assertSee('Open <span class="vd-mono">resources/views/jobs/create.blade.php</span> at line 3', false)
+                ->assertSee('data-copy="'.e($tag).'"', false)
+                ->assertSee('<span class="is-added"><b>+</b>  '.e($tag).'</span>', false)
+                ->assertSee('Fits on desktop and phone')->assertSee('May upset the layout')->assertSee('What the check found')
+                ->assertSee('(phone, open)')
+                ->assertSee('Minimised')->assertSee('Suggest again')
+                ->assertSee('AI cost <span class="vd-num">$'.number_format($spots['cost'], 4).'</span>', false);
+            $this->get("/video-demo/studio/{$video->id}/spots/1-mobile-open.jpg")->assertOk();
             $this->get("/video-demo/studio/{$video->id}/spots/9-mobile.jpg")->assertNotFound();
             $this->get("/video-demo/studio/{$video->id}/spots/..%2F..%2Fsecret.jpg")->assertNotFound();
         } finally {
@@ -172,14 +199,25 @@ class SpotsTest extends TestCase
         Queue::fake();
         $video = $this->readyVideo();
 
-        $this->get("/video-demo/studio/{$video->id}")->assertSee('Suggest where to put it')->assertSee('for about a cent');
+        config(['video-demo.ai.model' => 'claude-sonnet-5-5']);
+        $this->get("/video-demo/studio/{$video->id}")->assertSee('Suggest where to put it')->assertSee('costs about $0.0', false)->assertSee("added to the video's cost", false);
         $this->post("/video-demo/studio/{$video->id}/spots")->assertRedirect(route('video-demo.studio.show', $video).'#vd-spots');
         $this->post("/video-demo/studio/{$video->id}/spots")->assertRedirect();
         Queue::assertPushed(FindSpots::class, 1);
 
         $this->assertSame('working', $video->fresh()->spots['status']);
-        $this->get("/video-demo/studio/{$video->id}")->assertSee('Opening your pages and picking spots')->assertSee('data-spots-working', false)->assertDontSee('Suggest where to put it');
-        $this->getJson("/video-demo/studio/{$video->id}/status")->assertJsonPath('spots', 'working');
+        $this->get("/video-demo/studio/{$video->id}")->assertSee('Waiting for a queue worker')->assertSee('data-spots-working', false)->assertDontSee('Suggest where to put it');
+        $this->getJson("/video-demo/studio/{$video->id}/status")->assertJsonPath('spots', 'working')
+            ->assertJsonPath('spots_progress.stage', 'Waiting for a queue worker')->assertJsonPath('spots_progress.percent', 0);
+
+        // Each stage moves the bar on; the time left counts what is still to come.
+        $video->update(['spots' => [...$video->fresh()->spots, 'stage' => 'picking', 'stage_at' => now()->subSeconds(5)->toIso8601String()]]);
+        $progress = FindSpots::progress($video->fresh());
+        $this->assertSame('The AI is picking spots', $progress['stage']);
+        $this->assertGreaterThan(25, $progress['percent']);
+        $this->assertLessThan(80, $progress['percent']);
+        $this->assertGreaterThan(30, $progress['remaining']);
+        $this->get("/video-demo/studio/{$video->id}")->assertSee('id="vd-spots-progress"', false)->assertSee('The AI is picking spots');
 
         // A failure says why, and can be tried again.
         $video->update(['spots' => ['status' => 'failed', 'at' => now()->toIso8601String(), 'error' => 'None of the video\'s pages could be opened: /jobs gave HTTP 500.', 'items' => []]]);

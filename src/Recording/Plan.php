@@ -50,6 +50,35 @@ final class Plan
     }
 
     /**
+     * Keep only the fields a step can have, in their types, for a step
+     * edited by hand. Lengths of spoken lines are left out: they are worked
+     * out again when the plan is recorded.
+     *
+     * @param  array<string, mixed>  $step
+     * @return array<string, mixed>
+     */
+    public static function clean(array $step): array
+    {
+        $text = fn (string $field) => isset($step[$field]) && is_scalar($step[$field]) ? trim((string) $step[$field]) : null;
+        $target = is_array($step['target'] ?? null) ? $step['target'] : [];
+
+        return [
+            'action' => (string) $text('action'),
+            'why' => (string) $text('why'),
+            'url' => $text('url'),
+            'target' => array_combine(self::TARGET_FIELDS, array_map(fn ($f) => isset($target[$f]) && is_scalar($target[$f]) ? trim((string) $target[$f]) : null, self::TARGET_FIELDS)),
+            // A typed value keeps its spaces.
+            'value' => isset($step['value']) && is_scalar($step['value']) ? (string) $step['value'] : null,
+            'title' => $text('title'),
+            'text' => $text('text'),
+            'ms' => is_numeric($step['ms'] ?? null) ? max(0, min(60_000, (int) $step['ms'])) : null,
+            'chapter' => $text('chapter'),
+            'say' => $text('say'),
+            'only_on' => array_values(array_filter((array) ($step['only_on'] ?? []), 'is_string')),
+        ];
+    }
+
+    /**
      * Turn the empty values the model sends ("", 0, []) into null.
      *
      * The schema has no nullable fields, to stay within Anthropic's limit on
@@ -117,6 +146,28 @@ final class Plan
         }, $this->steps);
 
         return new self($this->title, $this->summary, $steps);
+    }
+
+    /**
+     * Get the plan with the style's end card after its last step, when the
+     * style has one: a title card such as "Try it at example.com". It is
+     * added when recording, so editing or re-planning never repeats it.
+     *
+     * @param  array<string, mixed>  $style  What a video kept of its style.
+     */
+    public function withEndCard(array $style): self
+    {
+        $title = trim((string) ($style['end_title'] ?? ''));
+        if ($title === '') {
+            return $this;
+        }
+
+        $text = trim((string) ($style['end_text'] ?? ''));
+
+        return new self($this->title, $this->summary, [...$this->steps, [
+            'action' => 'card', 'why' => 'The style\'s end card', 'url' => null, 'target' => null, 'value' => null,
+            'title' => $title, 'text' => $text !== '' ? $text : null, 'ms' => 3500, 'chapter' => null, 'say' => null, 'only_on' => null,
+        ]]);
     }
 
     /**
@@ -263,6 +314,55 @@ final class Plan
 
         // Actions play back faster; a pause the plan adds after one keeps its length.
         return (int) ($ms / max($speed, 0.1)) + (int) ($step['ms'] ?? 0);
+    }
+
+    /**
+     * Find the problems that keep the plan from being recorded: missing
+     * fields, unknown actions and versions, and too many steps. The same
+     * rules apply to plans from the AI and plans edited by hand.
+     *
+     * @return list<string>
+     */
+    public function problems(?int $maxSteps = null): array
+    {
+        $problems = [];
+        $limit = $maxSteps ?: 250;
+        if ($this->steps === []) {
+            $problems[] = 'The plan has no steps.';
+        }
+        if (count($this->steps) > $limit) {
+            $problems[] = 'The plan has '.count($this->steps)." steps; the limit is $limit. Combine or drop steps to fit.";
+        }
+
+        foreach ($this->steps as $i => $step) {
+            $n = $i + 1;
+            $action = $step['action'] ?? null;
+            // A frame alone isn't a target: something must identify the element in it.
+            $hasTarget = is_array($step['target'] ?? null)
+                && array_filter(array_diff_key($step['target'], ['frame' => true]), fn ($v) => $v !== null && $v !== '') !== [];
+
+            $missing = match ($action) {
+                'goto' => empty($step['url']) ? 'url' : null,
+                'click', 'hover', 'check' => $hasTarget ? null : 'target',
+                'type', 'select' => ! $hasTarget ? 'target' : (($step['value'] ?? '') === '' ? 'value' : null),
+                'press' => empty($step['value']) ? 'value' : null,
+                'caption', 'card' => empty($step['title']) ? 'title' : null,
+                'scroll', 'wait', 'pause' => null,
+                default => 'a known action',
+            };
+
+            if ($missing) {
+                $problems[] = "Step $n ($action) needs $missing.";
+            }
+            if ($action === 'goto' && ! empty($step['url']) && preg_match('~^[a-z]+://~i', $step['url'])) {
+                $problems[] = "Step $n: use a path such as /jobs, not a full URL.";
+            }
+            if ($unknown = array_diff((array) ($step['only_on'] ?? []), Devices::keys())) {
+                $problems[] = "Step $n runs only on ".implode(', ', $unknown).', which isn\'t a version. Choose from: '.implode(', ', Devices::keys()).'.';
+            }
+        }
+
+        return $problems;
     }
 
     /**

@@ -14,6 +14,9 @@ php artisan video-demo:generate "Show off posting a job" --style=ad --publish --
 php artisan video-demo:list --json
 php artisan video-demo:publish post-a-job
 php artisan video-demo:refresh   # record published videos again after UI changes, no AI cost
+php artisan video-demo:verify --changed=origin/main --json   # after changing the UI: which videos it broke (no recording, no AI)
+php artisan video-demo:translate post-a-job fr es --json   # the same video in other languages, from its plan
+php artisan video-demo:export post-a-job --format=gif --out=docs/post-a-job.gif   # gif, square or vertical
 </code-snippet>
 @endverbatim
 - Describe the flow the way the app's users would ask about it. Styles: `clean`, `quick`, `detailed`, `showcase`, `ad` (or any added on the studio's Styles page). Versions: `desktop`, `tv`, `tablet`, `mobile`.
@@ -28,6 +31,8 @@ php artisan video-demo:refresh   # record published videos again after UI change
 - Generating spends the app owner's AI credit: the command prints an estimate first, and each video's spending limit (`--max-cost`, default `video-demo.limits.max_cost_per_video`) caps it.
 - The recorder signs in as `VIDEO_DEMO_LOGIN_AS`. Sample data and test payment details (such as Stripe's `4242 4242 4242 4242`) belong in `video-demo.ai.notes` in `config/video-demo.php`.
 
+- After changing views, routes or labels, run `video-demo:verify --changed=origin/main --json`: it lists published videos whose steps no longer work (`step`, `device`, `error`). Fix the app if it broke, or run it with `--fix` to plan the video again. A small fix, such as a renamed button, can be made with `VideoDemo::updatePlan()` and recorded with `VideoDemo::rerecord()` at no AI cost.
+
 ### Showing videos
 
 @verbatim
@@ -35,6 +40,7 @@ php artisan video-demo:refresh   # record published videos again after UI change
 <x-video-demo::player slug="post-a-job" />            {{-- the version that fits the screen --}}
 <x-video-demo::player slug="post-a-job" device="mobile" />
 <x-video-demo::search placeholder="How do I…" />
+<x-video-demo::help />   {{-- in a layout: the videos that show the current page --}}
 </code-snippet>
 @endverbatim
 - The library is at `/help/videos` (public) and `/admin/videos` (private videos too). Prefixes and middleware are in `config/video-demo.php` under `library`.

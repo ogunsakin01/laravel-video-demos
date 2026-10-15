@@ -59,6 +59,8 @@
               @if ($style->highlight)<span class="vd-pill">Highlights each step</span>@endif
               @if ($style->voice)<span class="vd-pill">Voice: {{ \Ogunsakin01\VideoDemo\Voice\Voices::label($style->voice) }}</span>@endif
               @if ($style->music)<span class="vd-pill">Music: {{ \Ogunsakin01\VideoDemo\Voice\Music::label($style->music) }}</span>@endif
+              @if ($style->logo && $style->logo_position !== 'none')<span class="vd-pill">Logo {{ strtolower(VideoStyle::LOGO_POSITIONS[$style->logo_position] ?? '') }}</span>@endif
+              @if ($style->end_title)<span class="vd-pill">Ends with “{{ \Illuminate\Support\Str::limit($style->end_title, 40) }}”</span>@endif
               <span class="vd-pill" style="display:inline-flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:3px;background:{{ $style->accent }};border:1px solid var(--vd-border)"></span>{{ $style->accent }}</span>
             </div>
           </div>
@@ -66,7 +68,7 @@
       @endforeach
     </div>
 
-    <form method="post" class="vd-card vd-stack"
+    <form method="post" class="vd-card vd-stack" enctype="multipart/form-data"
       action="{{ $editing ? route('video-demo.studio.styles.update', $editing) : route('video-demo.studio.styles.store') }}">
       @csrf
       @if ($editing) @method('put') @endif
@@ -163,6 +165,39 @@
         </div>
       </div>
       <span class="vd-hint" style="margin-top:-8px">New videos in this style start with these; each video can change them.</span>
+      <div class="vd-row">
+        <div>
+          <label for="logo">Logo <span class="vd-optional">PNG, JPG, WebP or SVG, up to 1 MB</span></label>
+          @if ($form->logo)
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+              <img src="{{ route('video-demo.studio.styles.logo', $form) }}" alt="The current logo" style="height:32px;width:auto;max-width:160px;object-fit:contain;padding:6px;border:1px solid var(--vd-border);border-radius:var(--vd-radius-sm);background:{{ $form->theme === 'dark' ? '#141412' : '#faf8f3' }}">
+              <label class="vd-check-row"><input type="checkbox" name="remove_logo" value="1"> Remove</label>
+            </div>
+          @endif
+          <input type="file" id="logo" name="logo" accept=".png,.jpg,.jpeg,.webp,.svg,image/*">
+          @error('logo')<span class="vd-error">{{ $message }}</span>@enderror
+        </div>
+        <div>
+          <label for="logo_position">Logo position</label>
+          <select id="logo_position" name="logo_position">
+            @foreach (VideoStyle::LOGO_POSITIONS as $value => $label)
+              <option value="{{ $value }}" @selected(old('logo_position', $form->logo_position ?? 'none') === $value)>{{ $label }}</option>
+            @endforeach
+          </select>
+          <span class="vd-hint">Shown in a corner of every frame, cards included.</span>
+        </div>
+      </div>
+      <div class="vd-row">
+        <div>
+          <label for="end_title">End card <span class="vd-optional">optional</span></label>
+          <input type="text" id="end_title" name="end_title" maxlength="120" value="{{ old('end_title', $form->end_title) }}" placeholder="Try it at example.com">
+        </div>
+        <div>
+          <label for="end_text">End card sentence <span class="vd-optional">optional</span></label>
+          <input type="text" id="end_text" name="end_text" maxlength="200" value="{{ old('end_text', $form->end_text) }}" placeholder="Free for 14 days, no card needed.">
+        </div>
+      </div>
+      <span class="vd-hint" style="margin-top:-8px">A title card after the last step of every video in this style. Videos made before get the logo and end card when you choose the style again under Make it again.</span>
       <div class="vd-actions">
         <button class="vd-btn vd-btn-primary">{{ $editing ? 'Save style' : 'Add style' }}</button>
         @if ($editing)<a class="vd-btn vd-btn-ghost" href="{{ route('video-demo.studio.styles.index') }}">Cancel</a>@endif

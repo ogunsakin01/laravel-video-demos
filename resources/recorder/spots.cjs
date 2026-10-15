@@ -6,10 +6,15 @@
 // in: landmarks, cards and panels with a heading, empty states. Writes
 // result.json: { pages: [{ path, title, sections: [{ id, selector, kind, heading, text, box }] }], failed: [{ path, reason }] }.
 //
-// mode "shoot": for each of job.spots ({ path, selector, position }), opens the
-// page on each of job.screens, puts a player card for the video there (its
-// poster, title and length) with an outline around it, and saves a screenshot.
-// Writes result.json: { shots: [{ spot, screen, file }], missing: [{ spot, screen, reason }] }.
+// mode "shoot": for each of job.spots ({ path, selector, positions }), puts the
+// video's player (job.html, the real collapsible player) into the section and
+// checks it doesn't upset the page, minimised and open, on each of
+// job.screens: no sideways scrolling, nothing beside it squeezed or pushed
+// sideways, the player not clipped or covered. Positions are tried in order
+// until one passes everywhere; if none does, the one with fewest problems is kept. Saves a
+// screenshot of each state with the player outlined, as
+// <spot>-<screen>-<closed|open>.jpg in job.outDir. Writes result.json:
+// { spots: [{ found, position, ok, problems: [{ screen, state, problem }], shots: { screen: { closed, open } } }] }.
 const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
@@ -85,6 +90,8 @@ function sections() {
       id: found.length + 1,
       selector: selectorOf(el),
       kind: empty ? 'empty state' : (el.getAttribute('role') === 'main' ? 'main' : tag === 'div' ? 'panel' : tag),
+      tag,
+      classes: (typeof el.className === 'string' ? el.className : '').trim().split(/\s+/).filter(Boolean).slice(0, 4),
       heading,
       text: words.slice(0, 140),
       box: { x: Math.round(r.x), y: Math.round(r.y + scrollY), w: Math.round(r.width), h: Math.round(r.height) },
@@ -93,31 +100,90 @@ function sections() {
   return { title: (document.querySelector('h1') ? text(document.querySelector('h1')) : document.title).slice(0, 120), sections: found };
 }
 
-// Runs in the page: put the player card in its place, outlined, and bring it into view.
-function place([selector, position, card]) {
+// Runs in the page: note where everything that could move is, before the player goes in.
+function measure([selector, position]) {
   const target = document.querySelector(selector);
-  if (!target) return false;
-  const wrap = document.createElement('div');
-  wrap.setAttribute('data-video-demo-spot', '');
-  wrap.style.cssText = 'all:initial;display:block;box-sizing:border-box;width:100%;max-width:' + (position === 'top' ? '560px' : '640px') + ';margin:16px 0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;'
-    + 'outline:3px solid ' + card.accent + ';outline-offset:6px;border-radius:12px;position:relative;margin-top:26px';
-  wrap.innerHTML = '<span style="position:absolute;z-index:1;top:-17px;left:14px;background:' + card.accent + ';color:#fff;font:600 12px/1 ui-sans-serif,system-ui,sans-serif;padding:6px 9px;border-radius:6px;letter-spacing:.01em">Video goes here</span>'
-    + '<div style="display:flex;gap:14px;align-items:center;background:#ffffff;color:#171717;border:1px solid #e5e2dc;border-radius:12px;padding:12px;box-shadow:0 8px 24px -12px rgba(0,0,0,.25)">'
-    + '<div style="position:relative;flex:none;width:44%;max-width:240px;aspect-ratio:16/9;border-radius:8px;overflow:hidden;background:#141412">'
-    + (card.poster ? '<img src="' + card.poster + '" alt="" style="width:100%;height:100%;object-fit:cover;display:block">' : '')
-    + '<span style="position:absolute;inset:0;margin:auto;width:40px;height:40px;border-radius:50%;background:rgba(17,17,17,.82);display:flex;align-items:center;justify-content:center">'
-    + '<span style="width:0;height:0;border-left:13px solid #fff;border-top:8px solid transparent;border-bottom:8px solid transparent;margin-left:3px"></span></span></div>'
-    + '<div style="min-width:0"><div style="font-size:12px;color:#6b6f7b;margin-bottom:4px">How-to video · ' + card.length + '</div>'
-    + '<div style="font-size:15px;font-weight:600;line-height:1.35;color:#171717">' + card.title + '</div></div></div>';
-  if (position === 'before') target.before(wrap);
-  else if (position === 'after') target.after(wrap);
-  else target.prepend(wrap);
-  wrap.scrollIntoView({ block: 'center' });
+  if (!target) return null;
+  const parent = position === 'top' ? target : target.parentElement;
+  const box = el => { const r = el.getBoundingClientRect(); return { x: Math.round(r.x), w: Math.round(r.width) }; };
+  window.__vdBefore = {
+    wide: document.documentElement.scrollWidth > innerWidth + 1,
+    siblings: [...parent.children].map(el => ({ el, box: box(el) })),
+    target: box(target),
+  };
   return true;
 }
 
+// Runs in the page: put the player in its place.
+function place([selector, position, html]) {
+  const target = document.querySelector(selector);
+  const holder = document.createElement('div');
+  holder.innerHTML = html;
+  const player = holder.querySelector('details') || holder.firstElementChild;
+  // Its styles and script, once.
+  holder.querySelectorAll('style').forEach(st => document.head.appendChild(st));
+  if (position === 'before') target.before(player);
+  else if (position === 'after') target.after(player);
+  else target.prepend(player);
+  player.setAttribute('data-video-demo-spot', '');
+  return true;
+}
+
+// Runs in the page: what the player did to the page, in plain words.
+function problems() {
+  const player = document.querySelector('[data-video-demo-spot]');
+  const before = window.__vdBefore;
+  const found = [];
+  const name = el => {
+    const h = el.querySelector && el.querySelector('h1, h2, h3, h4, legend');
+    const words = (h ? h.innerText : el.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+    return words ? `“${words}”` : `the ${el.tagName.toLowerCase()} beside it`;
+  };
+  if (!before.wide && document.documentElement.scrollWidth > innerWidth + 1) found.push('The page scrolls sideways with it in.');
+  for (const { el, box } of before.siblings) {
+    if (!el.isConnected || el === player) continue;
+    const r = el.getBoundingClientRect();
+    if (Math.abs(r.width - box.w) > Math.max(4, box.w * 0.04)) found.push(`It changes the width of ${name(el)}.`);
+    else if (Math.abs(r.x - box.x) > 4) found.push(`It pushes ${name(el)} sideways.`);
+  }
+  const r = player.getBoundingClientRect();
+  if (r.width < Math.min(240, innerWidth - 40)) found.push(`It would be only ${Math.round(r.width)}px wide.`);
+  for (let a = player.parentElement; a && a !== document.body; a = a.parentElement) {
+    const st = getComputedStyle(a);
+    if (st.overflowX !== 'visible' || st.overflowY !== 'visible') {
+      const ar = a.getBoundingClientRect();
+      if (r.right > ar.right + 1 || r.left < ar.left - 1 || (st.overflowY !== 'visible' && st.overflowY !== 'auto' && st.overflowY !== 'scroll' && r.bottom > ar.bottom + 1)) {
+        found.push('Part of it is cut off by the section around it.');
+        break;
+      }
+    }
+  }
+  player.scrollIntoView({ block: 'center' });
+  const pr = player.getBoundingClientRect();
+  const hit = document.elementFromPoint(pr.left + Math.min(pr.width / 2, 60), pr.top + Math.min(pr.height / 2, 20));
+  if (hit && !player.contains(hit)) found.push('Something on the page covers it.');
+  return [...new Set(found)];
+}
+
+// Runs in the page: outline the player and label it for the screenshot. Both
+// sit outside the page's layout, so they move nothing.
+function outline(accent) {
+  const player = document.querySelector('[data-video-demo-spot]');
+  player.scrollIntoView({ block: 'center' });
+  player.style.outline = '3px solid ' + accent;
+  player.style.outlineOffset = '5px';
+  document.querySelector('[data-video-demo-label]')?.remove();
+  const r = player.getBoundingClientRect();
+  const label = document.createElement('div');
+  label.setAttribute('data-video-demo-label', '');
+  label.textContent = 'Video goes here';
+  label.style.cssText = 'position:absolute;z-index:2147483647;left:' + Math.max(4, r.left + scrollX + 8) + 'px;top:' + Math.max(4, r.top + scrollY - 22) + 'px;'
+    + 'background:' + accent + ';color:#fff;font:600 12px/1 ui-sans-serif,system-ui,sans-serif;padding:5px 8px;border-radius:6px;pointer-events:none';
+  document.body.appendChild(label);
+}
+
 (async () => {
-  const out = { pages: [], failed: [], shots: [], missing: [] };
+  const out = { pages: [], failed: [], spots: [] };
   const browser = await chromium.launch(job.channel ? { channel: job.channel } : {});
   try {
     if (job.mode === 'map') {
@@ -135,31 +201,60 @@ function place([selector, position, card]) {
         }
       }
     } else {
-      // The poster as a data address, so the page shows it whatever its own security rules.
-      const poster = job.poster && fs.existsSync(job.poster) ? 'data:image/jpeg;base64,' + fs.readFileSync(job.poster).toString('base64') : null;
-      const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]);
-      const card = { poster, title: esc(job.title), length: esc(job.length), accent: job.accent || '#e5693d' };
+      const contexts = {};
       for (const screen of job.screens) {
-        const context = await browser.newContext({ viewport: screen.viewport, hasTouch: !!screen.touch, isMobile: !!screen.touch, ignoreHTTPSErrors: !!job.ignoreHttpsErrors });
-        if (job.cookies?.length) await context.addCookies(job.cookies);
-        await signIn(context);
-        for (const [i, spot] of job.spots.entries()) {
-          try {
-            const { page } = await open(context, spot.path);
-            if (await page.evaluate(place, [spot.selector, spot.position, card])) {
-              await page.waitForTimeout(400);
-              const file = path.join(job.outDir, (i + 1) + '-' + screen.key + '.jpg');
-              await page.screenshot({ path: file, type: 'jpeg', quality: 80 });
-              out.shots.push({ spot: i, screen: screen.key, file });
-            } else {
-              out.missing.push({ spot: i, screen: screen.key, reason: 'The section was not on the page' });
+        contexts[screen.key] = await browser.newContext({ viewport: screen.viewport, hasTouch: !!screen.touch, isMobile: !!screen.touch, ignoreHTTPSErrors: !!job.ignoreHttpsErrors });
+        if (job.cookies?.length) await contexts[screen.key].addCookies(job.cookies);
+        await signIn(contexts[screen.key]);
+      }
+
+      for (const [i, spot] of job.spots.entries()) {
+        let chosen = null;
+        for (const position of spot.positions) {
+          const tried = { found: true, position, ok: true, problems: [], shots: {} };
+          for (const screen of job.screens) {
+            const { page } = await open(contexts[screen.key], spot.path);
+            try {
+              if (!(await page.evaluate(measure, [spot.selector, position]))) { tried.found = false; tried.ok = false; break; }
+              await page.evaluate(place, [spot.selector, position, job.html]);
+              await page.waitForTimeout(250);
+              const shots = {};
+              for (const state of ['closed', 'open']) {
+                if (state === 'open') {
+                  await page.evaluate(() => { const d = document.querySelector('[data-video-demo-spot]'); if (d) d.open = true; });
+                  await page.waitForTimeout(250);
+                }
+                for (const problem of await page.evaluate(problems)) tried.problems.push({ screen: screen.key, state, problem });
+                await page.evaluate(outline, job.accent || '#e5693d');
+                await page.waitForTimeout(150);
+                shots[state] = path.join(job.outDir, `${i + 1}-${screen.key}-${state}-${position}.jpg`);
+                await page.screenshot({ path: shots[state], type: 'jpeg', quality: 80 });
+                await page.evaluate(() => { const p = document.querySelector('[data-video-demo-spot]'); if (p) p.style.outline = ''; document.querySelector('[data-video-demo-label]')?.remove(); });
+              }
+              tried.shots[screen.key] = shots;
+            } finally {
+              await page.close();
             }
-            await page.close();
-          } catch (e) {
-            out.missing.push({ spot: i, screen: screen.key, reason: String(e.message || e).split('\n')[0].slice(0, 200) });
+          }
+          tried.ok = tried.found && tried.problems.length === 0;
+          // Keep the first position that fits; failing that, the one with the fewest problems.
+          if (tried.found && (!chosen || tried.problems.length < chosen.problems.length)) {
+            if (chosen) for (const s of Object.values(chosen.shots)) for (const f of Object.values(s)) fs.rmSync(f, { force: true });
+            chosen = tried;
+          } else {
+            for (const s of Object.values(tried.shots)) for (const f of Object.values(s)) fs.rmSync(f, { force: true });
+          }
+          if (chosen?.ok) break;
+        }
+        // Saved under a name without the position, now that it is settled.
+        if (chosen) {
+          for (const [screen, s] of Object.entries(chosen.shots)) for (const [state, f] of Object.entries(s)) {
+            const final = path.join(job.outDir, `${i + 1}-${screen}-${state}.jpg`);
+            fs.renameSync(f, final);
+            chosen.shots[screen][state] = final;
           }
         }
-        await context.close();
+        out.spots.push(chosen || { found: false, position: null, ok: false, problems: [], shots: {} });
       }
     }
   } catch (e) {

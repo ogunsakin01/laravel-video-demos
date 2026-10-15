@@ -4,6 +4,7 @@ namespace Ogunsakin01\VideoDemo\Models;
 
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 /**
@@ -25,6 +26,10 @@ use Illuminate\Support\Str;
  * @property bool $highlight
  * @property ?string $voice
  * @property ?string $music
+ * @property ?string $logo
+ * @property string $logo_position
+ * @property ?string $end_title
+ * @property ?string $end_text
  * @property int $position
  */
 class VideoStyle extends Model
@@ -43,6 +48,17 @@ class VideoStyle extends Model
     public const ARTS = ['none' => 'None', 'abstract' => 'Abstract line art', 'headline' => 'Bold headlines'];
 
     public const APP_THEMES = ['auto' => 'As the app shows it', 'light' => 'Light mode', 'dark' => 'Dark mode'];
+
+    /**
+     * Where the logo sits on every frame, or none.
+     */
+    public const LOGO_POSITIONS = ['none' => 'No logo', 'top-right' => 'Top right', 'top-left' => 'Top left', 'bottom-right' => 'Bottom right', 'bottom-left' => 'Bottom left'];
+
+    /**
+     * The biggest logo that can be uploaded, in kilobytes. It is sent to the
+     * recorded page as it is.
+     */
+    public const LOGO_MAX_KB = 1024;
 
     protected $table = 'video_demo_styles';
 
@@ -86,7 +102,7 @@ class VideoStyle extends Model
      */
     public static function defaults(): array
     {
-        return ['theme' => 'light', 'accent' => '#171717', 'captions' => 'bottom', 'pace' => 'normal', 'art' => 'none', 'app_theme' => 'auto', 'zoom' => false, 'highlight' => false];
+        return ['theme' => 'light', 'accent' => '#171717', 'captions' => 'bottom', 'pace' => 'normal', 'art' => 'none', 'app_theme' => 'auto', 'zoom' => false, 'highlight' => false, 'logo_position' => 'none'];
     }
 
     /**
@@ -106,6 +122,33 @@ class VideoStyle extends Model
      */
     public function snapshot(): array
     {
-        return $this->only(['key', 'name', 'direction', 'theme', 'accent', 'captions', 'pace', 'art', 'app_theme', 'zoom', 'highlight', 'voice', 'music']);
+        return $this->only(['key', 'name', 'direction', 'theme', 'accent', 'captions', 'pace', 'art', 'app_theme', 'zoom', 'highlight', 'voice', 'music', 'logo', 'logo_position', 'end_title', 'end_text']);
+    }
+
+    /**
+     * Get a style's logo as a data URI, for the recorded page to show, or
+     * null when it has none, it is turned off or the file is gone.
+     *
+     * @param  array<string, mixed>  $style  A style, or what a video kept of one.
+     */
+    public static function logoSource(array $style): ?string
+    {
+        $path = $style['logo'] ?? null;
+        if (! is_string($path) || $path === '' || ($style['logo_position'] ?? 'none') === 'none') {
+            return null;
+        }
+
+        $disk = Storage::disk(config('video-demo.storage.work_disk'));
+        if (! $disk->exists($path)) {
+            return null;
+        }
+        $mime = match (strtolower(pathinfo($path, PATHINFO_EXTENSION))) {
+            'svg' => 'image/svg+xml',
+            'jpg', 'jpeg' => 'image/jpeg',
+            'webp' => 'image/webp',
+            default => 'image/png',
+        };
+
+        return "data:$mime;base64,".base64_encode($disk->get($path));
     }
 }

@@ -59,7 +59,7 @@ class Placer
                                 'path' => ['type' => 'string', 'description' => 'The page path, as listed'],
                                 'section' => ['type' => 'integer', 'description' => 'The section number on that page'],
                                 'position' => ['type' => 'string', 'enum' => self::POSITIONS, 'description' => 'top: first thing inside the section; before or after: next to it'],
-                                'label' => ['type' => 'string', 'description' => 'A short name for the spot, such as "Above the job form"'],
+                                'label' => ['type' => 'string', 'description' => 'A short name for the section, such as "The job form" or "Tips beside the form"; not where in it, as that is checked afterwards'],
                                 'why' => ['type' => 'string', 'description' => 'One sentence: why users would want the video there'],
                             ],
                             'required' => ['path', 'section', 'position', 'label', 'why'],
@@ -102,6 +102,15 @@ class Placer
         }
 
         return $spots;
+    }
+
+    /**
+     * Estimate what picking spots costs, in US dollars: a short request over
+     * the sections of a few pages, with the given model.
+     */
+    public static function estimate(string $model, int $pages = 3): float
+    {
+        return Pricing::cost($model, 900 + $pages * 12 * 45, 0, 0, 450);
     }
 
     /**

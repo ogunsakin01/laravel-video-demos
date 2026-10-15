@@ -3,10 +3,12 @@
 namespace Ogunsakin01\VideoDemo;
 
 use Anthropic\Client;
+use Illuminate\Routing\Events\RouteMatched;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Ogunsakin01\VideoDemo\Ai\Claude;
 use Ogunsakin01\VideoDemo\Console\CleanCommand;
+use Ogunsakin01\VideoDemo\Console\ExportCommand;
 use Ogunsakin01\VideoDemo\Console\GenerateCommand;
 use Ogunsakin01\VideoDemo\Console\InstallCommand;
 use Ogunsakin01\VideoDemo\Console\InstallVoiceCommand;
@@ -16,9 +18,14 @@ use Ogunsakin01\VideoDemo\Console\RefreshCommand;
 use Ogunsakin01\VideoDemo\Console\SampleDatabaseCommand;
 use Ogunsakin01\VideoDemo\Console\SampleDataCommand;
 use Ogunsakin01\VideoDemo\Console\SuggestCommand;
+use Ogunsakin01\VideoDemo\Console\TranslateCommand;
+use Ogunsakin01\VideoDemo\Console\VerifyCommand;
 use Ogunsakin01\VideoDemo\Console\WorkCommand;
 use Ogunsakin01\VideoDemo\Library\Manifest;
+use Ogunsakin01\VideoDemo\Recording\Recorder;
 use Ogunsakin01\VideoDemo\SampleData\Sandbox;
+use Ogunsakin01\VideoDemo\Support\Language;
+use Ogunsakin01\VideoDemo\Support\Worker;
 
 class VideoDemoServiceProvider extends ServiceProvider
 {
@@ -58,6 +65,10 @@ class VideoDemoServiceProvider extends ServiceProvider
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
 
         $this->registerRoutes();
+        $this->useRecorderLocale();
+
+        // Queue workers leave a heartbeat, so the studio can say when none is running.
+        Worker::listen($this->app['events']);
 
         if ($this->app->runningInConsole()) {
             $this->publishes([__DIR__.'/../config/video-demo.php' => config_path('video-demo.php')], 'video-demo-config');
@@ -68,6 +79,7 @@ class VideoDemoServiceProvider extends ServiceProvider
                 InstallCommand::class,
                 InstallVoiceCommand::class,
                 CleanCommand::class,
+                ExportCommand::class,
                 GenerateCommand::class,
                 ListCommand::class,
                 PublishCommand::class,
@@ -75,9 +87,32 @@ class VideoDemoServiceProvider extends ServiceProvider
                 SampleDataCommand::class,
                 SampleDatabaseCommand::class,
                 SuggestCommand::class,
+                TranslateCommand::class,
+                VerifyCommand::class,
                 WorkCommand::class,
             ]);
         }
+    }
+
+    /**
+     * Show the app in the language the recorder asks for, when it records a
+     * video in another language. Only where the studio is enabled, which is
+     * where the recorder runs. An app that sets its locale later in the
+     * request, from the user's settings say, keeps its own.
+     */
+    protected function useRecorderLocale(): void
+    {
+        if (! static::studioEnabled()) {
+            return;
+        }
+
+        // When the route is found, before the app's own middleware runs.
+        $this->app['events']->listen(RouteMatched::class, function (RouteMatched $event) {
+            $code = $event->request->cookies->get(Recorder::LOCALE_COOKIE);
+            if (is_string($code) && ($code = Language::normalize($code))) {
+                $this->app->setLocale(str_replace('-', '_', $code));
+            }
+        });
     }
 
     /**

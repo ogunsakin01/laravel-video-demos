@@ -58,6 +58,9 @@
     @endif
   </section>
 
+  @if ($video->status->isWorking() || ($video->spots['status'] ?? null) === 'working')
+    @include('video-demo::studio.partials.worker-warning')
+  @endif
   @if ($queueWarning)
     <div class="vd-flash vd-flash-warn" role="status">{{ $queueWarning }}</div>
   @endif
@@ -126,6 +129,22 @@
         @include('video-demo::studio.partials.spots')
       @endif
 
+      @if (! $video->status->isWorking() && ! empty($video->plan['steps']) && ($video->status === \Ogunsakin01\VideoDemo\Enums\VideoStatus::Ready || $video->verify_result))
+        @include('video-demo::studio.partials.check')
+      @endif
+
+      @if ($video->status === \Ogunsakin01\VideoDemo\Enums\VideoStatus::Ready && $video->hasRecording())
+        @include('video-demo::studio.partials.downloads')
+      @endif
+
+      @if ($video->isPublished())
+        @include('video-demo::studio.partials.watching')
+      @endif
+
+      @if ($video->source_video_id || ($video->status === \Ogunsakin01\VideoDemo\Enums\VideoStatus::Ready && ! empty($video->plan['steps'])) || $video->translations()->exists())
+        @include('video-demo::studio.partials.translations')
+      @endif
+
       @if ($video->error)
         <div class="vd-card vd-stack-sm" style="border-color:transparent;background:var(--vd-bad-bg)">
           <h2 style="color:var(--vd-bad);margin:0">What went wrong</h2>
@@ -154,28 +173,7 @@
       @endif
 
       @if (! empty($video->plan['steps']))
-        <details class="vd-card">
-          <summary>Plan · {{ count($video->plan['steps']) }} steps</summary>
-          @if (! empty($video->plan['summary']))<p class="vd-small vd-muted" style="margin:10px 0 0">{{ $video->plan['summary'] }}</p>@endif
-          <ol class="vd-steps">
-            @foreach ($video->plan['steps'] as $step)
-              <li>
-                <code>{{ $step['action'] }}</code>
-                <span>
-                  @if (in_array($step['action'], ['caption', 'card']))
-                    “{{ $step['title'] }}”
-                  @elseif ($step['action'] === 'goto')
-                    <span class="vd-mono">{{ $step['url'] }}</span>
-                  @else
-                    {{ collect($step['target'] ?? [])->filter()->map(fn ($v, $k) => "$k: $v")->implode(', ') }}
-                    @if (! empty($step['value'])) → “{{ $step['value'] }}” @endif
-                  @endif
-                  @if (! empty($step['why']))<span class="vd-muted"> · {{ $step['why'] }}</span>@endif
-                </span>
-              </li>
-            @endforeach
-          </ol>
-        </details>
+        @include('video-demo::studio.partials.plan-editor')
       @endif
 
       <form method="post" action="{{ route('video-demo.studio.update', $video) }}" class="vd-card vd-stack">
@@ -334,7 +332,7 @@
                 <input type="checkbox" name="new_plan" value="1" id="a-new-plan" @checked(! $hasPlan) @disabled(! $hasPlan)>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>
                 <span class="vd-toggle-text"><span class="vd-toggle-name">Ask the AI for a new plan</span>
-                  <span class="vd-toggle-size" id="a-new-plan-hint">{{ $hasPlan ? 'Off: the same plan, recorded again for free. Turns on when you change what the AI plans from.' : 'There is no plan yet, so the AI makes one.' }}</span></span>
+                  <span class="vd-toggle-size" id="a-new-plan-hint">{{ $hasPlan ? 'Off: the same plan, recorded again for free. Turns on when you change what the AI plans from.'.($video->plan_edited_at ? ' A new plan starts from your edits to the plan.' : '') : 'There is no plan yet, so the AI makes one.' }}</span></span>
                 <span class="vd-switch" aria-hidden="true"></span>
               </label>
             </div>

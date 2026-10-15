@@ -6,6 +6,7 @@ use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Ogunsakin01\VideoDemo\Support\Language;
 use Throwable;
 
 /**
@@ -39,6 +40,20 @@ class Manifest
      */
     public function forArea(string $area): array
     {
+        $videos = $this->visible($area);
+        $listed = array_column($videos, 'slug');
+
+        // Versions in other languages are reached from their original, when it is listed.
+        return array_values(array_filter($videos, fn ($v) => empty($v['translation_of']) || ! in_array($v['translation_of'], $listed, true)));
+    }
+
+    /**
+     * Get every video an area may show, versions in other languages included.
+     *
+     * @return list<array<string, mixed>>
+     */
+    protected function visible(string $area): array
+    {
         return array_values(array_filter(
             $this->all(),
             fn ($v) => $area === 'private' || ($v['visibility'] ?? 'public') === 'public',
@@ -50,7 +65,69 @@ class Manifest
      */
     public function find(string $slug, string $area): ?array
     {
-        return collect($this->forArea($area))->firstWhere('slug', $slug);
+        return collect($this->visible($area))->firstWhere('slug', $slug);
+    }
+
+    /**
+     * Get a video's versions in other languages, in a library area.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function translations(string $slug, string $area): array
+    {
+        return array_values(array_filter($this->visible($area), fn ($v) => ($v['translation_of'] ?? null) === $slug));
+    }
+
+    /**
+     * Get the version of a video in a language: the video itself when it is
+     * in that language or has no version in it. A version asked for in
+     * another language leads back through its original.
+     *
+     * @param  array<string, mixed>  $video
+     * @return array<string, mixed>
+     */
+    public function localized(array $video, ?string $language, string $area): array
+    {
+        if ($language === null || Language::normalize($language) === null || Language::same($video['language'] ?? null, $language)) {
+            return $video;
+        }
+
+        $original = ! empty($video['translation_of']) ? ($this->find($video['translation_of'], $area) ?? $video) : $video;
+        if (Language::same($original['language'] ?? null, $language)) {
+            return $original;
+        }
+
+        return collect($this->translations($original['slug'], $area))->first(fn ($t) => Language::same($t['language'] ?? null, $language)) ?? $video;
+    }
+
+    /**
+     * Get the videos that show a page of the app, by its route's name (such
+     * as "jobs.create") or URI (such as "jobs/{job}"). Videos that start on
+     * the page come first. Videos published before routes were kept have
+     * none, so publish them again to list them.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function forRoute(?string $name, ?string $uri, string $area): array
+    {
+        $uri = $uri !== null ? trim($uri, '/') : null;
+        $at = function (array $video) use ($name, $uri): ?int {
+            foreach (array_values($video['routes'] ?? []) as $i => $route) {
+                if (($name !== null && ($route['name'] ?? null) === $name) || ($uri !== null && trim((string) ($route['uri'] ?? ''), '/') === $uri)) {
+                    return $i;
+                }
+            }
+
+            return null;
+        };
+
+        return collect($this->forArea($area))
+            ->map(fn ($video) => [$at($video), $video])
+            ->filter(fn ($pair) => $pair[0] !== null)
+            ->sortBy(fn ($pair) => $pair[0])
+            ->map(fn ($pair) => $pair[1])
+            ->values()
+            ->all();
     }
 
     /**

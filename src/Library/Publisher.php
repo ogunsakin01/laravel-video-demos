@@ -5,6 +5,8 @@ namespace Ogunsakin01\VideoDemo\Library;
 use Illuminate\Support\Facades\Storage;
 use Ogunsakin01\VideoDemo\Models\Video;
 use Ogunsakin01\VideoDemo\Recording\Devices;
+use Ogunsakin01\VideoDemo\Recording\Plan;
+use Ogunsakin01\VideoDemo\Support\Routes;
 use RuntimeException;
 
 /**
@@ -69,7 +71,11 @@ class Publisher
             'poster' => $primary['poster'],
             'subtitles' => $primary['subtitles'],
             'language' => $video->languageCode(),
+            // A version in another language is listed with its original, not on its own.
+            'translation_of' => $video->source?->slug,
             'sources' => $sources,
+            // The pages it shows, so <x-video-demo::help /> can list it on them.
+            'routes' => Routes::describe(Plan::fromArray($video->plan ?? [])->paths()),
             'version' => $video->version,
             'published_at' => now()->toIso8601String(),
         ]);

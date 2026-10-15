@@ -68,10 +68,12 @@ class DemoClaude extends Claude
             preg_match_all('~<page path="([^"]+)"[^>]*>(.*?)</page>~s', $prompt, $pages, PREG_SET_ORDER);
             $spots = [];
             foreach ($pages as [, $path, $body]) {
-                preg_match_all('~\[(\d+)\] (panel|form|section|aside|empty state|main) "([^"]+)"~', $body, $sections, PREG_SET_ORDER);
+                // A form or panel when the page has one, else its main content.
+                preg_match_all('~\[(\d+)\] (panel|form|section|aside|empty state) "([^"]+)"~', $body, $sections, PREG_SET_ORDER);
+                $sections = $sections ?: (preg_match_all('~\[(\d+)\] (main) "([^"]+)"~', $body, $main, PREG_SET_ORDER) ? $main : []);
                 foreach (array_slice($sections, 0, 1) as [, $id, $kind, $heading]) {
                     $spots[] = ['path' => $path, 'section' => (int) $id, 'position' => $kind === 'aside' ? 'top' : 'before',
-                        'label' => ($kind === 'aside' ? 'In the ' : 'Above ').$heading, 'why' => 'People who reach this point are about to do what the video shows.'];
+                        'label' => 'The “'.$heading.'” '.($kind === 'form' ? 'form' : 'section'), 'why' => 'People who reach this point are about to do what the video shows.'];
                 }
             }
 

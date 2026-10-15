@@ -141,6 +141,8 @@ class GenerateVideo implements ShouldQueue
         // The voice-over's clips, keyed by line; null once the voice has failed.
         $clips = $video->voice ? [] : null;
         $sandbox = null;
+        // A translation is recorded with the app in its language.
+        $recorder->locale = $video->recordingLocale();
 
         try {
             if ($video->sample_data) {
@@ -155,6 +157,8 @@ class GenerateVideo implements ShouldQueue
                 $video->moveTo(VideoStatus::Planning, 'The AI is reading the code');
                 $session = $planner->plan($video, $sandbox, $problems);
                 $plan = $session->plan;
+                // The new plan was made from the edits, and replaces them.
+                $video->update(['plan_edited_at' => null]);
                 $video->addLog(sprintf('Plan ready: %d steps, about %d seconds', count($plan->steps), $plan->estimatedSeconds($video->playbackSpeed())));
             } else {
                 $plan = Plan::fromArray($video->plan ?? []);
@@ -190,7 +194,8 @@ class GenerateVideo implements ShouldQueue
                 foreach ($devices as $device) {
                     $this->stopIfAsked($video);
                     $video->moveTo(VideoStatus::Recording, 'Recording the '.Devices::get($device)['label'].' version');
-                    $result = $recorder->record($plan, "$dir/$device", $video->style ?? [], $device, $video->record_as, $shouldStop, $video->playbackSpeed(), array_map(fn ($c) => $c['seconds'], $clips ?? []));
+                    // The style's end card goes after the last step; the plan itself keeps without it.
+                    $result = $recorder->record($plan->withEndCard($video->style ?? []), "$dir/$device", $video->style ?? [], $device, $video->record_as, $shouldStop, $video->playbackSpeed(), array_map(fn ($c) => $c['seconds'], $clips ?? []));
                     $video->addLog($result->summary());
 
                     if (! $result->ok) {
@@ -231,6 +236,7 @@ class GenerateVideo implements ShouldQueue
             $this->appErrors = $sandbox?->appErrors() ?? [];
             $sandbox?->delete();
             $recorder->sandbox = null;
+            $recorder->locale = null;
         }
 
         $video->moveTo(VideoStatus::Encoding, count($results) > 1 ? 'Encoding '.count($results).' versions' : 'Encoding the video');
@@ -253,7 +259,8 @@ class GenerateVideo implements ShouldQueue
             }
             $this->addSound($video, $result, $clips ?? [], $mp4, $work->path($video->workFile($device, 'subtitles')), "$dir/$device", $soundtrack, $encoder);
             File::deleteDirectory("$dir/$device");
-            $recordings[$device] = ['seconds' => $result->seconds, 'chapters' => $result->chapters];
+            // Where each step happened, for square and vertical exports to follow.
+            $recordings[$device] = ['seconds' => $result->seconds, 'chapters' => $result->chapters, 'focus' => array_slice($result->focus, 0, 500)];
         }
 
         // Remove the files of versions that are no longer chosen.
@@ -269,6 +276,9 @@ class GenerateVideo implements ShouldQueue
             'recordings' => $recordings,
             'error' => null,
             'version' => $video->version + 1,
+            // It was just recorded, so an older check that it no longer works is out of date.
+            'verify_result' => null,
+            'verified_at' => null,
         ]);
         $video->moveTo(VideoStatus::Ready, sprintf('Ready. The AI cost $%.4f in total.', $video->cost));
     }
@@ -378,37 +388,16 @@ class GenerateVideo implements ShouldQueue
         $video->moveTo(VideoStatus::Checking, is_file(Sandbox::dir().'/base-'.Sandbox::fingerprint().'.sqlite')
             ? 'Copying the sample database'
             : 'Building the sample database: running your migrations and seeders once (php artisan video-demo:sample-database does this ahead of time)');
+        if ($this->replan) {
+            $video->update(['sample_records' => null]);
+        }
+
         try {
-            $sandbox = Sandbox::create($video);
+            $sandbox = Sandbox::prepareFor($video, ! $this->replan, $video->addLog(...));
         } catch (RuntimeException $e) {
             throw new RuntimeException($e->getMessage().' To record on your own local data instead, untick "Record on sample data" under "Make it again" (or set VIDEO_DEMO_SAMPLE_DATA=false).', 0, $e);
         }
         $recorder->sandbox = $sandbox;
-
-        try {
-            $info = $sandbox->prepare($video->record_as);
-            foreach ($info['warnings'] as $warning) {
-                $video->addLog($warning);
-            }
-            $video->addLog($info['user']
-                ? 'Sample database ready. Signed in as '.($info['user']['email'] ?? 'user #'.$info['user']['id'])
-                : 'Sample database ready');
-
-            if ($this->replan) {
-                $video->update(['sample_records' => null]);
-            } elseif ($records = $video->sample_records) {
-                $failed = array_filter($sandbox->seed($records), fn ($r) => ! ($r['ok'] ?? false));
-                $video->addLog(sprintf('Added back the %d sample records the AI made', count($records) - count($failed)));
-                foreach ($failed as $result) {
-                    $video->addLog("A sample record ({$result['what']}) could not be added back: {$result['error']}");
-                }
-            }
-        } catch (Throwable $e) {
-            $sandbox->delete();
-            $recorder->sandbox = null;
-
-            throw $e;
-        }
 
         return $sandbox;
     }

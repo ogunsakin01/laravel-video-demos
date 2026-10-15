@@ -6,12 +6,14 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use InvalidArgumentException;
 use Ogunsakin01\VideoDemo\Ai\CodeTools;
 use Ogunsakin01\VideoDemo\Ai\CostEstimator;
 use Ogunsakin01\VideoDemo\Ai\Drivers\Drivers;
@@ -19,16 +21,20 @@ use Ogunsakin01\VideoDemo\Ai\FormAssistant;
 use Ogunsakin01\VideoDemo\Ai\PlanningFailed;
 use Ogunsakin01\VideoDemo\Ai\Pricing;
 use Ogunsakin01\VideoDemo\Enums\VideoStatus;
+use Ogunsakin01\VideoDemo\Jobs\ExportVideo;
 use Ogunsakin01\VideoDemo\Jobs\FindSpots;
 use Ogunsakin01\VideoDemo\Jobs\GenerateVideo;
+use Ogunsakin01\VideoDemo\Jobs\VerifyVideo;
 use Ogunsakin01\VideoDemo\Library\Manifest;
 use Ogunsakin01\VideoDemo\Library\Publisher;
+use Ogunsakin01\VideoDemo\Library\Stats;
 use Ogunsakin01\VideoDemo\Models\Spend;
 use Ogunsakin01\VideoDemo\Models\Video;
 use Ogunsakin01\VideoDemo\Models\VideoIdea;
 use Ogunsakin01\VideoDemo\Models\VideoRequest;
 use Ogunsakin01\VideoDemo\Models\VideoStyle;
 use Ogunsakin01\VideoDemo\Recording\Devices;
+use Ogunsakin01\VideoDemo\Recording\Exporter;
 use Ogunsakin01\VideoDemo\Recording\RecordAs;
 use Ogunsakin01\VideoDemo\Recording\Recorder;
 use Ogunsakin01\VideoDemo\Studio\Embeds;
@@ -36,6 +42,7 @@ use Ogunsakin01\VideoDemo\Studio\Examples;
 use Ogunsakin01\VideoDemo\Studio\Pages;
 use Ogunsakin01\VideoDemo\Studio\Progress;
 use Ogunsakin01\VideoDemo\Support\Language;
+use Ogunsakin01\VideoDemo\Support\Worker;
 use Ogunsakin01\VideoDemo\VideoDemo;
 use Ogunsakin01\VideoDemo\VideoDemoServiceProvider;
 use Ogunsakin01\VideoDemo\Voice\Music;
@@ -75,6 +82,7 @@ class VideoController extends Controller
 
         return response()->json([
             'total' => Spend::total(),
+            'worker' => Worker::running(),
             'videos' => Video::whereKey($ids)->get(['id', 'status', 'cost', 'duration_seconds'])->mapWithKeys(fn (Video $v) => [$v->id => [
                 'status' => $v->status->value,
                 'label' => $v->status->label(),
@@ -259,6 +267,33 @@ class VideoController extends Controller
     }
 
     /**
+     * Get how the published videos are watched and the searches that found
+     * nothing, from production when it is set up. Kept for a minute.
+     */
+    public function stats(Stats $stats): JsonResponse
+    {
+        return response()->json(Cache::remember('video-demo.studio.stats', 60, fn () => $stats->fetch()));
+    }
+
+    /**
+     * Get how the given video is watched: its counts, and where viewers stop.
+     */
+    public function videoStats(Video $video, Stats $stats): JsonResponse
+    {
+        $all = Cache::remember('video-demo.studio.stats', 60, fn () => $stats->fetch());
+        $counts = $all['videos'][$video->slug] ?? null;
+
+        return response()->json([
+            'source' => $all['source'],
+            'error' => $all['error'] ?? null,
+            'enabled' => $all['enabled'] ?? Stats::enabled(),
+            'days' => $all['days'] ?? 90,
+            'counts' => $counts,
+            'drop_off' => $counts ? Stats::dropOff($counts, (float) $video->duration_seconds, $video->recordings[$video->primaryDevice()]['chapters'] ?? []) : null,
+        ]);
+    }
+
+    /**
      * Get the given video's progress, for the page to poll.
      */
     public function status(Video $video): JsonResponse
@@ -274,6 +309,9 @@ class VideoController extends Controller
             'stopping' => $video->stop_requested,
             'progress' => Progress::for($video),
             'spots' => $video->spots['status'] ?? null,
+            'spots_progress' => FindSpots::progress($video),
+            'verify' => $video->verify_result['status'] ?? null,
+            'exports' => collect($video->exports ?? [])->map(fn ($e) => $e['status'])->all(),
         ]);
     }
 
@@ -299,6 +337,113 @@ class VideoController extends Controller
         abort_unless(! empty($video->error_details['step']['screenshot']) && $disk->exists($video->workPath('error.jpg')), 404);
 
         return response()->file($disk->path($video->workPath('error.jpg')), ['Cache-Control' => 'no-store']);
+    }
+
+    /**
+     * Queue a copy of the video as a GIF, or a square or vertical MP4.
+     */
+    public function export(Request $request, Video $video): RedirectResponse
+    {
+        abort_unless($video->status === VideoStatus::Ready && $video->hasRecording(), 409, 'Only a finished video can be copied.');
+        $data = $request->validate([
+            'format' => ['required', Rule::in(array_keys(Exporter::FORMATS))],
+            'device' => ['nullable', Rule::in($video->recordedDevices())],
+        ]);
+
+        if ((($video->exports ?? [])[$data['format']]['status'] ?? null) !== 'working') {
+            $video->forceFill(['exports' => [...($video->exports ?? []), $data['format'] => ['status' => 'working', 'at' => now()->toIso8601String()]]])->save();
+            ExportVideo::dispatch($video, $data['format'], $data['device'] ?? null);
+        }
+
+        return redirect()->to(route('video-demo.studio.show', $video).'#vd-downloads');
+    }
+
+    /**
+     * Download the video's copy in a format.
+     */
+    public function download(Video $video, string $format): BinaryFileResponse
+    {
+        $disk = Storage::disk(config('video-demo.storage.work_disk'));
+        $file = Exporter::file($video, $format);
+        abort_unless((($video->exports ?? [])[$format]['status'] ?? null) === 'ready' && $disk->exists($file), 404);
+
+        return response()->download($disk->path($file), $video->slug.($format === 'gif' ? '' : "-$format").'.'.Exporter::FORMATS[$format]['ext'], ['Cache-Control' => 'no-store']);
+    }
+
+    /**
+     * Make the video in another language, from its plan.
+     */
+    public function translate(Request $request, Video $video, VideoDemo $demo): RedirectResponse
+    {
+        $data = $request->validate([
+            'language' => ['required', 'string', Rule::in(array_keys(Language::options()))],
+            'voice' => ['nullable', 'string', Rule::in(array_keys(Voices::all()))],
+        ]);
+
+        try {
+            $translation = $demo->translate($video, $data['language'], ['voice' => $data['voice'] ?? null]);
+        } catch (InvalidArgumentException $e) {
+            return redirect()->to(route('video-demo.studio.show', $video).'#vd-languages')->withInput()->withErrors([str_contains($e->getMessage(), 'speak') ? 'voice' : 'language' => $e->getMessage()]);
+        }
+
+        return redirect()->route('video-demo.studio.show', $translation);
+    }
+
+    /**
+     * Save the plan as edited on the video page, and record it again for
+     * free when asked.
+     */
+    public function updatePlan(Request $request, Video $video, VideoDemo $demo): RedirectResponse
+    {
+        abort_if($video->status->isWorking(), 409, 'This video is still being made.');
+
+        $data = $request->validate([
+            'title' => ['nullable', 'string', 'max:160'],
+            'summary' => ['nullable', 'string', 'max:1000'],
+            'steps' => ['required', 'array', 'min:1', 'max:250'],
+            'steps.*' => ['array'],
+        ], ['steps.required' => 'Keep at least one step.']);
+
+        try {
+            $demo->updatePlan($video, ['title' => $data['title'] ?? null, 'summary' => $data['summary'] ?? null, 'steps' => $data['steps']]);
+        } catch (InvalidArgumentException $e) {
+            return redirect()->to(route('video-demo.studio.show', $video).'#vd-plan')->withInput()->withErrors(['plan' => $e->getMessage()]);
+        }
+
+        if ($request->input('then') === 'record') {
+            $demo->rerecord($video);
+
+            return redirect()->route('video-demo.studio.show', $video);
+        }
+
+        return redirect()->to(route('video-demo.studio.show', $video).'#vd-plan')->with('status', 'Plan saved. Record it again to see the change.');
+    }
+
+    /**
+     * Queue a check that the video's plan still works in the app.
+     */
+    public function verify(Video $video): RedirectResponse
+    {
+        abort_if($video->status->isWorking(), 409, 'This video is still being made.');
+        abort_if(empty($video->plan['steps']), 422, 'This video has no plan to check yet.');
+
+        if (($video->verify_result['status'] ?? null) !== 'working') {
+            $video->forceFill(['verify_result' => ['status' => 'working', 'at' => now()->toIso8601String()]])->save();
+            VerifyVideo::dispatch($video);
+        }
+
+        return redirect()->to(route('video-demo.studio.show', $video).'#vd-check');
+    }
+
+    /**
+     * Show the page as it was when the last check failed.
+     */
+    public function verifyScreenshot(Video $video): BinaryFileResponse
+    {
+        $disk = Storage::disk(config('video-demo.storage.work_disk'));
+        abort_unless(! empty($video->verify_result['screenshot']) && $disk->exists($video->workPath('verify.jpg')), 404);
+
+        return response()->file($disk->path($video->workPath('verify.jpg')), ['Cache-Control' => 'no-store']);
     }
 
     /**

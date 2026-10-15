@@ -92,6 +92,17 @@ function overlay() {
   ].join('\n');
   root.appendChild(css);
 
+  // The style's logo in a corner of every frame, over cards and captions too.
+  let logo = null;
+  if (style.logo_src && style.logo_position && style.logo_position !== 'none') {
+    const [v, h] = style.logo_position.split('-');
+    logo = document.createElement('img');
+    logo.src = style.logo_src;
+    logo.alt = '';
+    logo.style.cssText = 'position:absolute;' + v + ':22px;' + h + ':24px;height:clamp(22px,2.4vw,40px);width:auto;max-width:22vw;object-fit:contain;opacity:.95';
+    root.appendChild(logo);
+  }
+
   const add = () => {
     document.body.appendChild(root);
     // Geist for cards and captions; the system font shows if it can't load.
@@ -179,6 +190,8 @@ function overlay() {
     if (current) current.remove();
     current = el;
     root.appendChild(el);
+    // Kept last, so it stays on top.
+    if (logo) root.appendChild(logo);
     requestAnimationFrame(() => requestAnimationFrame(() => { el.style.opacity = '1'; el.style.transform = 'none'; }));
   };
 
@@ -240,8 +253,9 @@ function overlay() {
 }
 const OVERLAY_JS = '(' + overlay.toString() + ')();';
 
-// Every pause and the typing delay are scaled by the chosen pace.
-const PACES = { relaxed: 1.3, normal: 1, brisk: 0.7 };
+// Every pause and the typing delay are scaled by the chosen pace. "instant" is
+// for checking a plan without recording it.
+const PACES = { relaxed: 1.3, normal: 1, brisk: 0.7, instant: 0.05 };
 let pace = 1;
 const setPace = name => { pace = PACES[name] || 1; };
 const typingDelay = () => Math.round(55 * pace);

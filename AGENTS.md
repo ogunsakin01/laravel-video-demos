@@ -5,8 +5,8 @@ Instructions for AI coding agents (and people) changing laravel-video-demos itse
 ## Layout
 
 - `src/Ai`: the planner and its tools. `Drivers/` talks to providers: `AnthropicDriver` (Anthropic SDK, the default) and `PrismDriver` (everything else). `CodeTools` is what the model may read; `Redactor` hides secrets before anything is sent.
-- `src/Recording`: `Plan` (the step list and its JSON schema), `Recorder` (runs `resources/recorder/record.cjs` with Node), `Encoder` (ffmpeg), `Devices`.
-- `resources/recorder`: the Playwright recorder. `helpers.cjs` holds the cursor and the title-card and caption overlay, which runs inside the recorded page. `camera.cjs` draws the frames of styles with zoom through a virtual camera (`src/Recording/Camera.php` plans it); `check.cjs` and `pages.cjs` open pages without recording.
+- `src/Recording`: `Plan` (the step list, its JSON schema and the checks every plan passes, from the AI or edited by hand), `Recorder` (runs `resources/recorder/record.cjs` with Node), `Verifier` (plays a plan without recording, for `video-demo:verify`), `Exporter` (GIF, square and vertical copies), `Encoder` (ffmpeg, without filters, so any build works), `Devices`.
+- `resources/recorder`: the Playwright recorder. `helpers.cjs` holds the cursor and the title-card and caption overlay, which runs inside the recorded page. `camera.cjs` draws the frames of styles with zoom through a virtual camera (`src/Recording/Camera.php` plans it); `frame.cjs` draws square and vertical copies and `gif.cjs` makes GIFs (with gifenc), all in the browser; `check.cjs` and `pages.cjs` open pages without recording.
 - `src/VideoDemo.php` and `src/Facades/VideoDemo.php`: the public API for apps that build their own screens.
 - `src/Http`, `routes`, `resources/views`: the studio (local only, behind `AuthorizeStudio`) and the library (production).
 - `workbench/`: a demo app (Testbench) with sample data, and the tour plans that record the README videos.

@@ -38,6 +38,9 @@ class Planner
     {
         $session = new PlanningSession;
         $session->sampleData = $sandbox ? new SampleDataTools($sandbox) : null;
+        // A new plan is made from the code it reads now.
+        $this->code->takeReadFiles();
+        $video->update(['source_files' => null]);
         $this->drivers->for($video->model)->addUserText($session->messages, $this->brief($video, $sandbox, $problems));
 
         $this->run($session, $video);
@@ -174,6 +177,7 @@ class Planner
             if ($submitted) {
                 [$session->pendingSubmit, $session->plan] = $submitted;
                 $session->pendingResults = $results;
+                $this->keepSourceFiles($video);
 
                 return;
             }
@@ -182,6 +186,17 @@ class Planner
         }
 
         throw new PlanningFailed("No plan after $maxTurns requests to the model. Try a narrower description, or raise video-demo.limits.max_turns.");
+    }
+
+    /**
+     * Note the files the model read on the video, with those it read before,
+     * so video-demo:verify --changed knows which videos a change may break.
+     */
+    protected function keepSourceFiles(Video $video): void
+    {
+        $files = array_values(array_unique([...($video->source_files ?? []), ...$this->code->takeReadFiles()]));
+        sort($files);
+        $video->update(['source_files' => $files]);
     }
 
     /**
@@ -281,41 +296,7 @@ class Planner
      */
     public function problems(Plan $plan, ?int $maxSteps = null): array
     {
-        $problems = [];
-        $limit = $maxSteps ?: 250;
-        if ($plan->steps === []) {
-            $problems[] = 'The plan has no steps.';
-        }
-        if (count($plan->steps) > $limit) {
-            $problems[] = 'The plan has '.count($plan->steps)." steps; the limit is $limit. Combine or drop steps to fit.";
-        }
-
-        foreach ($plan->steps as $i => $step) {
-            $n = $i + 1;
-            $action = $step['action'] ?? null;
-            // A frame alone isn't a target: something must identify the element in it.
-            $hasTarget = is_array($step['target'] ?? null)
-                && array_filter(array_diff_key($step['target'], ['frame' => true]), fn ($v) => $v !== null && $v !== '') !== [];
-
-            $missing = match ($action) {
-                'goto' => empty($step['url']) ? 'url' : null,
-                'click', 'hover', 'check' => $hasTarget ? null : 'target',
-                'type', 'select' => ! $hasTarget ? 'target' : (($step['value'] ?? '') === '' ? 'value' : null),
-                'press' => empty($step['value']) ? 'value' : null,
-                'caption', 'card' => empty($step['title']) ? 'title' : null,
-                'scroll', 'wait', 'pause' => null,
-                default => 'a known action',
-            };
-
-            if ($missing) {
-                $problems[] = "Step $n ($action) needs $missing.";
-            }
-            if ($action === 'goto' && ! empty($step['url']) && preg_match('~^[a-z]+://~i', $step['url'])) {
-                $problems[] = "Step $n: use a path such as /jobs, not a full URL.";
-            }
-        }
-
-        return $problems;
+        return $plan->problems($maxSteps);
     }
 
     /**
@@ -353,6 +334,7 @@ class Planner
                 ? 'The same plan is recorded on each of these screens: '.implode('; ', array_map(Devices::describe(...), $devices)).". Choose targets that exist on all of them. Where a layout differs, such as navigation behind a menu button on small screens, add the extra steps with only_on naming the screens that need them. $signedIn"
                 : 'Screen: '.Devices::describe($devices[0]).". $signedIn",
             $notes !== '' ? "<notes_from_the_developer>\n$notes\n</notes_from_the_developer>" : null,
+            $this->editedPlan($video),
             VoiceLines::language($video),
             $video->hasVoiceOver()
                 ? "Voice-over: a narrator speaks each step's say line aloud while the viewer watches it happen, in the style's tone.\n".VoiceLines::GUIDE."\nThe recorder keeps a step going until its line is finished, so lines never overlap, but every line adds to the length: plan fewer steps or shorter captions to stay near the target."
@@ -361,6 +343,29 @@ class Planner
             $sandbox && ($rules = (new AccessRules)->describe()) !== '' ? "<access_rules>\n$rules\n</access_rules>" : null,
             "<routes>\n".$this->code->routeList(allMiddleware: $sandbox !== null)."\n</routes>",
         ]));
+    }
+
+    /**
+     * Describe the plan the developer edited by hand, for a new plan to start
+     * from, or null when it wasn't edited.
+     */
+    protected function editedPlan(Video $video): ?string
+    {
+        if (! $video->plan_edited_at || empty($video->plan['steps'])) {
+            return null;
+        }
+
+        $steps = array_map(function ($step) {
+            $kept = array_filter(array_diff_key($step, array_flip(['voice_ms', 'hold_ms', 'why'])), fn ($v) => $v !== null && $v !== '' && $v !== []);
+            if (isset($kept['target'])) {
+                $kept['target'] = array_filter($kept['target'], fn ($v) => $v !== null && $v !== '');
+            }
+
+            return json_encode($kept, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        }, $video->plan['steps']);
+
+        return (new Redactor)->redact("<edited_plan>\n".implode("\n", $steps)."\n</edited_plan>")
+            ."\nThe developer edited the video's last plan by hand. Start from it: keep their wording, the steps they added or removed and the targets they set, and change only what the request or the app now needs.";
     }
 
     /**

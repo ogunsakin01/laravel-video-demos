@@ -24,6 +24,18 @@ class Recorder
     public ?Sandbox $sandbox = null;
 
     /**
+     * The cookie that asks the app to show its pages in a language.
+     */
+    public const LOCALE_COOKIE = 'video_demo_locale';
+
+    /**
+     * The language the app is opened in, such as "fr", for a video made in
+     * another language than the one it was planned in. Null leaves the app
+     * in its own language.
+     */
+    public ?string $locale = null;
+
+    /**
      * The language of each page the last check opened, path => its lang
      * attribute, such as "fr" or "pt-BR".
      *
@@ -62,7 +74,11 @@ class Recorder
             'planPath' => "$dir/plan.json",
             'outDir' => $dir,
             'speed' => $speed,
-            'style' => [...VideoStyle::defaults(), ...array_intersect_key($style, array_flip(['theme', 'accent', 'captions', 'pace', 'art', 'app_theme', 'zoom', 'highlight']))],
+            'style' => [
+                ...VideoStyle::defaults(),
+                ...array_intersect_key($style, array_flip(['theme', 'accent', 'captions', 'pace', 'art', 'app_theme', 'zoom', 'highlight', 'logo_position'])),
+                'logo_src' => VideoStyle::logoSource($style),
+            ],
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
         File::delete("$dir/result.json");
 
@@ -85,6 +101,37 @@ class Recorder
         $result['lines'] = array_map(fn ($step) => $step['say'] ?? null, $plan->steps);
 
         return RecordingResult::fromArray($result, $device);
+    }
+
+    /**
+     * Play the plan for one version without recording it, as fast as it
+     * goes, to check that every step still works after the app changed. No
+     * cursor, captions or cards are shown and no video is made: only the
+     * result, with a screenshot in $dir when a step fails. It costs no AI.
+     */
+    public function verify(Plan $plan, string $dir, array $style = [], string $device = 'desktop', ?string $recordAs = null, ?Closure $shouldStop = null): RecordingResult
+    {
+        $plan = $plan->forDevice($device);
+
+        File::ensureDirectoryExists($dir);
+        File::put("$dir/plan.json", json_encode($plan->toArray(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+        File::put("$dir/job.json", json_encode([
+            ...$this->browserSettings(Devices::get($device), $recordAs),
+            'planPath' => "$dir/plan.json",
+            'outDir' => $dir,
+            'dryRun' => true,
+            // The app's colour scheme can change what is on the page; the rest of the look isn't shown.
+            'style' => ['app_theme' => $style['app_theme'] ?? 'auto'],
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        File::delete("$dir/result.json");
+
+        $this->run(static::script('record.cjs'), "$dir/job.json", 120 + count($plan->steps) * 20, $shouldStop);
+
+        if (! File::exists("$dir/result.json")) {
+            throw new RuntimeException('The check stopped without a result. Check that Node and Playwright work: php artisan video-demo:install');
+        }
+
+        return RecordingResult::fromArray(json_decode(File::get("$dir/result.json"), true) ?: [], $device);
     }
 
     /**
@@ -176,24 +223,26 @@ class Recorder
     }
 
     /**
-     * Show a player card for the video in each spot, and take a screenshot of
-     * it on each screen, saved in $outDir as <spot number>-<screen>.jpg.
+     * Put the video's player into each spot and check it doesn't upset the
+     * page, minimised and open, on each screen; screenshots of each are saved
+     * in $outDir as <spot number>-<screen>-<closed|open>.jpg. Each spot's
+     * positions are tried in order until one passes everywhere.
      *
-     * @param  list<array{path: string, selector: string, position: string}>  $spots
-     * @param  array{poster: ?string, title: string, length: string, accent?: string}  $card
+     * @param  list<array{path: string, selector: string, positions: list<string>}>  $spots
+     * @param  string  $html  The player, as the app will render it.
      * @param  list<string>  $screens  Device keys, such as desktop and mobile.
-     * @return array{shots: list<array{spot: int, screen: string, file: string}>, missing: list<array{spot: int, screen: string, reason: string}>}
+     * @return list<array{found: bool, position: ?string, ok: bool, problems: list<array{screen: string, state: string, problem: string}>, shots: array<string, array{closed: string, open: string}>}>
      */
-    public function shootSpots(array $spots, array $card, string $outDir, array $screens = ['desktop', 'mobile'], ?string $recordAs = null): array
+    public function shootSpots(array $spots, string $html, string $outDir, array $screens = ['desktop', 'mobile'], ?string $recordAs = null, string $accent = '#e5693d'): array
     {
         File::ensureDirectoryExists($outDir);
         $result = $this->runSpots([
-            'mode' => 'shoot', 'spots' => $spots, ...$card, 'outDir' => $outDir,
+            'mode' => 'shoot', 'spots' => $spots, 'html' => $html, 'accent' => $accent, 'outDir' => $outDir,
             ...$this->browserSettings(Devices::get('desktop'), $recordAs),
             'screens' => array_map(fn ($key) => ['key' => $key, 'viewport' => ['width' => Devices::get($key)['width'], 'height' => Devices::get($key)['height']], 'touch' => Devices::get($key)['touch']], $screens),
-        ], 60 + count($spots) * count($screens) * 25);
+        ], 60 + count($spots) * count($screens) * 3 * 15);
 
-        return ['shots' => $result['shots'] ?? [], 'missing' => $result['missing'] ?? []];
+        return $result['spots'] ?? [];
     }
 
     /**
@@ -263,6 +312,50 @@ class Recorder
     }
 
     /**
+     * Turn numbered JPEG frames into an animated GIF at most $width wide,
+     * with gif.cjs.
+     *
+     * @throws RuntimeException When the GIF isn't made.
+     */
+    public function makeGif(string $framesDir, string $gif, int $fps, int $width): void
+    {
+        $dir = dirname($gif);
+        File::ensureDirectoryExists($dir);
+        File::delete([$gif, "$dir/done.json"]);
+        File::put("$dir/gif.json", json_encode(['framesDir' => $framesDir, 'out' => $gif, 'fps' => $fps, 'width' => $width, 'channel' => config('video-demo.recorder.channel')], JSON_UNESCAPED_SLASHES));
+
+        $output = $this->run(static::script('gif.cjs'), "$dir/gif.json", 1800);
+        if (! File::exists("$dir/done.json") || ! File::exists($gif)) {
+            throw new RuntimeException('The GIF could not be made'.($output !== '' ? ': '.$output : '.'));
+        }
+    }
+
+    /**
+     * Draw numbered JPEG frames into a square or vertical frame, with
+     * frame.cjs, writing them to $outDir. $job gives the sizes, words, look
+     * and focus (see frame.cjs).
+     *
+     * @param  array<string, mixed>  $job
+     *
+     * @throws RuntimeException When the frames aren't made.
+     */
+    public function reframe(string $framesDir, string $outDir, array $job): void
+    {
+        File::ensureDirectoryExists($outDir);
+        File::put("$outDir.json", json_encode(['framesDir' => $framesDir, 'outDir' => $outDir, 'channel' => config('video-demo.recorder.channel'), ...$job], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+
+        try {
+            $output = $this->run(static::script('frame.cjs'), "$outDir.json", 1800);
+        } finally {
+            File::delete("$outDir.json");
+        }
+        if (! File::exists("$outDir/done.json")) {
+            throw new RuntimeException('The frames could not be drawn'.($output !== '' ? ': '.$output : '.'));
+        }
+        File::delete("$outDir/done.json");
+    }
+
+    /**
      * Get how many times faster the finished video plays than it was recorded.
      *
      * A video's own speed wins over the configured one. Either is kept
@@ -307,15 +400,20 @@ class Recorder
             'touch' => $screen['touch'],
             'channel' => config('video-demo.recorder.channel'),
             'ignoreHttpsErrors' => (bool) config('video-demo.recorder.ignore_https_errors'),
-            // Sends the browser's requests to the sample database.
-            'cookies' => $this->sandbox ? [[...$this->sandbox->cookie(), 'url' => rtrim((string) config('video-demo.recorder.base_url'), '/').'/']] : [],
+            // Sends the browser's requests to the sample database, and asks for the pages in the video's language.
+            'cookies' => array_values(array_filter([
+                $this->sandbox ? [...$this->sandbox->cookie(), 'url' => rtrim((string) config('video-demo.recorder.base_url'), '/').'/'] : null,
+                $this->locale ? ['name' => self::LOCALE_COOKIE, 'value' => $this->locale, 'url' => rtrim((string) config('video-demo.recorder.base_url'), '/').'/'] : null,
+            ])),
+            // The browser's own language too, for apps that read Accept-Language or navigator.language.
+            'locale' => $this->locale,
         ];
     }
 
     /**
      * Run a Node script, stopping it when $shouldStop says so or when it runs too long.
      */
-    protected function run(string $script, string $job, int $timeout, ?Closure $shouldStop = null): void
+    protected function run(string $script, string $job, int $timeout, ?Closure $shouldStop = null): string
     {
         $process = Process::timeout($timeout)
             ->env(['NODE_PATH' => implode(PATH_SEPARATOR, $this->nodePaths())])
@@ -340,6 +438,11 @@ class Recorder
         if (str_contains($output, "Cannot find module 'playwright'")) {
             throw new RuntimeException('Playwright is not installed. Run php artisan video-demo:install.');
         }
+        if (str_contains($output, "Cannot find module 'gifenc'")) {
+            throw new RuntimeException('The GIF encoder is not installed. Run php artisan video-demo:install.');
+        }
+
+        return $output;
     }
 
     /**

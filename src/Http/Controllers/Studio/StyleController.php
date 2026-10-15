@@ -5,11 +5,14 @@ namespace Ogunsakin01\VideoDemo\Http\Controllers\Studio;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Ogunsakin01\VideoDemo\Models\VideoStyle;
 use Ogunsakin01\VideoDemo\Voice\Music;
 use Ogunsakin01\VideoDemo\Voice\Voices;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 /**
  * Manages the video styles on the studio's Styles page.
@@ -47,7 +50,7 @@ class StyleController extends Controller
      */
     public function update(Request $request, VideoStyle $style): RedirectResponse
     {
-        $style->update($this->validated($request));
+        $style->update($this->validated($request, $style));
 
         return redirect()->route('video-demo.studio.styles.index')->with('status', 'Style saved. Videos already made keep the style they were made with.');
     }
@@ -61,15 +64,54 @@ class StyleController extends Controller
             return back()->with('error', 'Keep at least one style.');
         }
 
+        // Its logo file stays: videos made with it may be recorded again.
         $style->delete();
 
         return redirect()->route('video-demo.studio.styles.index')->with('status', 'Style deleted.');
     }
 
     /**
-     * Validate the style form.
+     * Show a style's logo.
      */
-    protected function validated(Request $request): array
+    public function logo(VideoStyle $style): BinaryFileResponse
+    {
+        $disk = Storage::disk(config('video-demo.storage.work_disk'));
+        abort_unless($style->logo && $disk->exists($style->logo), 404);
+
+        return response()->file($disk->path($style->logo), ['Cache-Control' => 'no-store']);
+    }
+
+    /**
+     * Validate the style form, keeping an uploaded logo.
+     */
+    protected function validated(Request $request, ?VideoStyle $style = null): array
+    {
+        $request->validate([
+            'logo' => ['nullable', 'file', 'mimes:png,jpg,jpeg,webp,svg', 'max:'.VideoStyle::LOGO_MAX_KB],
+            'logo_position' => ['nullable', Rule::in(array_keys(VideoStyle::LOGO_POSITIONS))],
+            'end_title' => ['nullable', 'string', 'max:120'],
+            'end_text' => ['nullable', 'string', 'max:200'],
+        ]);
+
+        // A new file replaces the logo; "remove" takes it away. The old file is
+        // kept, since videos made with it may be recorded again.
+        $logo = $style?->logo;
+        if ($request->hasFile('logo')) {
+            $file = $request->file('logo');
+            $logo = 'video-demo/logos/'.Str::lower(Str::random(16)).'.'.strtolower($file->getClientOriginalExtension() ?: 'png');
+            Storage::disk(config('video-demo.storage.work_disk'))->put($logo, $file->get());
+        } elseif ($request->boolean('remove_logo')) {
+            $logo = null;
+        }
+
+        return [...$this->settings($request), 'logo' => $logo, 'logo_position' => $logo ? ($request->input('logo_position') ?: 'top-right') : 'none',
+            'end_title' => trim((string) $request->input('end_title')) ?: null, 'end_text' => trim((string) $request->input('end_text')) ?: null];
+    }
+
+    /**
+     * Validate the style's other settings.
+     */
+    protected function settings(Request $request): array
     {
         return [...$request->validate([
             'name' => ['required', 'string', 'max:80'],

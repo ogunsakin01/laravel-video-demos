@@ -2,6 +2,33 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/). While the version is 0.x, minor releases may include breaking changes; they will be listed here.
 
+## v0.17.0 - 2026-10-16
+
+Run `php artisan video-demo:install` after updating, for the new columns and table, and the GIF encoder the recorder now uses.
+
+### Added
+
+- **Find videos a change broke.** `php artisan video-demo:verify` plays each published video's steps in a browser, as fast as they go and without recording, and lists the ones that no longer work: the step, the version and the error. It costs no AI, exits non-zero when a video is broken, and has `--json` for CI. `--changed=origin/main` checks only the videos made from code that differs from that ref: each new plan notes the files the AI read, along with the controllers behind its pages. `--fix` asks the AI for a new plan for each broken video, records it and publishes it again. The studio's **Does it still work?** card does the same for one video, with a picture of the page where it failed and **Fix with a new plan**; broken videos are marked on the videos page. `VideoDemo::verify()` and a `VideoBroke` event do it from code.
+- **Edit the plan by hand.** A video's plan is now a form on its page: reword a caption, title card or voice-over line, fix a button name, change a typed value, reorder or remove steps, or add a caption, card or pause. **Save and record it again** records it for free. A new plan from the AI starts from your edits. `VideoDemo::updatePlan()` does the same from code, with the same checks the AI's plans get.
+- **Videos for this page.** `<x-video-demo::help />` in your layout shows a "Videos for this page" button on every page a published video shows, with the videos ready to play; pages no video shows render nothing. It matches pages by route, so `/jobs/42` finds videos of `/jobs/7`. `route="jobs.create"` or `route="/jobs/create"` names another page, and `VideoDemo::forPage()` lists them for your own menu. Publish older videos again to list them.
+- **The same video in other languages.** **Other languages** on a finished video's page, `video-demo:translate post-a-job fr es` or `VideoDemo::translate()` make it in another language from its plan, without planning again: the AI translates the titles, captions, chapters, voice-over and typed sample text, for about a cent, and the steps are checked with your app in that language, finding again any button whose label the app translates. Each language is a video of its own, linked to the original, with a voice that speaks it. The player plays the version in the page's language (`language="fr"` picks one, `:language="false"` turns it off), and the library lists each video once, in the viewer's language, with a list of its languages.
+- **GIF, square and vertical copies.** **Downloads** on a finished video's page makes a GIF (for READMEs, changelogs, emails and chat) and square and vertical (9:16) MP4s for social posts, with the title above the app and the picture following each step. `video-demo:export post-a-job --format=gif --out=docs/post-a-job.gif` and `VideoDemo::export()` do it from the command line and code. Made on your machine with any ffmpeg build, at no AI cost.
+- **Logo and end card.** A style can put your logo in a corner of every frame, cards included, and end every video with a title card such as "Try it at example.com". Set them on the Styles page.
+- **How videos are watched.** With `VIDEO_DEMO_STATS=true` in production, the player counts plays and how far viewers get, and the library counts searches that found nothing. Only daily totals are kept, with no cookies, IP addresses or user ids. A published video's page in the studio shows its plays, how many watched to the end and where most viewers stop; the videos page lists searches that found nothing. Both are read from production with the requests token. **Ideas** now puts what users asked for and searched for first.
+- **A minimisable player.** `<x-video-demo::player slug="…" collapsible />` shows a slim "How-to video" bar that opens into the video and minimises again. It starts minimised (`open` starts it open), takes its colours from your page, works without JavaScript and remembers each viewer's choice.
+- **Where to put it checks the layout.** Each suggested spot gets the real collapsible player and is checked, minimised and open, on desktop and phone: no sideways scrolling, nothing beside it squeezed or pushed aside, not clipped or covered. Other positions are tried when one fails. The panel shows pictures of both states on both screens, whether each spot fits, and three steps to add it: the file and exact line, the code around it with the tag pasted in, and publishing.
+- **Progress, cost and a worker check.** Finding spots shows a progress bar with its stage and time left. Its AI cost shows with the spots and is counted in the video's cost and the total spent; the videos page now shows small amounts to four decimals instead of $0.00. The videos page, new-video form and a working video's page warn when no queue worker is running, with the command to start one, and the warning clears itself once one starts.
+
+### Changed
+
+- A video recorded again clears an older check that found it broken.
+- The recorder opens a video made in another language with the app in that language: it sends the language to the browser and in a cookie the package reads, where the studio is enabled, to set the app's locale.
+
+### Breaking
+
+- Apps that extend `Recorder::run()` need its new return type, `string`. Apps that extend `Encoder::frames()` or `Encoder::join()` need their new last parameter, `?int $fps = null`.
+- `Manifest::forArea()` leaves out videos in other languages whose original is listed; `Manifest::find()` still finds them.
+
 ## v0.16.0 - 2026-10-15
 
 Run `php artisan video-demo:install` after updating, for the new column.

@@ -39,6 +39,11 @@ class InstallCommand extends Command
     protected const PLAYWRIGHT = '1.64.0';
 
     /**
+     * The GIF encoder the recorder uses for GIF copies of videos.
+     */
+    protected const GIFENC = '1.0.3';
+
+    /**
      * Execute the console command.
      */
     public function handle(): int
@@ -94,8 +99,8 @@ class InstallCommand extends Command
             File::put("$dir/package.json", json_encode(['private' => true, 'name' => 'video-demo-recorder'], JSON_PRETTY_PRINT));
         }
 
-        $this->components->task('Installing Playwright '.self::PLAYWRIGHT, fn () => $this->runInDir(
-            [config('video-demo.recorder.npm'), 'install', '--no-audit', '--no-fund', 'playwright@'.self::PLAYWRIGHT],
+        $this->components->task('Installing Playwright '.self::PLAYWRIGHT.' and the GIF encoder', fn () => $this->runInDir(
+            [config('video-demo.recorder.npm'), 'install', '--no-audit', '--no-fund', 'playwright@'.self::PLAYWRIGHT, 'gifenc@'.self::GIFENC],
             $dir,
         ));
 

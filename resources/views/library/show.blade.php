@@ -15,7 +15,7 @@
   @php($sources = \Ogunsakin01\VideoDemo\Library\Manifest::sources($video))
   <div class="vd-split">
     <div class="vd-stack">
-      <x-video-demo::player :slug="$video['slug']" :area="$area" id="vd-player" />
+      <x-video-demo::player :slug="$video['slug']" :area="$area" :language="false" id="vd-player" />
       @if (count($sources) > 1)
         <div class="vd-segments" role="group" aria-label="Version" id="vd-versions">
           @foreach ($sources as $key => $source)
@@ -26,6 +26,16 @@
     </div>
 
     <aside class="vd-stack">
+      @if ($languages !== [])
+        <div class="vd-card">
+          <h2>Languages</h2>
+          <div class="vd-segments" role="group" aria-label="Language">
+            @foreach ($languages as $version)
+              <a class="vd-segment" href="{{ route('video-demo.'.$area.'.show', $version['slug']) }}?lang={{ $version['language'] }}" hreflang="{{ $version['language'] }}" lang="{{ $version['language'] }}" aria-current="{{ $version['slug'] === $video['slug'] ? 'true' : 'false' }}" aria-pressed="{{ $version['slug'] === $video['slug'] ? 'true' : 'false' }}">{{ \Ogunsakin01\VideoDemo\Support\Language::native($version['language']) }}</a>
+            @endforeach
+          </div>
+        </div>
+      @endif
       @if (! empty($video['chapters']))
         <div class="vd-card">
           <h2>Chapters</h2>

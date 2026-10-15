@@ -4,8 +4,12 @@ namespace Ogunsakin01\VideoDemo\Tests;
 
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
+use Illuminate\View\ComponentAttributeBag;
+use Ogunsakin01\VideoDemo\Enums\VideoStatus;
+use Ogunsakin01\VideoDemo\Models\Video;
 use Ogunsakin01\VideoDemo\Recording\Camera;
 use Ogunsakin01\VideoDemo\Recording\Encoder;
+use Ogunsakin01\VideoDemo\Recording\Exporter;
 use Ogunsakin01\VideoDemo\Recording\Plan;
 use Ogunsakin01\VideoDemo\Recording\Recorder;
 
@@ -49,28 +53,45 @@ class RecorderTest extends TestCase
         return [...['action' => $action, 'why' => '', 'url' => null, 'value' => null, 'title' => null, 'text' => null, 'ms' => null, 'chapter' => null], ...$fields, 'target' => $target];
     }
 
-    public function test_finds_sections_and_shows_the_video_in_one(): void
+    public function test_finds_sections_and_shows_the_video_in_one_that_fits(): void
     {
         $recorder = new Recorder;
-        $map = $recorder->mapPages(['/index.html']);
+        $map = $recorder->mapPages(['/index.html', '/spots.html']);
 
         $sections = collect($map['pages'][0]['sections'])->keyBy('kind');
         $this->assertSame('Post a job', $map['pages'][0]['title']);
         $this->assertSame(['header', 'main', 'form'], $sections->keys()->all());
         $this->assertSame('Post a job', $sections['main']['heading']);
+        $this->assertSame('form', $sections['form']['tag']);
+        $spots = collect($map['pages'][1]['sections'])->keyBy('heading');
 
-        $poster = $this->out.'/poster.jpg';
-        File::ensureDirectoryExists($this->out);
-        File::put($poster, base64_decode('/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q=='));
-        $shots = $recorder->shootSpots([
-            ['path' => '/index.html', 'selector' => $sections['form']['selector'], 'position' => 'before'],
-            ['path' => '/index.html', 'selector' => '#nowhere', 'position' => 'top'],
-        ], ['poster' => $poster, 'title' => 'Post a <job>', 'length' => '0:42'], $this->out.'/spots', ['desktop', 'mobile']);
+        $html = view('video-demo::partials.collapsible-player', [
+            'slug' => 'post-a-job', 'title' => 'Post a <job>', 'seconds' => 42, 'open' => false,
+            'attributes' => new ComponentAttributeBag, 'video' => ['title' => 'Post a job'],
+            'sources' => ['desktop' => $source = ['video' => '', 'poster' => '', 'subtitles' => null, 'width' => 1280, 'height' => 800]], 'first' => $source,
+        ])->render();
+        $checked = $recorder->shootSpots([
+            ['path' => '/index.html', 'selector' => $sections['form']['selector'], 'positions' => ['before', 'top']],
+            // Beside the card in a flex row, it would squeeze the row; inside the card it fits.
+            ['path' => '/spots.html', 'selector' => $spots['Listings']['selector'], 'positions' => ['before', 'top']],
+            // A 150px box can't hold it anywhere.
+            ['path' => '/spots.html', 'selector' => '.tiny', 'positions' => ['top']],
+            ['path' => '/index.html', 'selector' => '#nowhere', 'positions' => ['top']],
+        ], $html, $this->out.'/spots', ['desktop', 'mobile']);
 
-        $this->assertSame([[0, 'desktop'], [0, 'mobile']], array_map(fn ($s) => [$s['spot'], $s['screen']], $shots['shots']));
-        $this->assertFileExists($this->out.'/spots/1-desktop.jpg');
-        $this->assertFileExists($this->out.'/spots/1-mobile.jpg');
-        $this->assertSame([[1, 'The section was not on the page'], [1, 'The section was not on the page']], array_map(fn ($m) => [$m['spot'], $m['reason']], $shots['missing']));
+        $this->assertSame([true, 'before', true], [$checked[0]['found'], $checked[0]['position'], $checked[0]['ok']], json_encode($checked[0]['problems']));
+        $this->assertSame(['top', true], [$checked[1]['position'], $checked[1]['ok']], json_encode($checked[1]['problems']));
+        $this->assertFalse($checked[2]['ok']);
+        $this->assertStringContainsString('px wide', $checked[2]['problems'][0]['problem']);
+        $this->assertFalse($checked[3]['found']);
+        foreach (['desktop', 'mobile'] as $screen) {
+            foreach (['closed', 'open'] as $state) {
+                $this->assertFileExists($this->out."/spots/2-$screen-$state.jpg");
+            }
+        }
+        // Only the screenshots of the position kept are left.
+        $this->assertSame([], glob($this->out.'/spots/*-before.jpg') ?: []);
+        $this->assertSame([], glob($this->out.'/spots/2-*-top.jpg') ?: []);
     }
 
     public function test_records_and_encodes_a_plan(): void
@@ -100,6 +121,40 @@ class RecorderTest extends TestCase
         // half the time the recording took.
         $this->assertEqualsWithDelta($result->seconds, $this->duration("$this->out/video.mp4"), 0.6);
         $this->assertFileExists("$this->out/poster.jpg");
+    }
+
+    public function test_a_check_plays_the_plan_quickly_without_recording_it(): void
+    {
+        $plan = new Plan('Post a job', 'Posting a job.', [
+            $this->step('card', ['title' => 'Post a job', 'ms' => 5000]),
+            $this->step('goto', ['url' => '/index.html']),
+            $this->step('caption', ['title' => 'Start with the basics', 'ms' => 5000]),
+            $this->step('type', ['target' => ['label' => 'Job title'], 'value' => 'Laravel developer']),
+            $this->step('pause', ['ms' => 5000]),
+            $this->step('click', ['target' => ['role' => 'button', 'name' => 'Publish job']]),
+            $this->step('wait', ['target' => ['text' => 'Your job is live.']]),
+        ]);
+
+        $started = microtime(true);
+        $result = (new Recorder)->verify($plan, $this->out);
+
+        $this->assertTrue($result->ok, $result->summary());
+        $this->assertNull($result->video);
+        $this->assertSame([], File::glob("$this->out/*.webm"));
+        // The 15 seconds of cards, captions and pauses aren't waited for.
+        $this->assertLessThan(12, microtime(true) - $started);
+
+        $broken = new Plan('x', 'y', [
+            $this->step('goto', ['url' => '/index.html']),
+            $this->step('click', ['target' => ['role' => 'button', 'name' => 'Save draft']]),
+        ]);
+        $result = (new Recorder)->verify($broken, $this->out, [], 'mobile');
+
+        $this->assertFalse($result->ok);
+        $this->assertSame(2, $result->failedStep);
+        $this->assertSame('mobile', $result->device);
+        $this->assertStringContainsString('Save draft', $result->error);
+        $this->assertFileExists($result->screenshot);
     }
 
     public function test_a_failed_step_reports_what_was_on_the_page(): void
@@ -267,6 +322,38 @@ class RecorderTest extends TestCase
             usleep(100_000);
         }
         $this->fail('The fixture server did not start.');
+    }
+
+    public function test_makes_a_gif_and_a_vertical_copy_of_a_recording(): void
+    {
+        $plan = new Plan('Post a job', 'Posting a job.', [
+            $this->step('goto', ['url' => '/index.html']),
+            $this->step('type', ['target' => ['label' => 'Job title'], 'value' => 'Designer']),
+            $this->step('click', ['target' => ['role' => 'button', 'name' => 'Publish job']]),
+        ]);
+        $result = (new Recorder)->record($plan, $this->out);
+        $this->assertTrue($result->ok, $result->summary());
+
+        config(['filesystems.disks.local.root' => $this->out.'/disk']);
+        $video = Video::create([
+            'title' => 'Post a job, from the jobs page to a live listing', 'prompt' => 'x', 'target_seconds' => 30, 'model' => 'claude-sonnet-5-5', 'effort' => 'high',
+            'status' => VideoStatus::Ready, 'devices' => ['desktop'], 'style' => ['theme' => 'light', 'accent' => '#e5693d'],
+            'recordings' => ['desktop' => ['seconds' => $result->seconds, 'chapters' => [], 'focus' => $result->focus]],
+        ]);
+        $mp4 = Recorder::workDir($video->workFile('desktop'));
+        File::ensureDirectoryExists(dirname($mp4));
+        (new Encoder)->encode($result->video, $mp4, Recorder::workDir($video->workFile('desktop', 'poster')), $result->trimSeconds, 1, $result->timeline);
+
+        $exporter = app(Exporter::class);
+        $gif = Recorder::workDir($exporter->export($video, 'gif'));
+        $this->assertSame('GIF89a', substr(File::get($gif), 0, 6));
+        $this->assertSame([800, 500], array_slice(getimagesize($gif), 0, 2));
+
+        $vertical = Recorder::workDir($exporter->export($video, 'vertical'));
+        $this->assertMatchesRegularExpression('/Video: h264.*1080x1920/', Process::run([config('video-demo.recorder.ffmpeg'), '-i', $vertical])->errorOutput());
+        $this->assertEqualsWithDelta($result->seconds, $this->duration($vertical), 0.6);
+        // Nothing is left behind but the copies.
+        $this->assertSame(['gif.gif', 'vertical.mp4'], array_map('basename', File::files(dirname($vertical))));
     }
 
     protected function duration(string $file): float

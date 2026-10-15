@@ -106,21 +106,35 @@ class Encoder
     }
 
     /**
-     * Split an MP4 into numbered JPEG frames in $dir.
+     * Split an MP4 into numbered JPEG frames in $dir, at $fps frames a
+     * second (the encoder's own rate when left out).
      */
-    public function frames(string $mp4, string $dir): void
+    public function frames(string $mp4, string $dir, ?int $fps = null): void
     {
         File::ensureDirectoryExists($dir);
-        $this->run([config('video-demo.recorder.ffmpeg', 'ffmpeg'), '-y', '-v', 'error', '-i', $mp4, '-r', (string) self::FPS, '-q:v', '2', "$dir/%05d.jpg"]);
+        $this->run([config('video-demo.recorder.ffmpeg', 'ffmpeg'), '-y', '-v', 'error', '-i', $mp4, '-r', (string) ($fps ?? self::FPS), '-q:v', '2', "$dir/%05d.jpg"]);
     }
 
     /**
-     * Join numbered JPEG frames from $dir into an MP4.
+     * Join numbered JPEG frames from $dir into an MP4, at $fps frames a
+     * second (the encoder's own rate when left out).
      */
-    public function join(string $dir, string $mp4): void
+    public function join(string $dir, string $mp4, ?int $fps = null): void
     {
-        $this->run([config('video-demo.recorder.ffmpeg', 'ffmpeg'), '-y', '-v', 'error', '-framerate', (string) self::FPS, '-i', "$dir/%05d.jpg",
+        $this->run([config('video-demo.recorder.ffmpeg', 'ffmpeg'), '-y', '-v', 'error', '-framerate', (string) ($fps ?? self::FPS), '-i', "$dir/%05d.jpg",
             '-c:v', 'libx264', '-crf', '26', '-preset', 'slow', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-an', $mp4]);
+    }
+
+    /**
+     * Give an MP4 the sound of another, in place, when that one has any.
+     * Neither picture nor sound is encoded again.
+     */
+    public function copyAudio(string $from, string $mp4): void
+    {
+        $out = dirname($mp4).'/with-sound-'.basename($mp4);
+        $this->run([config('video-demo.recorder.ffmpeg', 'ffmpeg'), '-y', '-v', 'error', '-i', $mp4, '-i', $from,
+            '-map', '0:v', '-map', '1:a?', '-c', 'copy', '-shortest', '-movflags', '+faststart', $out]);
+        File::move($out, $mp4);
     }
 
     /**

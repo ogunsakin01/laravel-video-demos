@@ -2,7 +2,10 @@
 
 namespace Ogunsakin01\VideoDemo\Models;
 
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -30,7 +33,7 @@ use Ogunsakin01\VideoDemo\Voice\Voices;
  * @property ?array $plan
  * @property ?array $style
  * @property ?list<string> $devices
- * @property ?array<string, array{seconds: float, chapters: array}> $recordings
+ * @property ?array<string, array{seconds: float, chapters: array, focus?: list<array<string, mixed>>}> $recordings
  * @property ?array $log
  * @property ?string $error
  * @property int $input_tokens
@@ -60,7 +63,15 @@ use Ogunsakin01\VideoDemo\Voice\Voices;
  * @property ?float $music_volume
  * @property ?string $language
  * @property ?string $page_language
- * @property ?array{status: string, at: string, error?: string, note?: ?string, items: list<array<string, mixed>>} $spots
+ * @property ?array{status: string, at: string, error?: string, note?: ?string, stage?: string, stage_at?: string, cost?: float, items: list<array<string, mixed>>} $spots
+ * @property ?list<string> $source_files
+ * @property ?Carbon $verified_at
+ * @property ?Carbon $plan_edited_at
+ * @property ?int $source_video_id
+ * @property ?array<string, array{status: string, at: string, device?: string, version?: int, bytes?: int, error?: string}> $exports
+ * @property-read ?Video $source
+ * @property-read Collection<int, Video> $translations
+ * @property ?array{status: string, ok?: bool, checked?: list<string>, device?: ?string, step?: ?int, action?: ?string, error?: ?string, url?: ?string, issues?: list<array<string, mixed>>, screenshot?: bool} $verify_result
  */
 class Video extends Model
 {
@@ -97,6 +108,11 @@ class Video extends Model
             'music_volume' => 'float',
             'status_at' => 'datetime',
             'spots' => 'array',
+            'source_files' => 'array',
+            'verified_at' => 'datetime',
+            'verify_result' => 'array',
+            'plan_edited_at' => 'datetime',
+            'exports' => 'array',
         ];
     }
 
@@ -277,6 +293,45 @@ class Video extends Model
     public function stopRequested(): bool
     {
         return (bool) static::whereKey($this->id)->value('stop_requested');
+    }
+
+    /**
+     * Get the video this one is a translation of.
+     *
+     * @return BelongsTo<Video, $this>
+     */
+    public function source(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'source_video_id');
+    }
+
+    /**
+     * Get the versions of this video in other languages.
+     *
+     * @return HasMany<Video, $this>
+     */
+    public function translations(): HasMany
+    {
+        return $this->hasMany(self::class, 'source_video_id');
+    }
+
+    /**
+     * Get the language the app is opened in while this video is recorded:
+     * its own for a translation, whose plan came from another language, and
+     * null (the app's own) otherwise.
+     */
+    public function recordingLocale(): ?string
+    {
+        return $this->source_video_id ? $this->languageCode() : null;
+    }
+
+    /**
+     * Determine if the last check found that the video's plan no longer
+     * works in the app.
+     */
+    public function isBroken(): bool
+    {
+        return ($this->verify_result['status'] ?? null) === 'done' && ($this->verify_result['ok'] ?? true) === false;
     }
 
     /**

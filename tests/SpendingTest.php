@@ -52,7 +52,7 @@ class SpendingTest extends TestCase
         // The video's own cost is what was spent on it; Complete with AI isn't part of it.
         $this->assertEqualsWithDelta(0.27, $video->fresh()->cost, 0.0001);
 
-        $this->get('/video-demo/studio')->assertSee('$0.28')->assertSee('including Complete with AI and ideas');
+        $this->get('/video-demo/studio')->assertSee('$0.2770')->assertSee('including Complete with AI and ideas');
 
         $video->delete();
         $this->assertEqualsWithDelta(0.277, Spend::total(), 0.0001);
