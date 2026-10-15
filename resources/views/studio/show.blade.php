@@ -89,7 +89,11 @@
         <video class="vd-video" id="vd-preview" controls preload="metadata"
           style="aspect-ratio:{{ $devices[$first]['width'] }}/{{ $devices[$first]['height'] }};max-height:78vh;margin:0 auto"
           poster="{{ route('video-demo.studio.file', [$video, $first, 'poster']) }}?v={{ $video->version }}"
-          src="{{ route('video-demo.studio.file', [$video, $first, 'video']) }}?v={{ $video->version }}"></video>
+          src="{{ route('video-demo.studio.file', [$video, $first, 'video']) }}?v={{ $video->version }}">
+          @if (\Illuminate\Support\Facades\Storage::disk(config('video-demo.storage.work_disk'))->exists($video->workFile($first, 'subtitles')))
+            <track kind="subtitles" srclang="en" label="Captions" src="{{ route('video-demo.studio.file', [$video, $first, 'subtitles']) }}?v={{ $video->version }}">
+          @endif
+        </video>
         @if (count($recorded) > 1)
           <div class="vd-segments" role="group" aria-label="Version">
             @foreach ($recorded as $key)
@@ -231,16 +235,18 @@
 
           <div>
             <label for="r-style">Style</label>
-            <select id="r-style" name="style_id" data-needs-plan>
+            <select id="r-style" name="style_id" data-needs-plan data-defaults-for="sound">
               @unless ($currentStyle)
                 <option value="" selected>{{ $video->style['name'] ?? 'Its current style' }} (as it was)</option>
               @endunless
               @foreach ($styles as $style)
-                <option value="{{ $style->id }}" data-direction="{{ $style->direction }}" @selected($currentStyle?->is($style))>{{ $style->name }}</option>
+                <option value="{{ $style->id }}" data-direction="{{ $style->direction }}" data-voice="{{ $style->voice }}" data-music="{{ $style->music }}" @selected($currentStyle?->is($style))>{{ $style->name }}</option>
               @endforeach
             </select>
             <span class="vd-hint" id="r-style-hint">{{ $currentStyle?->direction }}</span>
           </div>
+
+          @include('video-demo::studio.partials.sound', ['prefix' => 'a', 'voice' => old('voice', $video->voice), 'music' => old('music', $video->music), 'volume' => $video->music_volume])
 
           <div class="vd-row">
             <div>
@@ -299,7 +305,7 @@
             <label class="vd-check-row"><input type="checkbox" name="new_plan" value="1" id="a-new-plan" @checked(! $hasPlan) @disabled(! $hasPlan)> Ask the AI for a new plan</label>
             <span class="vd-hint" id="a-new-plan-hint">
               @if ($hasPlan)
-                Off: the same plan is recorded again, free, with your new versions, speed and look. Changing the description, length, user, start page, data or model turns it on.
+                Off: the same plan is recorded again, free, with your new versions, speed, look, voice and music. Changing the description, length, user, start page, data or model turns it on.
               @else
                 There is no plan yet, so the AI makes one.
               @endif
@@ -335,6 +341,8 @@
           @endif
           <div class="vd-stat"><dt>Recorded as</dt><dd>{{ $video->record_as_label ?: \Ogunsakin01\VideoDemo\Recording\RecordAs::label($video->record_as) }}</dd></div>
           <div class="vd-stat"><dt>Data</dt><dd>{{ $video->sample_data ? 'Sample data' : 'Your local database' }}</dd></div>
+          <div class="vd-stat"><dt>Voice-over</dt><dd>{{ \Ogunsakin01\VideoDemo\Voice\Voices::label($video->voice) }}</dd></div>
+          <div class="vd-stat"><dt>Music</dt><dd>{{ \Ogunsakin01\VideoDemo\Voice\Music::label($video->music) }}</dd></div>
           <div class="vd-stat"><dt>Model</dt><dd>{{ \Ogunsakin01\VideoDemo\Ai\Pricing::model($video->model)['label'] ?? $video->model }}, {{ $video->effort }}</dd></div>
           <div class="vd-stat"><dt>Length</dt><dd class="vd-num">{{ $video->duration_seconds ? round($video->duration_seconds).'s of '.$video->target_seconds.'s target' : $video->target_seconds.'s target' }}</dd></div>
         </dl>

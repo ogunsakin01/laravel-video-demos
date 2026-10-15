@@ -32,7 +32,7 @@ class ExamplesTest extends TestCase
 
         $this->get('/video-demo/studio/create?style=ad')
             ->assertOk()
-            ->assertSee('<option value="'.$ad->id.'" data-direction="'.e($ad->direction).'" selected', false);
+            ->assertSee('<option value="'.$ad->id.'" data-direction="'.e($ad->direction).'" data-voice="" data-music="" selected', false);
     }
 
     public function test_the_page_can_be_turned_off_or_hosted_elsewhere(): void

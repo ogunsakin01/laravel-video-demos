@@ -73,14 +73,16 @@
           <label for="style_id">Style</label>
           <a class="vd-small vd-muted" href="{{ route('video-demo.studio.styles.index') }}">Manage styles</a>
         </div>
-        <select id="style_id" name="style_id">
+        <select id="style_id" name="style_id" data-defaults-for="sound">
           @foreach ($styles as $style)
-            <option value="{{ $style->id }}" data-direction="{{ $style->direction }}" @selected((int) old('style_id', $styles->firstWhere('key', $defaults['style'])?->id ?? $styles->first()->id) === $style->id)>{{ $style->name }}</option>
+            <option value="{{ $style->id }}" data-direction="{{ $style->direction }}" data-voice="{{ $style->voice }}" data-music="{{ $style->music }}" @selected((int) old('style_id', $styles->firstWhere('key', $defaults['style'])?->id ?? $styles->first()->id) === $style->id)>{{ $style->name }}</option>
           @endforeach
         </select>
         <span class="vd-hint" id="vd-style-hint"></span>
         @error('style_id')<span class="vd-error">{{ $message }}</span>@enderror
       </div>
+
+      @include('video-demo::studio.partials.sound', ['prefix' => 'new', 'voice' => old('voice', $defaults['voice']), 'music' => old('music', $defaults['music']), 'volume' => null])
 
       <div>
         <label for="title">Title <span class="vd-optional">optional</span></label>

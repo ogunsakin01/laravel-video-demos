@@ -2,6 +2,24 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/). While the version is 0.x, minor releases may include breaking changes; they will be listed here.
 
+## v0.11.0 - 2026-10-15
+
+Run `php artisan video-demo:install` after updating, for the new columns.
+
+### Added
+
+- **Voice-over.** A narrator speaks a short line at each step, written by the AI in the style's tone. Choose a voice per video, on the form or in Make it again, with **Play sample**; a style can set a default. Voices are only offered when they work on your machine:
+  - **Local voices** (Kokoro): ten natural English voices, free, on your machine. Install them with `php artisan video-demo:install-voice` or `video-demo:install --with-voice` (about 150 MB next to the recorder, kept out of git, and a 100 MB model in your user cache folder, shared by every project). `video-demo:clean --voice` removes them.
+  - **This computer's voice**: macOS `say`, Windows speech or `espeak-ng`, for drafts, with nothing to install.
+  Each step waits until its line is finished. Clips are saved, so recording the same plan again doesn't speak them again; adding a voice to a video that has a plan writes the lines with one small request instead of planning again. If a voice fails, the video is still made, silent, and its log says why.
+- **Background music.** Upload your own tracks in the new Music section of the Styles page (or list them in `video-demo.music.tracks`), and choose one per video with a volume slider, or as a style's default. Music loops to the video's length, fades in and out, and drops while the voice speaks. It's mixed by the package itself, so any ffmpeg build works.
+- **Subtitles** from the spoken lines, published with each version; the player and the studio preview get a CC button.
+- `--voice` and `--music` on `video-demo:generate`, `voice`, `music` and `music_volume` options in `VideoDemo::make()`, and `VideoDemo::voices()` and `VideoDemo::music()`. `VideoDemo::url($entry, 'subtitles')` gives a version's subtitles, and `url()` now returns null for a file a video doesn't have.
+
+### Changed
+
+- Apps that extend `Recorder::record()` need the new last parameter, `array $voice = []`.
+
 ## v0.10.2 - 2026-10-15
 
 ### Fixed

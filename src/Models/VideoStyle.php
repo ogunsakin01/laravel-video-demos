@@ -23,6 +23,8 @@ use Illuminate\Support\Str;
  * @property string $app_theme
  * @property bool $zoom
  * @property bool $highlight
+ * @property ?string $voice
+ * @property ?string $music
  * @property int $position
  */
 class VideoStyle extends Model
@@ -103,6 +105,6 @@ class VideoStyle extends Model
      */
     public function snapshot(): array
     {
-        return $this->only(['key', 'name', 'direction', 'theme', 'accent', 'captions', 'pace', 'art', 'app_theme', 'zoom', 'highlight']);
+        return $this->only(['key', 'name', 'direction', 'theme', 'accent', 'captions', 'pace', 'art', 'app_theme', 'zoom', 'highlight', 'voice', 'music']);
     }
 }

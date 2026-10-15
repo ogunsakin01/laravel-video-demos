@@ -353,6 +353,9 @@ class Planner
                 ? 'The same plan is recorded on each of these screens: '.implode('; ', array_map(Devices::describe(...), $devices)).". Choose targets that exist on all of them. Where a layout differs, such as navigation behind a menu button on small screens, add the extra steps with only_on naming the screens that need them. $signedIn"
                 : 'Screen: '.Devices::describe($devices[0]).". $signedIn",
             $notes !== '' ? "<notes_from_the_developer>\n$notes\n</notes_from_the_developer>" : null,
+            $video->voice
+                ? 'Voice-over: a narrator speaks each step\'s say line aloud while the viewer watches it happen. Write one short spoken sentence (under 15 words) for the steps that matter, in the style\'s tone and in the words the app\'s users use; add to what is on screen rather than reading the caption out, and leave routine steps silent. The recorder holds each step until its line is finished, so lines never overlap, but every line adds to the length: plan fewer steps or shorter captions to stay near the target.'
+                : 'This video has no voice-over: leave every step\'s say empty.',
             $sandbox ? $this->sampleDataBrief($sandbox, $problems) : null,
             $sandbox && ($rules = (new AccessRules)->describe()) !== '' ? "<access_rules>\n$rules\n</access_rules>" : null,
             "<routes>\n".$this->code->routeList(allMiddleware: $sandbox !== null)."\n</routes>",

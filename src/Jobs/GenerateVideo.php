@@ -9,7 +9,9 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
+use Ogunsakin01\VideoDemo\Ai\Narrator;
 use Ogunsakin01\VideoDemo\Ai\Planner;
+use Ogunsakin01\VideoDemo\Ai\PlanningFailed;
 use Ogunsakin01\VideoDemo\Ai\VideoStopped;
 use Ogunsakin01\VideoDemo\Enums\VideoStatus;
 use Ogunsakin01\VideoDemo\Models\Video;
@@ -18,8 +20,13 @@ use Ogunsakin01\VideoDemo\Recording\Devices;
 use Ogunsakin01\VideoDemo\Recording\Encoder;
 use Ogunsakin01\VideoDemo\Recording\Plan;
 use Ogunsakin01\VideoDemo\Recording\Recorder;
+use Ogunsakin01\VideoDemo\Recording\RecordingResult;
 use Ogunsakin01\VideoDemo\SampleData\Sandbox;
 use Ogunsakin01\VideoDemo\VideoDemoServiceProvider;
+use Ogunsakin01\VideoDemo\Voice\Music;
+use Ogunsakin01\VideoDemo\Voice\Soundtrack;
+use Ogunsakin01\VideoDemo\Voice\Speaker;
+use Ogunsakin01\VideoDemo\Voice\Voices;
 use RuntimeException;
 use Throwable;
 
@@ -64,7 +71,7 @@ class GenerateVideo implements ShouldQueue
     /**
      * Execute the job.
      */
-    public function handle(Planner $planner, Recorder $recorder, Encoder $encoder): void
+    public function handle(Planner $planner, Recorder $recorder, Encoder $encoder, Narrator $narrator, Speaker $speaker, Soundtrack $soundtrack): void
     {
         $video = $this->video;
         $video->refresh();
@@ -80,6 +87,8 @@ class GenerateVideo implements ShouldQueue
         $maxRepairs = (int) config('video-demo.limits.max_repairs', 2);
         $shouldStop = fn () => $video->stopRequested();
         $session = null;
+        // The voice-over's clips, keyed by line; null once the voice has failed.
+        $clips = $video->voice ? [] : null;
         $sandbox = null;
 
         try {
@@ -105,6 +114,7 @@ class GenerateVideo implements ShouldQueue
             // Every version plays the same plan. A failure on any of them goes
             // back to the AI, and the corrected plan is recorded on all again.
             while (true) {
+                [$plan, $clips] = $clips !== null ? $this->voiceOver($video, $plan, $narrator, $speaker) : [$plan->withoutVoice(), null];
                 $plan = $plan->fitTo(min($video->target_seconds, (int) config('video-demo.limits.max_seconds', 300)), $video->playbackSpeed());
                 $video->update(['plan' => $plan->toArray()]);
 
@@ -123,7 +133,7 @@ class GenerateVideo implements ShouldQueue
                 foreach ($devices as $device) {
                     $this->stopIfAsked($video);
                     $video->moveTo(VideoStatus::Recording, 'Recording the '.Devices::get($device)['label'].' version');
-                    $result = $recorder->record($plan, "$dir/$device", $video->style ?? [], $device, $video->record_as, $shouldStop, $video->playbackSpeed());
+                    $result = $recorder->record($plan, "$dir/$device", $video->style ?? [], $device, $video->record_as, $shouldStop, $video->playbackSpeed(), array_map(fn ($c) => $c['seconds'], $clips ?? []));
                     $video->addLog($result->summary());
 
                     if (! $result->ok) {
@@ -183,13 +193,14 @@ class GenerateVideo implements ShouldQueue
                     $video->addLog('The zoom could not be added to the '.$screen['label'].' version, so it plays without it.');
                 }
             }
+            $this->addSound($video, $result, $clips ?? [], $mp4, $work->path($video->workFile($device, 'subtitles')), "$dir/$device", $soundtrack, $encoder);
             File::deleteDirectory("$dir/$device");
             $recordings[$device] = ['seconds' => $result->seconds, 'chapters' => $result->chapters];
         }
 
         // Remove the files of versions that are no longer chosen.
         foreach (array_diff($video->recordedDevices(), $devices) as $old) {
-            $work->delete([$video->workFile($old), $video->workFile($old, 'poster')]);
+            $work->delete([$video->workFile($old), $video->workFile($old, 'poster'), $video->workFile($old, 'subtitles')]);
         }
 
         $primary = $recordings[Devices::primary($devices)];
@@ -202,6 +213,85 @@ class GenerateVideo implements ShouldQueue
             'version' => $video->version + 1,
         ]);
         $video->moveTo(VideoStatus::Ready, sprintf('Ready. The AI cost $%.4f in total.', $video->cost));
+    }
+
+    /**
+     * Get the plan with its voice-over spoken: the lines written (by the
+     * narrator, when a plan has none) and each turned into a clip, whose
+     * length is noted on its step. A voice that fails is logged and left
+     * out, and the video is made without it.
+     *
+     * @return array{0: Plan, 1: ?array<string, array{file: string, seconds: float}>}
+     */
+    protected function voiceOver(Video $video, Plan $plan, Narrator $narrator, Speaker $speaker): array
+    {
+        $this->stopIfAsked($video);
+
+        try {
+            if ($plan->lines() === []) {
+                $video->addLog('The AI is writing the voice-over');
+                $plan = $narrator->narrate($plan, $video);
+            }
+
+            $lines = $plan->lines();
+            $video->addLog(sprintf('Speaking the voice-over: %d %s in %s', count($lines), count($lines) === 1 ? 'line' : 'lines', Voices::label($video->voice)));
+            $clips = $speaker->speak((string) $video->voice, $lines);
+        } catch (RuntimeException|PlanningFailed $e) {
+            $video->addLog("The voice-over couldn't be made, so the video is made without it: ".$e->getMessage());
+
+            return [$plan, null];
+        }
+
+        $data = $plan->toArray();
+        foreach ($data['steps'] as &$step) {
+            $say = trim((string) ($step['say'] ?? ''));
+            if ($say !== '' && isset($clips[$say])) {
+                $step['voice_ms'] = (int) round(($clips[$say]['seconds'] + 0.5) * 1000);
+            }
+        }
+
+        return [Plan::fromArray($data), $clips];
+    }
+
+    /**
+     * Add the sound track to a recorded version: its voice-over clips, each
+     * where its step started, over the background music, and the spoken
+     * lines as subtitles. If it fails, the video is kept silent.
+     *
+     * @param  array<string, array{file: string, seconds: float}>  $clips
+     */
+    protected function addSound(Video $video, RecordingResult $result, array $clips, string $mp4, string $vtt, string $dir, Soundtrack $soundtrack, Encoder $encoder): void
+    {
+        File::delete($vtt);
+        $music = Music::find($video->music);
+        if ($video->music && ! $music) {
+            $video->addLog("The music [{$video->music}] wasn't found, so the video has none.");
+        }
+
+        $spoken = [];
+        foreach ($result->spoken as $line) {
+            if (isset($clips[$line['text']])) {
+                $spoken[] = ['text' => $line['text'], 'file' => $clips[$line['text']]['file'], 'at' => $line['at'] + Soundtrack::LEAD, 'seconds' => $clips[$line['text']]['seconds']];
+            }
+        }
+        if ($spoken === [] && ! $music) {
+            return;
+        }
+
+        try {
+            $soundtrack->mix(
+                array_map(fn ($s) => ['file' => $s['file'], 'at' => $s['at']], $spoken),
+                $music ? ['file' => $music['file'], 'volume' => $video->music_volume ?? (float) config('video-demo.music.volume', 0.25)] : null,
+                $result->seconds,
+                "$dir/sound.wav",
+            );
+            $encoder->addAudio($mp4, "$dir/sound.wav");
+            if ($spoken !== []) {
+                $soundtrack->subtitles($spoken, $vtt);
+            }
+        } catch (RuntimeException $e) {
+            $video->addLog("The sound couldn't be added, so this version is silent: ".$e->getMessage());
+        }
     }
 
     /**

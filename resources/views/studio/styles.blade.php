@@ -54,6 +54,8 @@
               @if ($style->app_theme !== 'auto')<span class="vd-pill">App in {{ strtolower(VideoStyle::APP_THEMES[$style->app_theme] ?? $style->app_theme) }}</span>@endif
               @if ($style->zoom)<span class="vd-pill">Zooms in on each step</span>@endif
               @if ($style->highlight)<span class="vd-pill">Highlights each step</span>@endif
+              @if ($style->voice)<span class="vd-pill">Voice: {{ \Ogunsakin01\VideoDemo\Voice\Voices::label($style->voice) }}</span>@endif
+              @if ($style->music)<span class="vd-pill">Music: {{ \Ogunsakin01\VideoDemo\Voice\Music::label($style->music) }}</span>@endif
               <span class="vd-pill" style="display:inline-flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:3px;background:{{ $style->accent }};border:1px solid var(--vd-border)"></span>{{ $style->accent }}</span>
             </div>
           </div>
@@ -133,10 +135,66 @@
         <label class="vd-check-row"><input type="checkbox" name="highlight" value="1" @checked(old('highlight', $form->highlight ?? false))> Highlight what is being used, dimming the rest</label>
         <span class="vd-hint">Together, these give the video a polished, close-up feel, like the Spotlight style.</span>
       </div>
+      <div class="vd-row">
+        <div>
+          <label for="voice">Voice-over</label>
+          <select id="voice" name="voice">
+            <option value="">No voice</option>
+            @foreach (\Ogunsakin01\VideoDemo\Voice\Voices::options() as $group => $voices)
+              <optgroup label="{{ $group }}">
+                @foreach ($voices as $key => $label)
+                  <option value="{{ $key }}" @selected(old('voice', $form->voice ?? null) === $key)>{{ $label }}</option>
+                @endforeach
+              </optgroup>
+            @endforeach
+          </select>
+        </div>
+        <div>
+          <label for="music">Background music</label>
+          <select id="music" name="music">
+            <option value="">No music</option>
+            @foreach (\Ogunsakin01\VideoDemo\Voice\Music::options() as $key => $label)
+              <option value="{{ $key }}" @selected(old('music', $form->music ?? null) === $key)>{{ $label }}</option>
+            @endforeach
+          </select>
+        </div>
+      </div>
+      <span class="vd-hint" style="margin-top:-8px">New videos in this style start with these; each video can change them.</span>
       <div class="vd-actions">
         <button class="vd-btn vd-btn-primary">{{ $editing ? 'Save style' : 'Add style' }}</button>
         @if ($editing)<a class="vd-btn vd-btn-ghost" href="{{ route('video-demo.studio.styles.index') }}">Cancel</a>@endif
       </div>
     </form>
+
+    @php($tracks = \Ogunsakin01\VideoDemo\Voice\Music::tracks())
+    <section class="vd-card vd-stack" id="music">
+      <div>
+        <h2 style="margin:0">Music</h2>
+        <p class="vd-small vd-muted" style="margin:4px 0 0">Background music for your videos. It loops to the video's length, fades in and out, and gets quieter while the voice speaks. Use music you have the right to publish.</p>
+      </div>
+      @forelse ($tracks as $key => $track)
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px">
+          <strong style="min-width:140px">{{ $track['label'] }}</strong>
+          <audio controls preload="none" src="{{ route('video-demo.studio.music.play', $key) }}" style="flex:1;min-width:200px;height:36px"></audio>
+          @if ($track['uploaded'])
+            <form method="post" action="{{ route('video-demo.studio.music.destroy', $key) }}" onsubmit="return confirm('Delete this track? Videos already made keep their sound.')">@csrf @method('delete')
+              <button class="vd-btn vd-btn-sm vd-btn-ghost vd-btn-danger">Delete</button>
+            </form>
+          @else
+            <span class="vd-small vd-muted">From your config</span>
+          @endif
+        </div>
+      @empty
+        <p class="vd-small vd-muted" style="margin:0">No tracks yet.</p>
+      @endforelse
+      <form method="post" action="{{ route('video-demo.studio.music.upload') }}" enctype="multipart/form-data" class="vd-stack-sm">@csrf
+        <label for="track">Add a track <span class="vd-optional">MP3, WAV, M4A, OGG or FLAC, up to 50 MB</span></label>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+          <input type="file" id="track" name="track" accept=".mp3,.wav,.m4a,.ogg,.flac,audio/*" required style="flex:1;min-width:200px">
+          <button class="vd-btn">Upload</button>
+        </div>
+        @error('track')<span class="vd-error">{{ $message }}</span>@enderror
+      </form>
+    </section>
   </div>
 </x-video-demo::layout>

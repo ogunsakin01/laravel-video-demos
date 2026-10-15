@@ -149,7 +149,7 @@ class StudioTest extends TestCase
         // The form offers every style, with the video's own picked.
         $this->get("/video-demo/studio/{$video->id}")
             ->assertSee('<label for="r-style">Style</label>', false)
-            ->assertSee('value="'.$clean->id.'" data-direction="'.e($clean->direction).'" selected', false)
+            ->assertSee('value="'.$clean->id.'" data-direction="'.e($clean->direction).'" data-voice="" data-music="" selected', false)
             ->assertSee('Spotlight');
 
         $form = ['prompt' => 'x', 'target_seconds' => 30, 'effort' => 'high'];

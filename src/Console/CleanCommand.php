@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Process;
 use Ogunsakin01\VideoDemo\Models\Video;
 use Ogunsakin01\VideoDemo\Recording\Recorder;
 use Ogunsakin01\VideoDemo\SampleData\Sandbox;
+use Ogunsakin01\VideoDemo\Voice\Voices;
 use Throwable;
 
 /**
@@ -23,6 +24,7 @@ class CleanCommand extends Command
      */
     protected $signature = 'video-demo:clean
         {--browser : Also remove the Playwright install and its browser (video-demo:install puts them back)}
+        {--voice : Also remove the local voice, its model and the saved voice-over clips (video-demo:install-voice puts the voice back)}
         {--dry-run : List what would be removed, without removing it}';
 
     /**
@@ -45,6 +47,22 @@ class CleanCommand extends Command
                 $remove[] = ['path' => dirname($modules), 'why' => 'the Playwright install and its browser'];
             } elseif ($modules !== '') {
                 $this->components->warn("Playwright at [$modules] is outside this app's storage folder, so it was left alone.");
+            }
+        }
+
+        if ($this->option('voice')) {
+            $modules = (string) config('video-demo.recorder.node_modules');
+            foreach (['kokoro-js', '@huggingface', 'onnxruntime-node', 'onnxruntime-common', 'onnxruntime-web', 'phonemizer'] as $package) {
+                if (is_dir("$modules/$package")) {
+                    $remove[] = ['path' => "$modules/$package", 'why' => "the local voice ($package)"];
+                }
+            }
+            if (is_dir(Voices::modelCache())) {
+                $remove[] = ['path' => Voices::modelCache(), 'why' => 'the local voice model'];
+            }
+            $clips = Recorder::workDir(trim((string) config('video-demo.storage.work_path'), '/').'/voice');
+            if (is_dir($clips)) {
+                $remove[] = ['path' => $clips, 'why' => 'saved voice-over clips'];
             }
         }
 
@@ -124,7 +142,7 @@ class CleanCommand extends Command
                 continue;
             }
 
-            if (in_array($name, ['checks', 'camera'], true)) {
+            if (in_array($name, ['checks', 'camera', 'mix'], true)) {
                 $remove[] = ['path' => $dir, 'why' => "temporary files ($name)"];
 
                 continue;

@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Ogunsakin01\VideoDemo\Http\Controllers\Studio\RecorderLoginController;
+use Ogunsakin01\VideoDemo\Http\Controllers\Studio\SoundController;
 use Ogunsakin01\VideoDemo\Http\Controllers\Studio\StyleController;
 use Ogunsakin01\VideoDemo\Http\Controllers\Studio\SuggestionController;
 use Ogunsakin01\VideoDemo\Http\Controllers\Studio\VideoController;
@@ -22,6 +23,11 @@ Route::middleware(AuthorizeStudio::class)->group(function () {
     Route::post('/ideas', [SuggestionController::class, 'store'])->name('suggestions.store');
     Route::delete('/ideas/{idea}', [SuggestionController::class, 'destroy'])->name('suggestions.destroy');
 
+    Route::get('/voice-sample', [SoundController::class, 'sample'])->name('voice-sample');
+    Route::get('/music/{key}', [SoundController::class, 'play'])->name('music.play');
+    Route::post('/music', [SoundController::class, 'upload'])->name('music.upload');
+    Route::delete('/music/{key}', [SoundController::class, 'destroy'])->name('music.destroy');
+
     Route::get('/styles', [StyleController::class, 'index'])->name('styles.index');
     Route::post('/styles', [StyleController::class, 'store'])->name('styles.store');
     Route::put('/styles/{style}', [StyleController::class, 'update'])->name('styles.update');
@@ -31,7 +37,7 @@ Route::middleware(AuthorizeStudio::class)->group(function () {
     Route::get('/delete', [VideoController::class, 'confirmDelete'])->name('delete');
     Route::get('/{video}', [VideoController::class, 'show'])->name('show');
     Route::get('/{video}/status', [VideoController::class, 'status'])->name('status');
-    Route::get('/{video}/file/{device}/{kind}', [VideoController::class, 'file'])->whereIn('kind', ['video', 'poster'])->name('file');
+    Route::get('/{video}/file/{device}/{kind}', [VideoController::class, 'file'])->whereIn('kind', ['video', 'poster', 'subtitles'])->name('file');
     Route::patch('/{video}', [VideoController::class, 'update'])->name('update');
     Route::post('/{video}/regenerate', [VideoController::class, 'regenerate'])->name('regenerate');
     Route::post('/{video}/rerecord', [VideoController::class, 'rerecord'])->name('rerecord');

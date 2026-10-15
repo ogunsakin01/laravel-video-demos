@@ -57,7 +57,7 @@ final class Plan
      */
     protected static function normalise(array $step): array
     {
-        foreach (['url', 'value', 'title', 'text', 'chapter'] as $field) {
+        foreach (['url', 'value', 'title', 'text', 'chapter', 'say'] as $field) {
             if (($step[$field] ?? null) === '') {
                 $step[$field] = null;
             }
@@ -96,6 +96,37 @@ final class Plan
         ));
 
         return new self($this->title, $this->summary, $steps);
+    }
+
+    /**
+     * Get the plan with each spoken step held, while recording, until its
+     * line is finished: the line's length plus a short gap, times the speed
+     * the video will play at. $voice gives each line's length in seconds.
+     *
+     * @param  array<string, float>  $voice
+     */
+    public function withHolds(array $voice, float $speed = 1): self
+    {
+        $steps = array_map(function ($step) use ($voice, $speed) {
+            $say = trim((string) ($step['say'] ?? ''));
+            if ($say !== '' && isset($voice[$say])) {
+                $step['hold_ms'] = (int) round(($voice[$say] + 0.5) * 1000 * $speed);
+            }
+
+            return $step;
+        }, $this->steps);
+
+        return new self($this->title, $this->summary, $steps);
+    }
+
+    /**
+     * Get the plan's spoken lines, in order.
+     *
+     * @return list<string>
+     */
+    public function lines(): array
+    {
+        return array_values(array_unique(array_filter(array_map(fn ($s) => trim((string) ($s['say'] ?? '')), $this->steps))));
     }
 
     /**
@@ -186,6 +217,37 @@ final class Plan
      */
     protected function stepMs(array $step, float $speed = 1): int
     {
+        // A step lasts at least as long as its spoken line.
+        return max($this->actionMs($step, $speed), self::speechMs($step));
+    }
+
+    /**
+     * Get how long a step's spoken line lasts, in milliseconds, once its clip
+     * is made. Lines of a video without a voice take no time.
+     */
+    public static function speechMs(array $step): int
+    {
+        return empty($step['say']) ? 0 : (int) ($step['voice_ms'] ?? 0);
+    }
+
+    /**
+     * Get the plan without its clips' lengths, for a video recorded without
+     * a voice. Its lines are kept, to be spoken if a voice is chosen later.
+     */
+    public function withoutVoice(): self
+    {
+        return new self($this->title, $this->summary, array_map(function ($step) {
+            unset($step['voice_ms']);
+
+            return $step;
+        }, $this->steps));
+    }
+
+    /**
+     * Get how long a step's action lasts in the finished video, in milliseconds.
+     */
+    protected function actionMs(array $step, float $speed = 1): int
+    {
         $action = $step['action'] ?? 'pause';
 
         if ($this->isFlexible($step)) {
@@ -245,13 +307,14 @@ final class Plan
                             'text' => $string('caption or card: one short sentence under the heading. Empty otherwise.'),
                             'ms' => ['type' => 'integer', 'description' => 'caption, card, pause: how long it shows, in milliseconds. Other actions: an extra pause afterwards. 0 for the default.'],
                             'chapter' => $string('Starts a chapter with this name at this step. Empty otherwise.'),
+                            'say' => $string('Voice-over: what the narrator says during this step, as one short spoken sentence. Empty for silence, and always empty when the video has no voice.'),
                             'only_on' => [
                                 'type' => 'array',
                                 'items' => ['type' => 'string', 'enum' => Devices::keys()],
                                 'description' => 'Run this step only on these versions, for example ["mobile"] to open the menu that small screens hide navigation behind. Empty runs it on every version.',
                             ],
                         ],
-                        'required' => ['action', 'why', 'url', 'target', 'value', 'title', 'text', 'ms', 'chapter', 'only_on'],
+                        'required' => ['action', 'why', 'url', 'target', 'value', 'title', 'text', 'ms', 'chapter', 'say', 'only_on'],
                         'additionalProperties' => false,
                     ],
                 ],

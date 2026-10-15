@@ -93,7 +93,7 @@ class CommandsTest extends TestCase
         {
             public array $speeds = [];
 
-            public function record(Plan $plan, string $dir, array $style = [], string $device = 'desktop', ?string $recordAs = null, ?\Closure $shouldStop = null, ?float $speed = null): RecordingResult
+            public function record(Plan $plan, string $dir, array $style = [], string $device = 'desktop', ?string $recordAs = null, ?\Closure $shouldStop = null, ?float $speed = null, array $voice = []): RecordingResult
             {
                 $this->speeds[] = $speed;
                 File::ensureDirectoryExists($dir);

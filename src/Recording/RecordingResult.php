@@ -22,6 +22,7 @@ final readonly class RecordingResult
         public ?string $device = null,
         public ?array $appError = null,
         public array $focus = [],
+        public array $spoken = [],
     ) {}
 
     /**
@@ -43,7 +44,28 @@ final readonly class RecordingResult
             $device,
             $r['appError'] ?? null,
             $r['focus'] ?? [],
+            self::spoken($r['lines'] ?? [], $r['starts'] ?? []),
         );
+    }
+
+    /**
+     * Pair each spoken line with when its step started, in seconds of the
+     * finished video, so its clip can be placed there.
+     *
+     * @param  list<?string>  $lines
+     * @param  list<float>  $starts
+     * @return list<array{text: string, at: float}>
+     */
+    protected static function spoken(array $lines, array $starts): array
+    {
+        $spoken = [];
+        foreach ($lines as $i => $line) {
+            if (is_string($line) && trim($line) !== '' && isset($starts[$i])) {
+                $spoken[] = ['text' => trim($line), 'at' => (float) $starts[$i]];
+            }
+        }
+
+        return $spoken;
     }
 
     /**

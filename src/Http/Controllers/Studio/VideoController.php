@@ -33,6 +33,8 @@ use Ogunsakin01\VideoDemo\Studio\Examples;
 use Ogunsakin01\VideoDemo\Studio\Pages;
 use Ogunsakin01\VideoDemo\VideoDemo;
 use Ogunsakin01\VideoDemo\VideoDemoServiceProvider;
+use Ogunsakin01\VideoDemo\Voice\Music;
+use Ogunsakin01\VideoDemo\Voice\Voices;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Throwable;
 
@@ -82,6 +84,8 @@ class VideoController extends Controller
                 'max_steps' => $request->query('max_steps'),
                 'record_as' => $request->query('record_as', config('video-demo.recorder.login_as') ? '' : RecordAs::GUEST),
                 'sample_data' => (bool) $request->query('sample_data', config('video-demo.sample_data.default', true)),
+                'voice' => $request->query('voice', config('video-demo.voice.default')),
+                'music' => $request->query('music', config('video-demo.music.default')),
                 'idea' => $request->query('idea'),
             ],
             'recordAs' => RecordAs::options(),
@@ -190,6 +194,7 @@ class VideoController extends Controller
         $data['devices'] = array_values(array_intersect(Devices::keys(), $data['devices']));
         $data['record_as'] = ($data['record_as'] ?? '') === '' ? null : $data['record_as'];
         $data['sample_data'] = $request->boolean('sample_data');
+        $data = [...$data, ...$this->sound($data)];
 
         $video = Video::create([
             ...$data,
@@ -326,6 +331,7 @@ class VideoController extends Controller
             'effort' => ['required', Rule::in(self::EFFORTS)],
             'max_cost' => ['nullable', 'numeric', 'min:0.01', 'max:100'],
             'max_steps' => ['nullable', 'integer', 'min:3', 'max:250'],
+            ...$this->soundRules($video),
             'new_plan' => ['nullable', 'boolean'],
         ], ['devices.required' => 'Choose at least one version.']);
 
@@ -349,6 +355,7 @@ class VideoController extends Controller
             'effort' => $data['effort'],
             'max_cost' => $data['max_cost'] ?? null,
             'max_steps' => $data['max_steps'] ?? null,
+            ...$this->sound($data),
             ...($style ? ['style' => $style->snapshot()] : []),
             ...($estimate ? ['estimate_low' => $estimate['low'], 'estimate_high' => $estimate['high']] : []),
             'status' => VideoStatus::Queued,
@@ -580,6 +587,33 @@ class VideoController extends Controller
     }
 
     /**
+     * Get the rules for the voice-over and music fields: a voice or track
+     * that can be used here, or the one the video already has.
+     */
+    protected function soundRules(?Video $video = null): array
+    {
+        return [
+            'voice' => ['nullable', 'string', Rule::in([...array_keys(Voices::all()), ...array_filter([$video?->voice])])],
+            'music' => ['nullable', 'string', Rule::in([...array_keys(Music::options()), ...array_filter([$video?->music])])],
+            'music_volume' => ['nullable', 'integer', 'min:0', 'max:100'],
+        ];
+    }
+
+    /**
+     * Get the voice-over and music from the form's fields, as they are stored.
+     *
+     * @return array{voice: ?string, music: ?string, music_volume: ?float}
+     */
+    protected function sound(array $data): array
+    {
+        return [
+            'voice' => ($data['voice'] ?? '') ?: null,
+            'music' => ($data['music'] ?? '') ?: null,
+            'music_volume' => isset($data['music_volume']) ? round($data['music_volume'] / 100, 2) : null,
+        ];
+    }
+
+    /**
      * Get the validation rules for the new-video form.
      */
     protected function rules(bool $forEstimate = false): array
@@ -601,6 +635,7 @@ class VideoController extends Controller
             'speed' => ['nullable', 'numeric', 'min:0.25', 'max:4'],
             'record_as' => ['nullable', 'string', Rule::in(array_keys(RecordAs::options()))],
             'sample_data' => ['nullable', 'boolean'],
+            ...$this->soundRules(),
             'idea' => ['nullable', 'integer'],
             'devices' => ['required', 'array', 'min:1'],
             'devices.*' => ['string', Rule::in(Devices::keys())],

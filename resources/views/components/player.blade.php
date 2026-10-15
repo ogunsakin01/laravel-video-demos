@@ -14,6 +14,7 @@
           ->map(fn ($s, $key) => [
               'video' => $manifest->url($video, 'video', $key),
               'poster' => $manifest->url($video, 'poster', $key),
+              'subtitles' => $manifest->url($video, 'subtitles', $key),
               'width' => $s['width'], 'height' => $s['height'],
           ]);
       $first = $sources[$device] ?? $sources->first();
@@ -23,7 +24,9 @@
   <video {{ $attributes->except('style')->merge(['class' => 'vd-video', 'controls' => true, 'preload' => 'metadata', 'playsinline' => true]) }}
     data-vd-sources='@json($sources)' @if ($device) data-vd-device="{{ $device }}" @endif
     poster="{{ $first['poster'] }}" src="{{ $first['video'] }}" title="{{ $video['title'] }}"
-    style="{{ $attributes->get('style', 'width:100%;border-radius:12px;background:#0e0e0d;display:block;max-height:82vh') }};aspect-ratio:{{ $first['width'] }}/{{ $first['height'] }}"></video>
+    style="{{ $attributes->get('style', 'width:100%;border-radius:12px;background:#0e0e0d;display:block;max-height:82vh') }};aspect-ratio:{{ $first['width'] }}/{{ $first['height'] }}">
+    @if ($first['subtitles'])<track kind="subtitles" srclang="en" label="Captions" src="{{ $first['subtitles'] }}">@endif
+  </video>
   @once
     <script>
       // Play the recorded version closest to this screen: phone, tablet, desktop or TV.
@@ -39,6 +42,9 @@
         el.dataset.vdShowing = device;
         el.poster = s.poster;
         el.src = s.video;
+        // Each version has its own subtitles, timed to its steps.
+        const track = el.querySelector('track');
+        if (track && s.subtitles) track.src = s.subtitles;
         el.style.aspectRatio = s.width + '/' + s.height;
       };
       document.addEventListener('DOMContentLoaded', () => {

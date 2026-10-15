@@ -40,10 +40,16 @@ class Publisher
             $base = $this->manifest->path("{$video->slug}-v{$video->version}-$device");
             $disk->writeStream("$base.mp4", $work->readStream($video->workFile($device)));
             $disk->put("$base.jpg", $work->get($video->workFile($device, 'poster')));
+            // The spoken lines, when the video has a voice-over.
+            $subtitles = $work->exists($video->workFile($device, 'subtitles')) ? "$base.vtt" : null;
+            if ($subtitles) {
+                $disk->put($subtitles, $work->get($video->workFile($device, 'subtitles')));
+            }
             $screen = Devices::get($device);
             $sources[$device] = [
                 'video' => "$base.mp4",
                 'poster' => "$base.jpg",
+                'subtitles' => $subtitles,
                 'width' => $screen['width'],
                 'height' => $screen['height'],
                 'duration' => $video->recordings[$device]['seconds'] ?? $video->duration_seconds,
@@ -61,13 +67,14 @@ class Publisher
             'chapters' => $primary['chapters'],
             'video' => $primary['video'],
             'poster' => $primary['poster'],
+            'subtitles' => $primary['subtitles'],
             'sources' => $sources,
             'version' => $video->version,
             'published_at' => now()->toIso8601String(),
         ]);
 
         if ($old) {
-            $kept = collect($sources)->flatMap(fn ($s) => [$s['video'], $s['poster']])->all();
+            $kept = collect($sources)->flatMap(fn ($s) => array_filter([$s['video'], $s['poster'], $s['subtitles']]))->all();
             $disk->delete(array_diff(Manifest::files($old), $kept));
         }
 

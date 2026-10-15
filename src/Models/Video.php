@@ -50,6 +50,9 @@ use Ogunsakin01\VideoDemo\Recording\Recorder;
  * @property bool $stop_requested
  * @property bool $sample_data
  * @property ?list<array<string, mixed>> $sample_records
+ * @property ?string $voice
+ * @property ?string $music
+ * @property ?float $music_volume
  */
 class Video extends Model
 {
@@ -82,6 +85,7 @@ class Video extends Model
             'stop_requested' => 'boolean',
             'sample_data' => 'boolean',
             'sample_records' => 'array',
+            'music_volume' => 'float',
         ];
     }
 
@@ -188,7 +192,11 @@ class Video extends Model
      */
     public function workFile(string $device, string $kind = 'video'): string
     {
-        return $this->workPath($kind === 'video' ? "video-$device.mp4" : "poster-$device.jpg");
+        return $this->workPath(match ($kind) {
+            'poster' => "poster-$device.jpg",
+            'subtitles' => "subtitles-$device.vtt",
+            default => "video-$device.mp4",
+        });
     }
 
     /**

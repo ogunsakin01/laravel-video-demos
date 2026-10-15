@@ -9,7 +9,8 @@ use Symfony\Component\Process\Exception\ProcessSignaledException;
 use Symfony\Component\Process\Exception\ProcessStartFailedException;
 
 /**
- * Converts the browser's WebM recording to an MP4 that plays everywhere, and grabs a poster frame.
+ * Converts the browser's WebM recording to an MP4 that plays everywhere,
+ * grabs a poster frame, and adds a video's sound track.
  */
 class Encoder
 {
@@ -63,6 +64,27 @@ class Encoder
     {
         $this->run([config('video-demo.recorder.ffmpeg', 'ffmpeg'), '-y', '-v', 'error', '-framerate', (string) self::FPS, '-i', "$dir/%05d.jpg",
             '-c:v', 'libx264', '-crf', '26', '-preset', 'slow', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-an', $mp4]);
+    }
+
+    /**
+     * Convert any audio file to 16-bit stereo WAV at 44.1 kHz, the format
+     * voice clips and music are mixed in.
+     */
+    public function toWav(string $input, string $wav): void
+    {
+        File::ensureDirectoryExists(dirname($wav));
+        $this->run([config('video-demo.recorder.ffmpeg', 'ffmpeg'), '-y', '-v', 'error', '-i', $input, '-vn', '-ar', '44100', '-ac', '2', '-c:a', 'pcm_s16le', $wav]);
+    }
+
+    /**
+     * Add a sound track to an MP4, in place. The picture is copied as it is.
+     */
+    public function addAudio(string $mp4, string $wav): void
+    {
+        $out = dirname($mp4).'/with-sound-'.basename($mp4);
+        $this->run([config('video-demo.recorder.ffmpeg', 'ffmpeg'), '-y', '-v', 'error', '-i', $mp4, '-i', $wav,
+            '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', $out]);
+        File::move($out, $mp4);
     }
 
     /**

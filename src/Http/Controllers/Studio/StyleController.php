@@ -8,6 +8,8 @@ use Illuminate\Routing\Controller;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Ogunsakin01\VideoDemo\Models\VideoStyle;
+use Ogunsakin01\VideoDemo\Voice\Music;
+use Ogunsakin01\VideoDemo\Voice\Voices;
 
 /**
  * Manages the video styles on the studio's Styles page.
@@ -78,6 +80,9 @@ class StyleController extends Controller
             'pace' => ['required', Rule::in(array_keys(VideoStyle::PACES))],
             'art' => ['required', Rule::in(array_keys(VideoStyle::ARTS))],
             'app_theme' => ['nullable', Rule::in(array_keys(VideoStyle::APP_THEMES))],
-        ]), 'app_theme' => $request->input('app_theme') ?: 'auto', 'zoom' => $request->boolean('zoom'), 'highlight' => $request->boolean('highlight')];
+            'voice' => ['nullable', 'string', Rule::in([...array_keys(Voices::all()), ...array_filter([$request->route('style')?->voice])])],
+            'music' => ['nullable', 'string', Rule::in([...array_keys(Music::options()), ...array_filter([$request->route('style')?->music])])],
+        ]), 'app_theme' => $request->input('app_theme') ?: 'auto', 'zoom' => $request->boolean('zoom'), 'highlight' => $request->boolean('highlight'),
+            'voice' => $request->input('voice') ?: null, 'music' => $request->input('music') ?: null];
     }
 }

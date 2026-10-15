@@ -215,7 +215,8 @@ async function snapshot(page) {
 }
 
 (async () => {
-  const result = { ok: false, video: null, durationMs: 0, trimMs: 0, chapters: [], focus, failedStep: null, error: null, url: null, title: null, snapshot: null };
+  // starts: when each step began, in ms since recording started, so voice-over lines can be placed.
+  const result = { ok: false, video: null, durationMs: 0, trimMs: 0, chapters: [], starts: [], focus, failedStep: null, error: null, url: null, title: null, snapshot: null };
   const browser = await chromium.launch(job.channel ? { channel: job.channel } : {});
   let page;
   try {
@@ -278,8 +279,12 @@ async function snapshot(page) {
       const step = plan.steps[i];
       if (step.chapter) result.chapters.push({ title: step.chapter, at: (Date.now() - started) / 1000 });
       const stepStarted = Date.now();
+      result.starts.push(stepStarted - started);
       try {
         await run(page, step, i === plan.steps.length - 1);
+        // A step with a spoken line lasts until the line is finished.
+        const left = (step.hold_ms || 0) - (Date.now() - stepStarted);
+        if (left > 0) await pause(page, left);
       } catch (e) {
         result.failedStep = i + 1;
         result.error = String(e.message || e).split('\n')[0];

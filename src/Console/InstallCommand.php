@@ -23,7 +23,8 @@ class InstallCommand extends Command
      */
     protected $signature = 'video-demo:install
         {--no-browser : Skip installing Playwright and Chromium}
-        {--no-sample-data : Skip building the sample database}';
+        {--no-sample-data : Skip building the sample database}
+        {--with-voice : Also install the free local voice for voice-overs (about 250 MB, once)}';
 
     /**
      * The console command description.
@@ -62,6 +63,10 @@ class InstallCommand extends Command
 
         if (! $this->option('no-sample-data')) {
             $this->buildSampleDatabase();
+        }
+
+        if ($this->option('with-voice')) {
+            $this->call('video-demo:install-voice');
         }
 
         // Running workers keep the code they started with until they restart.

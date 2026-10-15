@@ -75,6 +75,7 @@ The plan is stored with the video, so after a redesign you can record it again a
 
 - **[A studio](https://github.com/ogunsakin01/laravel-video-demos/wiki/The-Studio)** to describe, estimate, stop, review, publish and make videos again. **Ideas** suggests the videos worth making first.
 - **[Sample data](https://github.com/ogunsakin01/laravel-video-demos/wiki/Sample-Data)**: recorded as any type of user (Admin, Member…) on a database made for the video, never your own.
+- **[Voice-over and music](https://github.com/ogunsakin01/laravel-video-demos/wiki/Voice-Over-and-Music)**: a narrator that speaks a line at each step, with free local voices, and your own background music that steps aside while the voice speaks. Subtitles come with it. Off unless you choose them.
 - **[Styles and screens](https://github.com/ogunsakin01/laravel-video-demos/wiki/Styles-and-Screens)**: from step-by-step tutorials to the Spotlight feature reel, on desktop, TV, tablet and mobile, at the speed you choose.
 - **[A help library](https://github.com/ogunsakin01/laravel-video-demos/wiki/The-Library)** for your users, and a Blade tag to put any video on any page.
 - **[Cost control](https://github.com/ogunsakin01/laravel-video-demos/wiki/AI-Providers-and-Costs)**: an estimate first, a spending limit on every video ($0.50 unless you change it), and the real cost afterwards.
@@ -86,7 +87,7 @@ The plan is stored with the video, so after a redesign you can record it again a
 | | |
 | --- | --- |
 | Getting started | [Setup checklist](https://github.com/ogunsakin01/laravel-video-demos/wiki/Setup-Checklist) · [Installation](https://github.com/ogunsakin01/laravel-video-demos/wiki/Installation) · [Upgrading](https://github.com/ogunsakin01/laravel-video-demos/wiki/Upgrading) |
-| Making videos | [The studio](https://github.com/ogunsakin01/laravel-video-demos/wiki/The-Studio) · [Sample data](https://github.com/ogunsakin01/laravel-video-demos/wiki/Sample-Data) · [Styles and screens](https://github.com/ogunsakin01/laravel-video-demos/wiki/Styles-and-Screens) · [Command line](https://github.com/ogunsakin01/laravel-video-demos/wiki/Command-Line) |
+| Making videos | [The studio](https://github.com/ogunsakin01/laravel-video-demos/wiki/The-Studio) · [Sample data](https://github.com/ogunsakin01/laravel-video-demos/wiki/Sample-Data) · [Styles and screens](https://github.com/ogunsakin01/laravel-video-demos/wiki/Styles-and-Screens) · [Voice-over and music](https://github.com/ogunsakin01/laravel-video-demos/wiki/Voice-Over-and-Music) · [Command line](https://github.com/ogunsakin01/laravel-video-demos/wiki/Command-Line) |
 | Showing videos | [The library](https://github.com/ogunsakin01/laravel-video-demos/wiki/The-Library) |
 | Going further | [Using it from code](https://github.com/ogunsakin01/laravel-video-demos/wiki/Using-It-From-Code) · [AI providers and costs](https://github.com/ogunsakin01/laravel-video-demos/wiki/AI-Providers-and-Costs) · [Configuration](https://github.com/ogunsakin01/laravel-video-demos/wiki/Configuration) |
 | Help | [Troubleshooting](https://github.com/ogunsakin01/laravel-video-demos/wiki/Troubleshooting) · [FAQ](https://github.com/ogunsakin01/laravel-video-demos/wiki/FAQ) · [Security](https://github.com/ogunsakin01/laravel-video-demos/wiki/Security) |

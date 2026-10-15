@@ -38,6 +38,8 @@ class GenerateCommand extends Command
         {--as= : Record as a type of user, such as "admin", "guest" for signed out, or a user id or email}
         {--sample-data : Record on sample data (the default, unless VIDEO_DEMO_SAMPLE_DATA=false)}
         {--own-data : Record on your own local data instead of sample data}
+        {--voice= : A voice-over voice, such as kokoro:af_heart ("none" for no voice)}
+        {--music= : The key of a background music track ("none" for no music)}
         {--private : List it in the private library only}
         {--publish : Publish it to the library when it is ready}
         {--queue : Queue it and return straight away, instead of waiting}
@@ -113,6 +115,9 @@ class GenerateCommand extends Command
             'speed' => $this->option('speed'),
             'as' => $this->option('as') ?: null,
             'sample_data' => $this->option('own-data') ? false : ($this->option('sample-data') ?: null),
+            // "none" is kept as an empty value, so it means no voice rather than the default.
+            'voice' => $this->option('voice') === 'none' ? '' : $this->option('voice'),
+            'music' => $this->option('music') === 'none' ? '' : $this->option('music'),
         ], fn ($v) => $v !== null), 'Queued from the command line');
 
         if (! $this->option('json')) {

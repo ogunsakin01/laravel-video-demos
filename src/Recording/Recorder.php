@@ -30,12 +30,20 @@ class Recorder
      * out, or null for video-demo.recorder.login_as. $shouldStop is asked
      * twice a second; when it returns true the browser is closed. $speed is
      * how much faster the video will play, or null for the configured speed.
+     * $voice gives each spoken line's length in seconds, keyed by the line,
+     * so the step speaking it is held until it is finished.
+     *
+     * @param  array<string, float>  $voice
      */
-    public function record(Plan $plan, string $dir, array $style = [], string $device = 'desktop', ?string $recordAs = null, ?Closure $shouldStop = null, ?float $speed = null): RecordingResult
+    public function record(Plan $plan, string $dir, array $style = [], string $device = 'desktop', ?string $recordAs = null, ?Closure $shouldStop = null, ?float $speed = null, array $voice = []): RecordingResult
     {
         $speed = static::speed($speed);
         $screen = Devices::get($device);
         $plan = $plan->forDevice($device);
+
+        if ($voice !== []) {
+            $plan = $plan->withHolds($voice, $speed);
+        }
 
         File::ensureDirectoryExists($dir);
         File::delete(File::glob("$dir/*.webm"));
@@ -62,6 +70,8 @@ class Recorder
         $result['durationMs'] = ($result['durationMs'] ?? 0) / $speed;
         $result['chapters'] = array_map(fn ($c) => [...$c, 'at' => round($c['at'] / $speed, 2)], $result['chapters'] ?? []);
         $result['focus'] = array_map(fn ($f) => [...$f, 't' => round($f['t'] / 1000 / $speed, 3)], $result['focus'] ?? []);
+        $result['starts'] = array_map(fn ($t) => round($t / 1000 / $speed, 3), $result['starts'] ?? []);
+        $result['lines'] = array_map(fn ($step) => $step['say'] ?? null, $plan->steps);
 
         return RecordingResult::fromArray($result, $device);
     }

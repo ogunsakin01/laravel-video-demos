@@ -21,6 +21,8 @@ use Ogunsakin01\VideoDemo\Recording\RecordAs;
 use Ogunsakin01\VideoDemo\Recording\Recorder;
 use Ogunsakin01\VideoDemo\Studio\Embeds;
 use Ogunsakin01\VideoDemo\Studio\Pages;
+use Ogunsakin01\VideoDemo\Voice\Music;
+use Ogunsakin01\VideoDemo\Voice\Voices;
 use RuntimeException;
 
 /**
@@ -46,11 +48,12 @@ class VideoDemo
      * (a key or name), devices (list), model, effort, private (bool),
      * max_cost (dollars), max_steps, speed (0.25 to 4), as (a user type such
      * as "admin", "guest", or a user id or email), sample_data (false records
-     * on the app's own local data instead of a temporary sample database) and
-     * queue (false makes it now, in this process). Throws
-     * InvalidArgumentException for a bad option.
+     * on the app's own local data instead of a temporary sample database),
+     * voice (such as "kokoro:af_heart"; see voices()), music (a track's key;
+     * see music()), music_volume (0 to 1) and queue (false makes it now, in
+     * this process). Throws InvalidArgumentException for a bad option.
      *
-     * @param  array{title?: string, start?: string, length?: int, style?: string, devices?: list<string>, model?: string, effort?: string, private?: bool, max_cost?: float, max_steps?: int, speed?: float, as?: string, sample_data?: bool, queue?: bool}  $options
+     * @param  array{title?: string, start?: string, length?: int, style?: string, devices?: list<string>, model?: string, effort?: string, private?: bool, max_cost?: float, max_steps?: int, speed?: float, as?: string, sample_data?: bool, voice?: ?string, music?: ?string, music_volume?: float, queue?: bool}  $options
      */
     public function make(string $description, array $options = []): Video
     {
@@ -133,6 +136,20 @@ class VideoDemo
             }
         }
 
+        // A style's own voice and music are the defaults, then the config's.
+        $voice = array_key_exists('voice', $options) ? $options['voice'] : ($style->voice ?? config('video-demo.voice.default'));
+        if ($voice && ! Voices::available($voice)) {
+            throw new InvalidArgumentException("The voice [$voice] isn't available here. Choose one of: ".(implode(', ', array_keys(Voices::all())) ?: 'none (run php artisan video-demo:install-voice)').'.');
+        }
+        $music = array_key_exists('music', $options) ? $options['music'] : ($style->music ?? config('video-demo.music.default'));
+        if ($music && ! Music::find($music)) {
+            throw new InvalidArgumentException("There is no music track [$music]. Choose one of: ".(implode(', ', array_keys(Music::options())) ?: 'none (add tracks on the Styles page)').'.');
+        }
+        $volume = $options['music_volume'] ?? null;
+        if ($volume !== null && (! is_numeric($volume) || $volume < 0 || $volume > 1)) {
+            throw new InvalidArgumentException('The music volume must be a number from 0 to 1, such as 0.35.');
+        }
+
         $estimate = $this->estimate($model, $effort, $seconds);
 
         $video = Video::create([
@@ -151,6 +168,9 @@ class VideoDemo
             'record_as' => $recordAs,
             'record_as_label' => RecordAs::label($recordAs),
             'sample_data' => (bool) ($options['sample_data'] ?? config('video-demo.sample_data.default', true)),
+            'voice' => $voice ?: null,
+            'music' => $music ?: null,
+            'music_volume' => $volume !== null ? (float) $volume : null,
             'status' => VideoStatus::Queued,
             'estimate_low' => $estimate['low'],
             'estimate_high' => $estimate['high'],
@@ -313,11 +333,12 @@ class VideoDemo
     }
 
     /**
-     * Get the address of a published video's MP4 or poster.
+     * Get the address of a published video's MP4, poster or subtitles
+     * ("video", "poster" or "subtitles"), or null when it has none.
      *
      * @param  array<string, mixed>  $entry  A video from library() or search().
      */
-    public function url(array $entry, string $kind = 'video', ?string $device = null): string
+    public function url(array $entry, string $kind = 'video', ?string $device = null): ?string
     {
         return $this->manifest->url($entry, $kind, $device);
     }
@@ -360,6 +381,26 @@ class VideoDemo
     public function userTypes(): array
     {
         return RecordAs::options();
+    }
+
+    /**
+     * Get the voices a video can be narrated in on this machine, key => label.
+     *
+     * @return array<string, string>
+     */
+    public function voices(): array
+    {
+        return Voices::all();
+    }
+
+    /**
+     * Get the background music tracks, key => label.
+     *
+     * @return array<string, string>
+     */
+    public function music(): array
+    {
+        return Music::options();
     }
 
     /**

@@ -274,6 +274,59 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Voice-over and Music
+    |--------------------------------------------------------------------------
+    |
+    | Videos are silent unless a voice or music is chosen for them, on the
+    | form, per style, or here for every new video. The AI writes a short line
+    | for each step, a voice speaks it, and the recorder waits for each line
+    | to finish. Music plays underneath and drops while the voice speaks.
+    |
+    | Local voices are free and run on this machine; install them with
+    | php artisan video-demo:install-voice. The computer's own voice (macOS
+    | "say", Windows speech, or espeak-ng on Linux) needs no install and is
+    | meant for drafts. Clips are saved, so recording again costs nothing.
+    |
+    */
+
+    'voice' => [
+        // The voice new videos start with, such as "kokoro:af_heart". Empty for none.
+        'default' => env('VIDEO_DEMO_VOICE'),
+
+        // Where the local voice model is kept. Outside the project, so it is
+        // never committed, and shared by every project on this machine.
+        'cache_path' => env('VIDEO_DEMO_VOICE_CACHE'),
+
+        // The local voices offered, voice id => label: Kokoro's best-rated ones.
+        'kokoro_voices' => [
+            'af_heart' => 'Heart, warm (US)',
+            'af_bella' => 'Bella, bright (US)',
+            'af_nicole' => 'Nicole, soft (US)',
+            'am_michael' => 'Michael, steady (US)',
+            'am_fenrir' => 'Fenrir, bold (US)',
+            'bf_emma' => 'Emma, calm (UK)',
+            'bf_isabella' => 'Isabella, friendly (UK)',
+            'am_puck' => 'Puck, lively (US)',
+            'bm_george' => 'George, warm (UK)',
+            'bm_fable' => 'Fable, storyteller (UK)',
+        ],
+    ],
+
+    'music' => [
+        // The track new videos start with: a track's key, or empty for none.
+        'default' => env('VIDEO_DEMO_MUSIC'),
+
+        // How loud the music is, from 0 to 1. It drops to a quarter of this
+        // while the voice speaks.
+        'volume' => 0.25,
+
+        // Tracks of your own, key => absolute path to an MP3, WAV, M4A, OGG or
+        // FLAC file. Tracks uploaded on the Styles page are added to these.
+        'tracks' => [],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Sample Data
     |--------------------------------------------------------------------------
     |

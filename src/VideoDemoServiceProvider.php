@@ -9,6 +9,7 @@ use Ogunsakin01\VideoDemo\Ai\Claude;
 use Ogunsakin01\VideoDemo\Console\CleanCommand;
 use Ogunsakin01\VideoDemo\Console\GenerateCommand;
 use Ogunsakin01\VideoDemo\Console\InstallCommand;
+use Ogunsakin01\VideoDemo\Console\InstallVoiceCommand;
 use Ogunsakin01\VideoDemo\Console\ListCommand;
 use Ogunsakin01\VideoDemo\Console\PublishCommand;
 use Ogunsakin01\VideoDemo\Console\RefreshCommand;
@@ -64,6 +65,7 @@ class VideoDemoServiceProvider extends ServiceProvider
 
             $this->commands([
                 InstallCommand::class,
+                InstallVoiceCommand::class,
                 CleanCommand::class,
                 GenerateCommand::class,
                 ListCommand::class,

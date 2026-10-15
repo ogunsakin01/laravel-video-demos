@@ -93,7 +93,8 @@ class Manifest
         return array_values(array_unique(array_filter([
             $video['video'] ?? null,
             $video['poster'] ?? null,
-            ...collect($video['sources'] ?? [])->flatMap(fn ($s) => [$s['video'] ?? null, $s['poster'] ?? null])->all(),
+            $video['subtitles'] ?? null,
+            ...collect($video['sources'] ?? [])->flatMap(fn ($s) => [$s['video'] ?? null, $s['poster'] ?? null, $s['subtitles'] ?? null])->all(),
         ])));
     }
 
@@ -114,13 +115,17 @@ class Manifest
     }
 
     /**
-     * Get the URL of a video's MP4 or poster.
+     * Get the URL of a video's MP4, poster or subtitles, or null when it has none of that kind.
      *
      * Private videos get a temporary link where the disk supports one.
      */
-    public function url(array $video, string $kind = 'video', ?string $device = null): string
+    public function url(array $video, string $kind = 'video', ?string $device = null): ?string
     {
-        $path = $device ? (static::sources($video)[$device][$kind] ?? $video[$kind]) : $video[$kind];
+        // Subtitles exist only for videos with a voice-over.
+        $path = $device ? (static::sources($video)[$device][$kind] ?? $video[$kind] ?? null) : ($video[$kind] ?? null);
+        if ($path === null) {
+            return null;
+        }
         $disk = $this->disk();
 
         if (($video['visibility'] ?? 'public') === 'private') {
