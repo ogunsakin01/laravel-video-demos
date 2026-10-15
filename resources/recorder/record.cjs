@@ -217,6 +217,12 @@ async function snapshot(page) {
 (async () => {
   // starts: when each step began, in ms since recording started, so voice-over lines can be placed.
   const result = { ok: false, video: null, durationMs: 0, trimMs: 0, chapters: [], starts: [], focus, failedStep: null, error: null, url: null, title: null, snapshot: null };
+  // For the full error view: the browser's own messages and failed requests, and the page when it failed.
+  const browserLog = [];
+  const log = (kind, text, extra = {}) => {
+    browserLog.push({ kind, text: String(text).slice(0, 1000), t: started ? Date.now() - started : 0, ...extra });
+    if (browserLog.length > 60) browserLog.shift();
+  };
   const browser = await chromium.launch(job.channel ? { channel: job.channel } : {});
   let page;
   try {
@@ -274,6 +280,10 @@ async function snapshot(page) {
       if (r.status() >= 500 && r.request().isNavigationRequest()) appErrors.push({ kind: 'server', status: r.status(), url: r.url(), at: Date.now() });
     });
     page.on('pageerror', e => appErrors.push({ kind: 'javascript', message: String(e.message || e).split('\n')[0], url: page.url(), at: Date.now() }));
+    page.on('pageerror', e => log('exception', e.stack || e.message || e, { url: page.url() }));
+    page.on('console', m => { if (['error', 'warning'].includes(m.type())) log(m.type(), m.text(), { url: m.location()?.url || null }); });
+    page.on('response', r => { if (r.status() >= 400) log('response', `${r.request().method()} ${r.url()}`, { status: r.status() }); });
+    page.on('requestfailed', r => log('failed', `${r.method()} ${r.url()}`, { reason: r.failure()?.errorText || null }));
 
     for (let i = 0; i < plan.steps.length; i++) {
       const step = plan.steps[i];
@@ -288,7 +298,9 @@ async function snapshot(page) {
       } catch (e) {
         result.failedStep = i + 1;
         result.error = String(e.message || e).split('\n')[0];
+        result.errorFull = String(e.message || e).slice(0, 4000);
         result.url = page.url();
+        result.screenshot = await page.screenshot({ path: path.join(job.outDir, 'failure.jpg'), type: 'jpeg', quality: 75 }).then(() => path.join(job.outDir, 'failure.jpg')).catch(() => null);
         result.title = await page.title().catch(() => '');
         result.snapshot = await snapshot(page);
         // A server error or JavaScript error during this step means the app is broken here.
@@ -310,6 +322,7 @@ async function snapshot(page) {
     result.error = String(e.message || e).split('\n')[0];
   } finally {
     await browser.close();
+    result.browserLog = browserLog;
     fs.writeFileSync(path.join(job.outDir, 'result.json'), JSON.stringify(result, null, 2));
   }
   process.exit(0);

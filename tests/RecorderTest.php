@@ -92,6 +92,14 @@ class RecorderTest extends TestCase
         $this->assertSame(2, $result->failedStep);
         $this->assertStringContainsString('Save draft', $result->error);
         $this->assertStringContainsString('button "Publish job"', $result->describeForRepair());
+
+        // For the full error view: Playwright's whole message, a screenshot, and what the browser said.
+        $this->assertStringContainsString('Save draft', $result->errorFull);
+        $this->assertFileExists($result->screenshot);
+        $this->assertSame([1280, 800], array_slice(getimagesize($result->screenshot), 0, 2));
+        $log = collect($result->browserLog);
+        $this->assertSame('Draft autosave is off', $log->firstWhere('kind', 'warning')['text']);
+        $this->assertStringContainsString('/missing-logo.png', $log->firstWhere('kind', 'failed')['text']);
     }
 
     public function test_records_the_mobile_version_with_touch_and_its_own_steps(): void
@@ -207,6 +215,8 @@ class RecorderTest extends TestCase
             $this->assertFalse($result->ok);
             $this->assertFalse($result->canRepair());
             $this->assertSame('/server-recording', $result->issue()['path']);
+            // The full error view lists the failed request.
+            $this->assertSame(500, collect($result->browserLog)->firstWhere('kind', 'response')['status']);
         } finally {
             $server->stop();
         }

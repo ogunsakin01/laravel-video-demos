@@ -23,6 +23,9 @@ final readonly class RecordingResult
         public ?array $appError = null,
         public array $focus = [],
         public array $spoken = [],
+        public ?string $errorFull = null,
+        public ?string $screenshot = null,
+        public array $browserLog = [],
     ) {}
 
     /**
@@ -45,6 +48,9 @@ final readonly class RecordingResult
             $r['appError'] ?? null,
             $r['focus'] ?? [],
             self::spoken($r['lines'] ?? [], $r['starts'] ?? []),
+            $r['errorFull'] ?? null,
+            $r['screenshot'] ?? null,
+            $r['browserLog'] ?? [],
         );
     }
 

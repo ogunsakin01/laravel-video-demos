@@ -2,6 +2,18 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/). While the version is 0.x, minor releases may include breaking changes; they will be listed here.
 
+## v0.13.0 - 2026-10-15
+
+Run `php artisan video-demo:install` after updating, for the new column.
+
+### Added
+
+- **View full error.** A failed video's "What went wrong" card has a button that opens the whole error, laid out like Laravel's error page: the exception, its stack trace with the code around each of your app's frames (vendor frames folded), and the video's settings. When a step fails while recording, it also shows a screenshot of the page, the step, Playwright's full message, the browser's console errors and failed requests, and the page structure the recorder saw. On sample data, exceptions your app throws while it is recorded are caught with their stack traces too. **Copy as Markdown** copies it, to paste into an issue or an AI chat.
+
+### Fixed
+
+- A failed step's message no longer ends with two full stops.
+
 ## v0.12.1 - 2026-10-15
 
 ### Fixed

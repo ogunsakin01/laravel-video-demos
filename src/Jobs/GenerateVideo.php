@@ -21,8 +21,10 @@ use Ogunsakin01\VideoDemo\Recording\Devices;
 use Ogunsakin01\VideoDemo\Recording\Encoder;
 use Ogunsakin01\VideoDemo\Recording\Plan;
 use Ogunsakin01\VideoDemo\Recording\Recorder;
+use Ogunsakin01\VideoDemo\Recording\RecordingFailed;
 use Ogunsakin01\VideoDemo\Recording\RecordingResult;
 use Ogunsakin01\VideoDemo\SampleData\Sandbox;
+use Ogunsakin01\VideoDemo\Studio\ErrorReport;
 use Ogunsakin01\VideoDemo\VideoDemoServiceProvider;
 use Ogunsakin01\VideoDemo\Voice\Music;
 use Ogunsakin01\VideoDemo\Voice\Soundtrack;
@@ -70,9 +72,34 @@ class GenerateVideo implements ShouldQueue
     }
 
     /**
+     * The exceptions the app threw while it was recorded on sample data.
+     *
+     * @var list<array<string, mixed>>
+     */
+    protected array $appErrors = [];
+
+    /**
      * Execute the job.
      */
     public function handle(Planner $planner, Recorder $recorder, Encoder $encoder, Narrator $narrator, Speaker $speaker, Soundtrack $soundtrack): void
+    {
+        try {
+            $this->make($planner, $recorder, $encoder, $narrator, $speaker, $soundtrack);
+        } catch (VideoStopped $e) {
+            throw $e;
+        } catch (Throwable $e) {
+            // Kept now, while what the recorder and the app saw is at hand.
+            $this->video->refresh();
+            $this->video->update(['error' => $e->getMessage(), 'error_details' => ErrorReport::for($this->video, $e, $this->appErrors)]);
+
+            throw $e;
+        }
+    }
+
+    /**
+     * Make the video: plan it, record each version, then encode them.
+     */
+    protected function make(Planner $planner, Recorder $recorder, Encoder $encoder, Narrator $narrator, Speaker $speaker, Soundtrack $soundtrack): void
     {
         $video = $this->video;
         $video->refresh();
@@ -153,11 +180,11 @@ class GenerateVideo implements ShouldQueue
                 if (($issue = $failure->issue()) && ! $sampleFix) {
                     $video->update(['issues' => [$issue]]);
 
-                    throw new RuntimeException("The app itself failed at {$issue['path']}: {$issue['problem']}. Fix it, then try again; asking the AI to repair the plan wouldn't help.");
+                    throw new RecordingFailed("The app itself failed at {$issue['path']}: {$issue['problem']}. Fix it, then try again; asking the AI to repair the plan wouldn't help.", $failure, $this->failedStep($plan, $failure));
                 }
 
                 if (! $session || ! ($failure->canRepair() || $sampleFix) || $session->repairs >= $maxRepairs) {
-                    throw new RuntimeException($failure->summary().($session ? '' : '. Try again with a new plan to let the AI fix it.'));
+                    throw new RecordingFailed(rtrim($failure->summary(), '.').($session ? '.' : '. Try again with a new plan to let the AI fix it.'), $failure, $this->failedStep($plan, $failure));
                 }
 
                 $this->stopIfAsked($video);
@@ -172,6 +199,7 @@ class GenerateVideo implements ShouldQueue
 
             return;
         } finally {
+            $this->appErrors = $sandbox?->appErrors() ?? [];
             $sandbox?->delete();
             $recorder->sandbox = null;
         }
@@ -406,6 +434,22 @@ class GenerateVideo implements ShouldQueue
     }
 
     /**
+     * Get the step of the plan a failed recording stopped at, as its version
+     * plays it.
+     *
+     * @return ?array<string, mixed>
+     */
+    protected function failedStep(Plan $plan, RecordingResult $failure): ?array
+    {
+        if ($failure->failedStep === null) {
+            return null;
+        }
+        $steps = $failure->device ? $plan->forDevice($failure->device)->steps : $plan->steps;
+
+        return $steps[$failure->failedStep - 1] ?? null;
+    }
+
+    /**
      * Mark the video as stopped and log what the AI cost so far.
      */
     protected function stopped(Video $video): void
@@ -423,6 +467,8 @@ class GenerateVideo implements ShouldQueue
         $this->video->refresh();
         $this->video->stop_requested = false;
         $this->video->error = $e->getMessage();
+        // Timeouts end the job without the chance to keep the details first.
+        $this->video->error_details ??= ErrorReport::for($this->video, $e);
         $this->video->moveTo(VideoStatus::Failed, 'Failed: '.$e->getMessage());
     }
 }

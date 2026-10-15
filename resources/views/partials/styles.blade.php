@@ -191,6 +191,66 @@
   .vd .vd-check-row { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 500; cursor: pointer; }
   .vd .vd-check-row input { width: 16px; height: 16px; margin: 0; accent-color: var(--vd-accent); }
   .vd input[type=range] { accent-color: var(--vd-accent); }
+  /* The full error view, laid out like Laravel's error page. */
+  .vd-modal { width: min(1100px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); padding: 0; border: 1px solid var(--vd-border); border-radius: var(--vd-radius-lg);
+    background: var(--vd-paper); color: var(--vd-ink); box-shadow: var(--vd-shadow-lg); overflow: auto; }
+  .vd-modal::backdrop { background: rgb(23 23 23 / .55); }
+  .vd-modal-head { position: sticky; top: 0; z-index: 1; display: flex; gap: 16px; justify-content: space-between; align-items: flex-start; flex-wrap: wrap;
+    padding: 20px 24px; background: var(--vd-card); border-bottom: 1px solid var(--vd-border); }
+  .vd-modal-head > div:first-child { flex: 1 1 480px; }
+  .vd-modal-body { padding: 20px 24px 28px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .vd-error-class { font: 500 13px/1.4 var(--vd-mono); color: var(--vd-muted-ink); margin: 0; overflow-wrap: anywhere; }
+  .vd .vd-error-message { font-size: 20px; line-height: 1.35; letter-spacing: -.015em; color: var(--vd-bad); margin: 4px 0 6px; overflow-wrap: anywhere; }
+  .vd-error-app-message { font-size: 16px; font-weight: 600; color: var(--vd-strong); margin: 4px 0; overflow-wrap: anywhere; }
+  .vd-error-file { font: 13px/1.4 var(--vd-mono); color: var(--vd-ink); margin: 0; overflow-wrap: anywhere; }
+  .vd-error-pills { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; }
+  .vd-error-pills span { font: 12px/1 var(--vd-mono); padding: 5px 8px; border-radius: 99px; background: var(--vd-muted); color: var(--vd-muted-ink); }
+  .vd-error-section { background: var(--vd-card); border: 1px solid var(--vd-border); border-radius: var(--vd-radius-lg); padding: 16px 18px; min-width: 0; }
+  .vd-error-section h3 { font-size: 14px; font-weight: 600; color: var(--vd-strong); margin: 0 0 10px; }
+  .vd-error-section summary { cursor: pointer; }
+  .vd-error-label { font-size: 12px; font-weight: 500; color: var(--vd-muted-ink); margin: 0; }
+  .vd-error-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  .vd-error-shot { display: block; border: 1px solid var(--vd-border); border-radius: var(--vd-radius); overflow: hidden; background: var(--vd-muted); }
+  .vd-error-shot img { display: block; width: 100%; height: auto; }
+  .vd-error-context { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+  .vd-kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 16px; margin: 0; font-size: 13px; }
+  .vd-kv dt { color: var(--vd-muted-ink); }
+  .vd-kv dd { margin: 0; color: var(--vd-strong); overflow-wrap: anywhere; }
+  .vd-error-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 13px; }
+  .vd .vd-error-list code { font: 12px/1.5 var(--vd-mono); overflow-wrap: anywhere; background: none; border: 0; padding: 0; color: var(--vd-ink); }
+  .vd-browser-log li { display: grid; grid-template-columns: 84px 44px minmax(0, 1fr); gap: 8px; align-items: baseline; }
+  .vd-log-kind { font: 500 11px/1.6 var(--vd-mono); text-transform: uppercase; color: var(--vd-muted-ink); }
+  .vd-log-error, .vd-log-exception, .vd-log-failed { color: var(--vd-bad); }
+  .vd-log-warning { color: var(--vd-warn); }
+  .vd-code { margin: 0; padding: 10px 0; background: var(--vd-muted); border: 1px solid var(--vd-border); border-radius: var(--vd-radius); overflow: auto;
+    font: 12px/1.6 var(--vd-mono); color: var(--vd-ink); max-width: 100%; }
+  .vd-code > span { display: block; padding: 0 12px; white-space: pre; }
+  .vd-code b { display: inline-block; min-width: 3.5em; font-weight: 400; color: var(--vd-faint-ink); user-select: none; }
+  .vd-code .vd-code-hit { background: var(--vd-bad-bg); color: var(--vd-strong); }
+  .vd-code .vd-code-hit b { color: var(--vd-bad); }
+  .vd-code-plain { padding: 10px 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .vd-frames { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .vd-frames > li { min-width: 0; }
+  .vd-frame { min-width: 0; border: 1px solid var(--vd-border); border-radius: var(--vd-radius); background: var(--vd-card); overflow: hidden; }
+  .vd-frame > summary { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; padding: 8px 12px; cursor: pointer; font-size: 13px; }
+  .vd-frame[open] > summary { border-bottom: 1px solid var(--vd-border); }
+  .vd-frame > .vd-code { border: 0; border-radius: 0 0 var(--vd-radius) var(--vd-radius); }
+  .vd-frame > .vd-frames { padding: 6px 12px 10px; }
+  .vd-frame-vendor { background: var(--vd-muted); }
+  .vd-frame-vendor > summary { color: var(--vd-muted-ink); }
+  .vd-frame-call { font: 500 12px/1.5 var(--vd-mono); color: var(--vd-strong); overflow-wrap: anywhere; min-width: 0; }
+  .vd-frame-file { font: 12px/1.5 var(--vd-mono); color: var(--vd-muted-ink); overflow-wrap: anywhere; min-width: 0; }
+  .vd-frame-line { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; font-size: 12px; padding: 3px 0; border-top: 1px solid var(--vd-border); }
+  .vd-frame-line:first-child { border-top: 0; }
+  @media (max-width: 720px) {
+    .vd-modal { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0; border-radius: 0; border: 0; }
+    .vd-modal-head, .vd-modal-body { padding-left: 16px; padding-right: 16px; }
+    .vd-modal-head { position: static; }
+    .vd .vd-error-message { font-size: 17px; }
+    .vd-error-grid { grid-template-columns: minmax(0, 1fr); }
+    .vd-browser-log li { grid-template-columns: 72px minmax(0, 1fr); }
+    .vd-browser-log li > span:nth-child(2) { display: none; }
+  }
   .vd-progress { margin-top: 14px; display: grid; gap: 6px; max-width: 520px; }
   .vd-progress-track { height: 8px; border-radius: 999px; background: var(--vd-muted); border: 1px solid var(--vd-border); overflow: hidden; }
   .vd-progress-track span { display: block; height: 100%; background: var(--vd-accent); border-radius: 999px; transition: width .6s ease; }

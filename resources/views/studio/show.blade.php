@@ -125,6 +125,10 @@
         <div class="vd-card vd-stack-sm" style="border-color:transparent;background:var(--vd-bad-bg)">
           <h2 style="color:var(--vd-bad);margin:0">What went wrong</h2>
           <p style="margin:0;color:var(--vd-bad);overflow-wrap:anywhere">{{ $video->error }}</p>
+          @if (! empty($video->error_details['exception']))
+            <div><button type="button" class="vd-btn" data-open-error>View full error</button></div>
+            @include('video-demo::studio.partials.error-details')
+          @endif
           @if ($video->status === \Ogunsakin01\VideoDemo\Enums\VideoStatus::Failed)
             <p class="vd-small" style="margin:0;color:var(--vd-bad)">Trying again uses the same description, style, versions and model. To change any of them, use "Make it again" below.</p>
             @php($hasPlan = ! empty($video->plan['steps']))

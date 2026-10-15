@@ -49,6 +49,7 @@ use Ogunsakin01\VideoDemo\Recording\Recorder;
  * @property ?list<array{path: string, problem: string, status: ?int, url: ?string, detail: ?string}> $issues
  * @property bool $stop_requested
  * @property ?Carbon $status_at
+ * @property ?array<string, mixed> $error_details
  * @property ?Carbon $updated_at
  * @property bool $sample_data
  * @property ?list<array<string, mixed>> $sample_records
@@ -84,6 +85,7 @@ class Video extends Model
             'max_cost' => 'float',
             'speed' => 'float',
             'issues' => 'array',
+            'error_details' => 'array',
             'stop_requested' => 'boolean',
             'sample_data' => 'boolean',
             'sample_records' => 'array',
@@ -97,6 +99,13 @@ class Video extends Model
      */
     protected static function booted(): void
     {
+        // The full error goes with the error: clearing one clears both.
+        static::saving(function (Video $video) {
+            if ($video->error === null) {
+                $video->error_details = null;
+            }
+        });
+
         static::creating(function (Video $video) {
             $video->slug ??= static::uniqueSlug($video->title ?: Str::words($video->prompt, 8, ''));
         });

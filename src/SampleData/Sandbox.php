@@ -3,14 +3,17 @@
 namespace Ogunsakin01\VideoDemo\SampleData;
 
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
 use Ogunsakin01\VideoDemo\Models\Video;
 use Ogunsakin01\VideoDemo\Recording\RecordAs;
+use Ogunsakin01\VideoDemo\Studio\ErrorReport;
 use Ogunsakin01\VideoDemo\VideoDemoServiceProvider;
 use RuntimeException;
 use Symfony\Component\Process\PhpExecutableFinder;
+use Throwable;
 
 /**
  * A temporary SQLite database a video is recorded against, filled with
@@ -294,7 +297,46 @@ class Sandbox
         $value = $app['request']->cookies->get(self::COOKIE);
         if (is_string($value) && ($path = static::fromCookie($value))) {
             static::activate($path);
+            static::keepErrors($app, $path);
         }
+    }
+
+    /**
+     * Keep the exceptions the app reports while serving the recorder, with
+     * their stack traces, for the video's full error view.
+     */
+    protected static function keepErrors(Application $app, string $path): void
+    {
+        $app['events']->listen(MessageLogged::class, function (MessageLogged $logged) use ($app, $path) {
+            $exception = $logged->context['exception'] ?? null;
+            if (! $exception instanceof Throwable) {
+                return;
+            }
+            try {
+                $request = $app['request'];
+                $error = [...ErrorReport::exception($exception), 'method' => $request->method(), 'url' => $request->fullUrl(), 'at' => now()->toIso8601String()];
+                File::append($path.'.errors.json', json_encode($error, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE)."\n");
+            } catch (Throwable) {
+                // Never let keeping an error cause another.
+            }
+        });
+    }
+
+    /**
+     * Get the exceptions the app reported while serving the recorder, the
+     * latest last.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function appErrors(int $limit = 5): array
+    {
+        $file = $this->path.'.errors.json';
+        if (! is_file($file)) {
+            return [];
+        }
+        $errors = array_values(array_filter(array_map(fn ($line) => json_decode($line, true), file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [])));
+
+        return array_slice($errors, -$limit);
     }
 
     /**

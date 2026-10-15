@@ -286,6 +286,17 @@ class VideoController extends Controller
     }
 
     /**
+     * Show the recorder's screenshot of the page a video failed on.
+     */
+    public function errorScreenshot(Video $video): BinaryFileResponse
+    {
+        $disk = Storage::disk(config('video-demo.storage.work_disk'));
+        abort_unless(! empty($video->error_details['step']['screenshot']) && $disk->exists($video->workPath('error.jpg')), 404);
+
+        return response()->file($disk->path($video->workPath('error.jpg')), ['Cache-Control' => 'no-store']);
+    }
+
+    /**
      * Update the given video's title and visibility.
      */
     public function update(Request $request, Video $video): RedirectResponse
