@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Storage;
 use InvalidArgumentException;
 use Ogunsakin01\VideoDemo\Ai\Narrator;
 use Ogunsakin01\VideoDemo\Enums\VideoStatus;
+use Ogunsakin01\VideoDemo\Http\Controllers\Studio\SoundController;
 use Ogunsakin01\VideoDemo\Jobs\GenerateVideo;
 use Ogunsakin01\VideoDemo\Library\Manifest;
 use Ogunsakin01\VideoDemo\Library\Publisher;
@@ -417,9 +418,149 @@ class VoiceTest extends TestCase
         $this->artisan('video-demo:generate', ['description' => 'x', '--voice' => 'none', '--queue' => true, '--json' => true])->assertSuccessful();
         $this->assertNull(Video::latest('id')->first()->voice);
 
+        // A style's track that isn't here is left out rather than refused.
+        config(['video-demo.music.builtin' => false]);
+        $this->assertNull($demo->make('w', ['style' => 'promo', 'voice' => null])->music);
+
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage("The voice [kokoro:nobody] isn't available here.");
         $demo->make('z', ['voice' => 'kokoro:nobody']);
+    }
+
+    public function test_voices_know_the_languages_they_speak(): void
+    {
+        Voices::flush(['Amélie' => 'Amélie (fr CA)', 'Samantha' => 'Samantha (en US)'], ['Amélie' => 'fr-CA', 'Samantha' => 'en-US']);
+
+        $this->assertSame(['en'], Voices::languages('kokoro:af_heart'));
+        $this->assertSame(['fr'], Voices::languages('system:Amélie'));
+        $this->assertSame(['*'], Voices::languages('openai:marin'));
+        $this->assertTrue(Voices::speaks('system:Amélie', 'fr-FR'));
+        $this->assertFalse(Voices::speaks('system:Samantha', 'fr'));
+        $this->assertFalse(Voices::speaks('kokoro:af_heart', 'de'));
+        $this->assertTrue(Voices::speaks('gemini:Kore', 'ja'));
+
+        // ElevenLabs speaks many languages, unless its model is an English-only one.
+        $this->assertTrue(Voices::speaks('elevenlabs:abc', 'es'));
+        config(['video-demo.voice.providers.elevenlabs.model' => 'eleven_turbo_v2']);
+        $this->assertFalse(Voices::speaks('elevenlabs:abc', 'es'));
+    }
+
+    public function test_a_video_is_made_in_the_language_of_the_pages_and_skips_a_voice_that_cannot_speak_it(): void
+    {
+        config(['video-demo.recorder.check_pages' => true, 'app.locale' => 'en']);
+        $fakes = $this->fakeMaking();
+        $checker = new class extends Recorder
+        {
+            public function checkPages(array $paths, ?string $recordAs = null, string $device = 'desktop', ?Closure $shouldStop = null): array
+            {
+                $this->pageLanguages = ['/jobs' => 'fr-FR'];
+
+                return [];
+            }
+
+            public function record(Plan $plan, string $dir, array $style = [], string $device = 'desktop', ?string $recordAs = null, ?Closure $shouldStop = null, ?float $speed = null, array $voice = []): RecordingResult
+            {
+                File::ensureDirectoryExists($dir);
+                File::put("$dir/raw.webm", 'webm');
+
+                return RecordingResult::fromArray(['ok' => true, 'video' => "$dir/raw.webm", 'durationMs' => 9000, 'lines' => [], 'starts' => []], $device);
+            }
+        };
+        $this->app->instance(Recorder::class, $checker);
+        $video = $this->voicedVideo(['music' => null]);
+
+        GenerateVideo::dispatchSync($video, replan: false);
+        $video->refresh();
+
+        $this->assertSame(VideoStatus::Ready, $video->status, (string) $video->error);
+        $this->assertSame('fr-FR', $video->page_language);
+        $this->assertSame('fr-FR', $video->languageCode());
+        $log = array_column($video->log, 'message');
+        $this->assertContains('The pages are in French (France), so the video is made in French (France)', $log);
+        // The local voice speaks only English, so the video has no voice-over rather than a mangled one.
+        $this->assertContains("Heart, warm (US) doesn't speak French (France), so the video is made without a voice-over. Choose a voice that does.", $log);
+        $this->assertArrayNotHasKey('voice_ms', $video->plan['steps'][0]);
+        $this->assertSame([], $fakes['soundtrack']->mixes);
+    }
+
+    public function test_the_forms_take_a_language_and_list_the_voices_that_speak_it(): void
+    {
+        Queue::fake();
+        $this->installLocalVoice();
+        Voices::flush(['Amélie' => 'Amélie (fr CA)'], ['Amélie' => 'fr-CA']);
+        config(['app.locale' => 'de']);
+        $form = ['style_id' => VideoStyle::options()->first()->id, 'devices' => ['desktop'], 'prompt' => 'Post a job', 'target_seconds' => 30, 'model' => 'claude-sonnet-5-5', 'effort' => 'high', 'visibility' => 'public'];
+
+        $this->get('/video-demo/studio/create')
+            ->assertSee('Same as the app (German)')
+            ->assertSee('data-languages="en"', false)
+            ->assertSee('data-languages="fr"', false);
+
+        $this->post('/video-demo/studio', [...$form, 'language' => 'fr', 'voice' => 'system:Amélie'])->assertRedirect();
+        $video = Video::latest('id')->first();
+        $this->assertSame(['fr', 'system:Amélie'], [$video->language, $video->voice]);
+
+        // A voice that doesn't speak the chosen language is refused, and so is an unknown language.
+        $this->post('/video-demo/studio', [...$form, 'language' => 'fr', 'voice' => 'kokoro:af_heart'])->assertSessionHasErrors(['voice' => "Heart, warm (US) doesn't speak French. Choose a voice that does, or no voice."]);
+        $this->post('/video-demo/studio', [...$form, 'language' => 'klingon'])->assertSessionHasErrors('language');
+
+        // Another language in Make it again needs a new plan, as the plan's words are in the old one.
+        $video->update(['status' => VideoStatus::Ready, 'plan' => ['title' => 'x', 'summary' => '', 'steps' => [['action' => 'goto', 'url' => '/']]]]);
+        $this->get("/video-demo/studio/{$video->id}")->assertSee('<dt>Language</dt><dd>French</dd>', false);
+        $again = ['prompt' => 'Post a job', 'target_seconds' => 30, 'devices' => ['desktop'], 'model' => 'claude-sonnet-5-5', 'effort' => 'high', 'sample_data' => '0', 'record_as' => '', 'voice' => '', 'new_plan' => '0'];
+        $this->post("/video-demo/studio/{$video->id}/again", [...$again, 'language' => 'fr'])->assertRedirect();
+        Queue::assertPushed(GenerateVideo::class, fn ($job) => ! $job->replan);
+        $video->refresh()->update(['status' => VideoStatus::Ready]);
+        $this->post("/video-demo/studio/{$video->id}/again", [...$again, 'language' => 'es'])->assertRedirect();
+        Queue::assertPushed(GenerateVideo::class, fn ($job) => $job->replan);
+        $this->assertSame('es', $video->fresh()->language);
+    }
+
+    public function test_voice_samples_are_spoken_in_the_voices_language(): void
+    {
+        $spoken = [];
+        $this->app->instance(Speaker::class, new class($spoken) extends Speaker
+        {
+            public function __construct(public array &$spoken) {}
+
+            public function speak(string $voice, array $lines, bool $mixable = true, string $tone = ''): array
+            {
+                $this->spoken[] = $lines[0];
+                File::put($file = sys_get_temp_dir().'/vd-sample-'.uniqid().'.wav', 'wav');
+
+                return [$lines[0] => ['file' => $file, 'seconds' => 1.0]];
+            }
+        });
+        Voices::flush(['Amélie' => 'Amélie (fr CA)'], ['Amélie' => 'fr-CA']);
+        config(['video-demo.voice.providers.openai.key' => 'sk-test']);
+
+        $this->get('/video-demo/studio/voice-sample?voice=system:Am%C3%A9lie&language=de')->assertOk();
+        $this->get('/video-demo/studio/voice-sample?voice=openai:marin&language=es')->assertOk();
+        $this->get('/video-demo/studio/voice-sample?voice=openai:marin')->assertOk();
+
+        $this->assertSame([SoundController::SAMPLES['fr'], SoundController::SAMPLES['es'], SoundController::SAMPLE], $spoken);
+    }
+
+    public function test_the_facade_and_the_command_take_a_language(): void
+    {
+        Queue::fake();
+        $this->installLocalVoice();
+        $demo = app(VideoDemo::class);
+
+        $this->assertSame('pt-BR', $demo->make('x', ['language' => 'pt_br'])->language);
+        $this->assertNull($demo->make('y')->language);
+        $this->artisan('video-demo:generate', ['description' => 'x', '--language' => 'fr', '--queue' => true, '--json' => true])->assertSuccessful();
+        $this->assertSame('fr', Video::latest('id')->first()->language);
+
+        try {
+            $demo->make('z', ['language' => 'fr', 'voice' => 'kokoro:af_heart']);
+            $this->fail('A voice that cannot speak the language was accepted.');
+        } catch (InvalidArgumentException $e) {
+            $this->assertSame("The voice [kokoro:af_heart] doesn't speak French. Choose one that does, or no voice.", $e->getMessage());
+        }
+
+        $this->expectExceptionMessage("[Français] isn't a language code.");
+        $demo->make('z', ['language' => 'Français']);
     }
 
     public function test_published_videos_carry_their_subtitles_to_the_player(): void
@@ -435,6 +576,7 @@ class VoiceTest extends TestCase
         $entry = app(Manifest::class)->find($video->slug, 'private');
 
         $this->assertStringEndsWith('-desktop.vtt', $entry['sources']['desktop']['subtitles']);
+        $this->assertSame('en', $entry['language']);
         $this->assertContains($entry['subtitles'], Manifest::files($entry));
         Storage::disk('public')->assertExists($entry['subtitles']);
         $this->assertStringContainsString('<track kind="subtitles"', (string) view('video-demo::components.player', ['slug' => $video->slug, 'area' => 'private'])->render());

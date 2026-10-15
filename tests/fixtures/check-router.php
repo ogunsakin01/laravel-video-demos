@@ -8,7 +8,7 @@ $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 switch ($path) {
     case '/':
     case '/login':
-        echo '<!doctype html><title>Fine</title><h1>Welcome</h1>';
+        echo '<!doctype html><html lang="fr-FR"><title>Fine</title><h1>Welcome</h1>';
         break;
     case '/reports':
         http_response_code(500);

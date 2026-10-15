@@ -40,6 +40,7 @@ class GenerateCommand extends Command
         {--own-data : Record on your own local data instead of sample data}
         {--voice= : A voice-over voice, such as kokoro:af_heart ("none" for no voice)}
         {--music= : The key of a background music track ("none" for no music)}
+        {--language= : The language of the titles, captions and voice-over, such as fr or pt-BR (the language of the app\'s pages when left out)}
         {--private : List it in the private library only}
         {--publish : Publish it to the library when it is ready}
         {--queue : Queue it and return straight away, instead of waiting}
@@ -118,6 +119,7 @@ class GenerateCommand extends Command
             // "none" is kept as an empty value, so it means no voice rather than the default.
             'voice' => $this->option('voice') === 'none' ? '' : $this->option('voice'),
             'music' => $this->option('music') === 'none' ? '' : $this->option('music'),
+            'language' => $this->option('language') ?: null,
         ], fn ($v) => $v !== null), 'Queued from the command line');
 
         if (! $this->option('json')) {

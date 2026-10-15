@@ -1,6 +1,6 @@
 {{-- The demo "host app" (Acme HR), styled after Interstack's dashboard. Solid colours only. --}}
 <!doctype html>
-<html lang="en">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">

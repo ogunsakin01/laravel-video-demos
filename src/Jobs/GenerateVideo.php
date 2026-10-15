@@ -27,6 +27,7 @@ use Ogunsakin01\VideoDemo\Recording\RecordingFailed;
 use Ogunsakin01\VideoDemo\Recording\RecordingResult;
 use Ogunsakin01\VideoDemo\SampleData\Sandbox;
 use Ogunsakin01\VideoDemo\Studio\ErrorReport;
+use Ogunsakin01\VideoDemo\Support\Language;
 use Ogunsakin01\VideoDemo\VideoDemoServiceProvider;
 use Ogunsakin01\VideoDemo\Voice\Music;
 use Ogunsakin01\VideoDemo\Voice\Soundtrack;
@@ -164,10 +165,7 @@ class GenerateVideo implements ShouldQueue
             // Every version plays the same plan. A failure on any of them goes
             // back to the AI, and the corrected plan is recorded on all again.
             while (true) {
-                [$plan, $clips] = $clips !== null ? $this->voiceOver($video, $plan, $narrator, $speaker) : [$plan->withoutVoice(), null];
-                $plan = $plan->fitTo(min($video->target_seconds, (int) config('video-demo.limits.max_seconds', 300)), $video->playbackSpeed());
-                $video->update(['plan' => $plan->toArray()]);
-
+                // Checked first, as it finds the language of the pages, which the voice-over is spoken in.
                 $canRepair = $session?->sampleData && $session->repairs < $maxRepairs;
                 $problems = $this->checkPages($recorder, $video, $plan->paths(), 'Checking the pages in the plan', fail: ! $canRepair);
                 if ($problems !== []) {
@@ -177,6 +175,15 @@ class GenerateVideo implements ShouldQueue
 
                     continue;
                 }
+
+                // A voice that can't speak the video's language would read it out wrongly.
+                if ($clips !== null && ! $video->hasVoiceOver()) {
+                    $video->addLog(sprintf("%s doesn't speak %s, so the video is made without a voice-over. Choose a voice that does.", Voices::label($video->voice), Language::name($video->languageCode())));
+                    $clips = null;
+                }
+                [$plan, $clips] = $clips !== null ? $this->voiceOver($video, $plan, $narrator, $speaker) : [$plan->withoutVoice(), null];
+                $plan = $plan->fitTo(min($video->target_seconds, (int) config('video-demo.limits.max_seconds', 300)), $video->playbackSpeed());
+                $video->update(['plan' => $plan->toArray()]);
 
                 $results = [];
                 $failure = null;
@@ -407,6 +414,32 @@ class GenerateVideo implements ShouldQueue
     }
 
     /**
+     * Keep the language of the pages the check opened: the video is made in
+     * it unless another was chosen.
+     *
+     * @param  array<string, string>  $languages  path => lang attribute
+     * @param  list<string>  $paths
+     */
+    protected function notePageLanguage(Video $video, array $languages, array $paths): void
+    {
+        $found = null;
+        foreach ($paths as $path) {
+            if ($found = Language::normalize($languages[$path] ?? null)) {
+                break;
+            }
+        }
+        if ($found === null || $found === $video->page_language) {
+            return;
+        }
+
+        $video->update(['page_language' => $found]);
+        $made = $video->languageCode();
+        $video->addLog(Language::same($found, $made)
+            ? sprintf('The pages are in %s, so the video is made in %s', Language::name($found), Language::name($made))
+            : sprintf('The pages are in %s; the video is made in %s, as chosen', Language::name($found), Language::name($made)));
+    }
+
+    /**
      * Check the pages before any AI is spent on them, and return the ones that
      * fail. With $fail, a failing page fails the job instead.
      *
@@ -421,6 +454,7 @@ class GenerateVideo implements ShouldQueue
         $this->stopIfAsked($video);
         $video->moveTo(VideoStatus::Checking, $message.' ('.count($paths).')');
         $problems = $recorder->checkPages($paths, $video->record_as, $video->deviceList()[0], fn () => $video->stopRequested());
+        $this->notePageLanguage($video, $recorder->pageLanguages, $paths);
 
         if ($problems !== [] && ! $fail) {
             $video->addLog(count($problems) === 1 ? "{$problems[0]['path']} failed: {$problems[0]['problem']}" : count($problems).' pages failed the check');

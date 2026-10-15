@@ -38,7 +38,7 @@ class Narrator
         }
 
         $answer = $this->drivers->for($video->model)->structured(
-            system: "You write the voice-over for a short how-to video of a web app. A narrator speaks one line during a step while the viewer watches it happen, in the style's tone.\n".VoiceLines::GUIDE,
+            system: "You write the voice-over for a short how-to video of a web app. A narrator speaks one line during a step while the viewer watches it happen, in the style's tone.\n".VoiceLines::GUIDE."\n".VoiceLines::language($video),
             prompt: (new Redactor)->redact(implode("\n\n", array_filter([
                 "<video>\n{$video->prompt}\n</video>",
                 ! empty($video->style['direction']) ? "<style name=\"{$video->style['name']}\">\n{$video->style['direction']}\n</style>" : null,

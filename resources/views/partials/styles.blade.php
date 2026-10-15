@@ -116,6 +116,8 @@
   .vd label, .vd-label { display: block; font-size: 13px; font-weight: 500; color: var(--vd-strong); margin-bottom: 6px; }
   .vd-optional { font-weight: 400; color: var(--vd-faint-ink); }
   .vd-hint { display: block; font-size: 12.5px; color: var(--vd-muted-ink); margin-top: 6px; }
+  .vd-hint.vd-warn-text { color: var(--vd-warn); }
+  .vd-hint[hidden] { display: none; }
   .vd-error { display: block; font-size: 12.5px; color: var(--vd-bad); margin-top: 6px; }
   .vd input[type=text], .vd input[type=search], .vd input[type=number], .vd select, .vd textarea {
     width: 100%; min-height: 38px; padding: 8px 12px; border-radius: var(--vd-radius); border: 1px solid var(--vd-border);

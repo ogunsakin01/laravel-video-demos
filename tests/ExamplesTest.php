@@ -17,12 +17,12 @@ class ExamplesTest extends TestCase
         $this->get('/video-demo/studio/examples')
             ->assertOk()
             ->assertSee('Spotlight')
-            ->assertSee('https://cdn.jsdelivr.net/gh/ogunsakin01/laravel-video-demos@v0.7.0/docs/examples/example-spotlight.mp4', false)
+            ->assertSee('https://cdn.jsdelivr.net/gh/ogunsakin01/laravel-video-demos@v0.15.0/docs/examples/example-spotlight.mp4', false)
             ->assertSee('docs/examples/example-quick.mp4', false)
             ->assertSee('Make one like this');
 
         // One desktop video for each built-in style.
-        $this->assertSame(['clean', 'quick', 'detailed', 'showcase', 'ad', 'spotlight'], array_column(Examples::all(), 'style_key'));
+        $this->assertSame(['clean', 'quick', 'detailed', 'showcase', 'ad', 'spotlight', 'promo'], array_column(Examples::all(), 'style_key'));
         $this->assertSame([['desktop']], array_values(array_unique(array_map(fn ($e) => array_keys($e['versions']), Examples::all()), SORT_REGULAR)));
     }
 

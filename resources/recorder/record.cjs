@@ -22,6 +22,8 @@ const FIND_TIMEOUT = 8000;
 // { t: ms since recording started, x, y, w, h } for an element, or { t, wide: true }
 // when the whole page should show again.
 const focus = [];
+// How many title cards and captions have been shown, to number them in styles that do.
+let headlines = 0;
 let started = 0;
 
 // Time spent waiting on the app (pages loading, something appearing), in ms
@@ -181,7 +183,7 @@ async function run(page, step, isLast) {
       return;
     case 'caption':
       await wide(page);
-      await page.evaluate(([t, s]) => window.__demoOverlay.caption(t, s), [step.title, step.text || '']);
+      await page.evaluate(([t, s, n]) => window.__demoOverlay.caption(t, s, n), [step.title, step.text || '', ++headlines]);
       await pause(page, (step.ms || 3000) * SPEED);
       // The last step stays on screen, so the video doesn't end mid-fade.
       if (isLast) return;
@@ -190,7 +192,7 @@ async function run(page, step, isLast) {
       return;
     case 'card':
       await wide(page);
-      await page.evaluate(([t, s]) => window.__demoOverlay.card(t, s), [step.title, step.text || '']);
+      await page.evaluate(([t, s, n]) => window.__demoOverlay.card(t, s, n), [step.title, step.text || '', ++headlines]);
       await pause(page, (step.ms || 3500) * SPEED);
       if (isLast) return;
       await page.evaluate(() => window.__demoOverlay.hide());

@@ -36,10 +36,11 @@ class VideoStyle extends Model
     public const PACES = ['relaxed' => 'Relaxed', 'normal' => 'Normal', 'brisk' => 'Brisk'];
 
     /**
-     * What shows behind title cards: nothing, or animated abstract line art with
-     * words that rise in.
+     * How title cards and captions are drawn: plain, with animated abstract
+     * line art and words that rise in, or as big two-line headlines under a
+     * numbered label, like a product promo.
      */
-    public const ARTS = ['none' => 'None', 'abstract' => 'Abstract line art'];
+    public const ARTS = ['none' => 'None', 'abstract' => 'Abstract line art', 'headline' => 'Bold headlines'];
 
     public const APP_THEMES = ['auto' => 'As the app shows it', 'light' => 'Light mode', 'dark' => 'Dark mode'];
 

@@ -5,6 +5,7 @@ namespace Ogunsakin01\VideoDemo\Voice;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
+use Ogunsakin01\VideoDemo\Support\Language;
 use Throwable;
 
 /**
@@ -14,6 +15,9 @@ use Throwable;
  * espeak-ng on Linux); and OpenAI, Gemini and ElevenLabs voices when their
  * key is set. A voice is stored as "provider:id", such as "kokoro:af_heart",
  * "system:Samantha" or "openai:marin".
+ *
+ * Each voice speaks some languages: the local voices English only, the
+ * computer's voices their own language, and the cloud voices nearly any.
  */
 class Voices
 {
@@ -24,11 +28,29 @@ class Voices
     protected const SYSTEM_VOICES = ['Samantha', 'Daniel', 'Karen', 'Moira', 'Tessa', 'Rishi', 'Fiona', 'Alex', 'Ava', 'Tom', 'Allison', 'Susan', 'Serena', 'Kate', 'Oliver', 'Lee'];
 
     /**
+     * The macOS voices that come in every language, such as "Eddy (French
+     * (France))". Each language has its own voices too, so these are left out.
+     */
+    protected const EVERY_LANGUAGE_VOICES = ['Eddy', 'Flo', 'Grandma', 'Grandpa', 'Reed', 'Rocko', 'Sandy', 'Shelley'];
+
+    /**
+     * ElevenLabs models that speak only English; the others speak many languages.
+     */
+    protected const ENGLISH_ONLY_MODELS = ['eleven_monolingual_v1', 'eleven_turbo_v2', 'eleven_flash_v2', 'eleven_english_sts_v2'];
+
+    /**
      * The computer's voices, found once per process.
      *
      * @var ?array<string, string>
      */
     protected static ?array $system = null;
+
+    /**
+     * The language each of the computer's voices speaks, id => code.
+     *
+     * @var array<string, string>
+     */
+    protected static array $systemLanguages = [];
 
     /**
      * Get the voices to choose from, key => label, grouped by where they run.
@@ -138,6 +160,35 @@ class Voices
     }
 
     /**
+     * Get the languages a voice speaks, as codes without a region such as
+     * "en"; ["*"] for a voice that speaks nearly any language.
+     *
+     * @return list<string>
+     */
+    public static function languages(?string $key): array
+    {
+        [$provider, $id] = static::parse((string) $key);
+
+        return match ($provider) {
+            // Kokoro's pronunciation, as bundled for Node, knows English only.
+            'kokoro' => ['en'],
+            'system' => isset(static::systemVoices()[$id], static::$systemLanguages[$id]) ? [Language::base(static::$systemLanguages[$id])] : ['*'],
+            'elevenlabs' => in_array(config('video-demo.voice.providers.elevenlabs.model'), self::ENGLISH_ONLY_MODELS, true) ? ['en'] : ['*'],
+            default => ['*'],
+        };
+    }
+
+    /**
+     * Determine if a voice speaks the given language.
+     */
+    public static function speaks(?string $key, ?string $language): bool
+    {
+        $languages = static::languages($key);
+
+        return in_array('*', $languages, true) || in_array(Language::base($language), $languages, true);
+    }
+
+    /**
      * Determine if a voice can be used on this machine.
      */
     public static function available(?string $key): bool
@@ -206,24 +257,33 @@ class Voices
      */
     public static function systemVoices(): array
     {
-        return static::$system ??= static::findSystemVoices();
+        if (static::$system === null) {
+            $found = static::findSystemVoices();
+            static::$system = array_map(fn ($voice) => $voice[0], $found);
+            static::$systemLanguages = array_filter(array_map(fn ($voice) => $voice[1], $found));
+        }
+
+        return static::$system;
     }
 
     /**
      * Forget the voices found, or set them, such as in tests: the next call
-     * looks again when given null.
+     * looks again when given null. $languages gives each voice's language,
+     * id => code.
      *
      * @param  ?array<string, string>  $voices
+     * @param  array<string, string>  $languages
      */
-    public static function flush(?array $voices = null): void
+    public static function flush(?array $voices = null, array $languages = []): void
     {
         static::$system = $voices;
+        static::$systemLanguages = $languages;
     }
 
     /**
-     * Ask the computer which voices it has.
+     * Ask the computer which voices it has, id => [label, language code].
      *
-     * @return array<string, string>
+     * @return array<string, array{0: string, 1: ?string}>
      */
     protected static function findSystemVoices(): array
     {
@@ -232,11 +292,12 @@ class Voices
                 $voices = [];
                 foreach (explode("\n", Process::timeout(10)->run(['say', '-v', '?'])->output()) as $line) {
                     // "Samantha            en_US    # Hello! My name is Samantha."
-                    if (preg_match('/^(.+?)\s{2,}(en_[A-Z]{2})\s+#/', $line, $m)) {
+                    if (preg_match('/^(.+?)\s+([a-z]{2,3})_([A-Z0-9]{2,3})\s+#/', $line, $m)) {
                         $name = trim($m[1]);
-                        $base = preg_replace('/\s*\((Enhanced|Premium)\)$/', '', $name);
-                        if (in_array($base, self::SYSTEM_VOICES, true)) {
-                            $voices[$name] = "$name (".str_replace('_', ' ', $m[2]).')';
+                        $base = preg_replace('/\s*\(.*\)$/', '', $name);
+                        // English has novelty voices (Bells, Boing…), which are left out.
+                        if ($m[2] === 'en' ? in_array($base, self::SYSTEM_VOICES, true) : ! in_array($base, self::EVERY_LANGUAGE_VOICES, true)) {
+                            $voices[$name] = ["$name ($m[2] $m[3])", "$m[2]-$m[3]"];
                         }
                     }
                 }
@@ -246,14 +307,24 @@ class Voices
 
             if (PHP_OS_FAMILY === 'Windows') {
                 $names = Process::timeout(15)->run(['powershell', '-NoProfile', '-Command',
-                    'Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).GetInstalledVoices() | ForEach-Object { $_.VoiceInfo.Name }'])->output();
+                    'Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).GetInstalledVoices() | ForEach-Object { $_.VoiceInfo.Name + "|" + $_.VoiceInfo.Culture.Name }'])->output();
 
-                return collect(explode("\n", $names))->map(fn ($n) => trim($n))->filter()->mapWithKeys(fn ($n) => [$n => $n])->all();
+                return collect(explode("\n", $names))->map(fn ($n) => explode('|', trim($n), 2))->filter(fn ($n) => $n[0] !== '')
+                    ->mapWithKeys(fn ($n) => [$n[0] => [$n[0], Language::normalize($n[1] ?? null)]])->all();
             }
 
-            // Linux and others: espeak-ng, when it is installed.
-            if (Process::timeout(10)->run(['espeak-ng', '--version'])->successful()) {
-                return ['en-us' => 'English (US)', 'en-gb' => 'English (UK)'];
+            // Linux and others: espeak-ng, when it is installed, in each language it has.
+            $list = Process::timeout(10)->run(['espeak-ng', '--voices']);
+            if ($list->successful()) {
+                $voices = [];
+                foreach (explode("\n", $list->output()) as $line) {
+                    // " 5  fr-fr           --/M      French_(France)    roa/fr"
+                    if (preg_match('/^\s*\d+\s+(\S+)\s/', $line, $m) && ($code = Language::normalize($m[1]))) {
+                        $voices[$m[1]] = [Language::name($code), $code];
+                    }
+                }
+
+                return $voices;
             }
         } catch (Throwable) {
             // No speech tool on this machine.

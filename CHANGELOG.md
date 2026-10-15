@@ -2,6 +2,15 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/). While the version is 0.x, minor releases may include breaking changes; they will be listed here.
 
+## v0.15.0 - 2026-10-15
+
+Run `php artisan video-demo:install` after updating, for the new columns.
+
+### Added
+
+- **Videos in your app's language.** The titles, captions, title cards, chapters and voice-over are written in the language of your app's pages, read from their `lang` attribute (or `app.locale`) when the pages are checked. Choose another language per video with the new Language field, the `language` option of `VideoDemo::make()` or `video-demo:generate --language=fr`. The voice list shows only the voices that speak it: the cloud voices speak nearly any language, a Mac's own voices cover about 40, and the local Kokoro voices speak English only. A voice that can't speak the video's language is refused on the form, or left out with a note in the log. Voice samples are spoken in the voice's language, and the captions track is marked with it.
+- **Promo reel style.** A punchy product promo like the package's own: title cards and captions as big two-line headlines (a bold claim, then a muted line) under a numbered label, words rising in, the app in dark mode with the camera on each step and an outline on what is used, a brisk pace and the upbeat built-in track. Its look is a new **Bold headlines** setting you can give any style. Apps that already have styles get it from the migration, and the studio's Examples page has a sample of it. A style's music that isn't available here, such as a built-in track with those turned off, is now left out instead of refusing the video.
+
 ## v0.14.0 - 2026-10-15
 
 Run `php artisan video-demo:install` after updating, for the new column. Videos now play at 1× by default: if you published the config, change `'speed' => (float) env('VIDEO_DEMO_SPEED', 2)` to 1, or set `VIDEO_DEMO_SPEED=1`.

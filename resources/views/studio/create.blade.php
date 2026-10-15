@@ -121,7 +121,7 @@
           @error('style_id')<span class="vd-error">{{ $message }}</span>@enderror
         </div>
 
-        @include('video-demo::studio.partials.sound', ['prefix' => 'new', 'voice' => old('voice', $defaults['voice']), 'music' => old('music', $defaults['music']), 'volume' => null])
+        @include('video-demo::studio.partials.sound', ['prefix' => 'new', 'voice' => old('voice', $defaults['voice']), 'music' => old('music', $defaults['music']), 'volume' => null, 'language' => old('language', $defaults['language'])])
       </section>
 
       <section class="vd-section">

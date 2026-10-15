@@ -21,6 +21,7 @@ use Ogunsakin01\VideoDemo\Recording\RecordAs;
 use Ogunsakin01\VideoDemo\Recording\Recorder;
 use Ogunsakin01\VideoDemo\Studio\Embeds;
 use Ogunsakin01\VideoDemo\Studio\Pages;
+use Ogunsakin01\VideoDemo\Support\Language;
 use Ogunsakin01\VideoDemo\Voice\Music;
 use Ogunsakin01\VideoDemo\Voice\Voices;
 use RuntimeException;
@@ -50,10 +51,11 @@ class VideoDemo
      * as "admin", "guest", or a user id or email), sample_data (false records
      * on the app's own local data instead of a temporary sample database),
      * voice (such as "kokoro:af_heart"; see voices()), music (a track's key;
-     * see music()), music_volume (0 to 1) and queue (false makes it now, in
-     * this process). Throws InvalidArgumentException for a bad option.
+     * see music()), music_volume (0 to 1), language (such as "fr" or "pt-BR";
+     * the app's pages' language when left out) and queue (false makes it now,
+     * in this process). Throws InvalidArgumentException for a bad option.
      *
-     * @param  array{title?: string, start?: string, length?: int, style?: string, devices?: list<string>, model?: string, effort?: string, private?: bool, max_cost?: float, max_steps?: int, speed?: float, as?: string, sample_data?: bool, voice?: ?string, music?: ?string, music_volume?: float, queue?: bool}  $options
+     * @param  array{title?: string, start?: string, length?: int, style?: string, devices?: list<string>, model?: string, effort?: string, private?: bool, max_cost?: float, max_steps?: int, speed?: float, as?: string, sample_data?: bool, voice?: ?string, music?: ?string, music_volume?: float, language?: ?string, queue?: bool}  $options
      */
     public function make(string $description, array $options = []): Video
     {
@@ -142,12 +144,24 @@ class VideoDemo
             throw new InvalidArgumentException("The voice [$voice] isn't available here. Choose one of: ".(implode(', ', array_keys(Voices::all())) ?: 'none (run php artisan video-demo:install-voice)').'.');
         }
         $music = array_key_exists('music', $options) ? $options['music'] : ($style->music ?? config('video-demo.music.default'));
+        // A style's or the config's track that isn't here, such as a built-in one with those turned off, is left out.
+        if ($music && ! Music::find($music) && ! array_key_exists('music', $options)) {
+            $music = null;
+        }
         if ($music && ! Music::find($music)) {
             throw new InvalidArgumentException("There is no music track [$music]. Choose one of: ".(implode(', ', array_keys(Music::options())) ?: 'none (add tracks on the Styles page)').'.');
         }
         $volume = $options['music_volume'] ?? null;
         if ($volume !== null && (! is_numeric($volume) || $volume < 0 || $volume > 1)) {
             throw new InvalidArgumentException('The music volume must be a number from 0 to 1, such as 0.35.');
+        }
+
+        $language = null;
+        if (($options['language'] ?? null) !== null && $options['language'] !== '') {
+            $language = Language::normalize($options['language']) ?? throw new InvalidArgumentException("[{$options['language']}] isn't a language code. Use one such as fr, es or pt-BR.");
+        }
+        if ($voice && $language && ! Voices::speaks($voice, $language)) {
+            throw new InvalidArgumentException('The voice ['.$voice.'] doesn\'t speak '.Language::name($language).'. Choose one that does, or no voice.');
         }
 
         $estimate = $this->estimate($model, $effort, $seconds);
@@ -171,6 +185,7 @@ class VideoDemo
             'voice' => $voice ?: null,
             'music' => $music ?: null,
             'music_volume' => $volume !== null ? (float) $volume : null,
+            'language' => $language,
             'status' => VideoStatus::Queued,
             'estimate_low' => $estimate['low'],
             'estimate_high' => $estimate['high'],

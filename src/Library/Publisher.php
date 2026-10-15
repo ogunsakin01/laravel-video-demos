@@ -68,6 +68,7 @@ class Publisher
             'video' => $primary['video'],
             'poster' => $primary['poster'],
             'subtitles' => $primary['subtitles'],
+            'language' => $video->languageCode(),
             'sources' => $sources,
             'version' => $video->version,
             'published_at' => now()->toIso8601String(),

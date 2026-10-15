@@ -501,8 +501,9 @@ return [
     | to write the video. "theme" (light or dark) and "accent" set the look
     | of title cards and captions, "captions" puts them at the top or bottom,
     | "pace" (relaxed, normal or brisk) sets how fast the video moves, and
-    | "art" (none or abstract) puts animated line art behind title cards,
-    | with the words rising into place, like an ad. "app_theme" (auto, light
+    | "art" (none, abstract or headline) puts animated line art behind title
+    | cards with the words rising into place, like an ad, or draws cards and
+    | captions as big two-line headlines, like a product promo. "app_theme" (auto, light
     | or dark) is the colour scheme the app is recorded in, for apps that
     | follow the system setting. "zoom" moves the camera in on each step and
     | "highlight" outlines what is being used, dimming the rest.
@@ -564,6 +565,20 @@ return [
             'app_theme' => 'dark',
             'zoom' => true,
             'highlight' => true,
+        ],
+        'promo' => [
+            'name' => 'Promo reel',
+            'direction' => 'A punchy product promo. Open on a card whose title is one bold claim of under six words, with a sentence of under eight words that backs it up. Show only the two to four moments that prove it, each with a caption: a title of under six words naming what the viewer gains, and a second line of a few words. Leave out routine steps. Close on a card naming the result. No step-by-step explanation.',
+            'theme' => 'dark',
+            'accent' => '#e5693d',
+            'captions' => 'top',
+            'pace' => 'brisk',
+            // Big two-line headlines, the app in dark mode with the camera on each step, and upbeat music.
+            'art' => 'headline',
+            'app_theme' => 'dark',
+            'zoom' => true,
+            'highlight' => true,
+            'music' => 'builtin:upbeat',
         ],
     ],
 

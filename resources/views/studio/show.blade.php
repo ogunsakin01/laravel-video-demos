@@ -98,7 +98,7 @@
           poster="{{ route('video-demo.studio.file', [$video, $first, 'poster']) }}?v={{ $video->version }}"
           src="{{ route('video-demo.studio.file', [$video, $first, 'video']) }}?v={{ $video->version }}">
           @if (\Illuminate\Support\Facades\Storage::disk(config('video-demo.storage.work_disk'))->exists($video->workFile($first, 'subtitles')))
-            <track kind="subtitles" srclang="en" label="Captions" src="{{ route('video-demo.studio.file', [$video, $first, 'subtitles']) }}?v={{ $video->version }}">
+            <track kind="subtitles" srclang="{{ $video->languageCode() }}" label="Captions" src="{{ route('video-demo.studio.file', [$video, $first, 'subtitles']) }}?v={{ $video->version }}">
           @endif
         </video>
         @if (count($recorded) > 1)
@@ -288,7 +288,7 @@
               <span class="vd-hint" id="r-style-hint">{{ $currentStyle?->direction }}</span>
             </div>
 
-            @include('video-demo::studio.partials.sound', ['prefix' => 'a', 'voice' => old('voice', $video->voice), 'music' => old('music', $video->music), 'volume' => $video->music_volume])
+            @include('video-demo::studio.partials.sound', ['prefix' => 'a', 'voice' => old('voice', $video->voice), 'music' => old('music', $video->music), 'volume' => $video->music_volume, 'language' => old('language', $video->language), 'appLanguage' => $video->page_language])
 
             <details class="vd-more">
               <summary>More options <small>model, spending limit, steps</small></summary>
@@ -365,6 +365,7 @@
           @endif
           <div class="vd-stat"><dt>Recorded as</dt><dd>{{ $video->record_as_label ?: \Ogunsakin01\VideoDemo\Recording\RecordAs::label($video->record_as) }}</dd></div>
           <div class="vd-stat"><dt>Data</dt><dd>{{ $video->sample_data ? 'Sample data' : 'Your local database' }}</dd></div>
+          <div class="vd-stat"><dt>Language</dt><dd>{{ \Ogunsakin01\VideoDemo\Support\Language::name($video->languageCode()) }}{{ $video->language ? '' : ', as the app' }}</dd></div>
           <div class="vd-stat"><dt>Voice-over</dt><dd>{{ \Ogunsakin01\VideoDemo\Voice\Voices::label($video->voice) }}</dd></div>
           <div class="vd-stat"><dt>Music</dt><dd>{{ \Ogunsakin01\VideoDemo\Voice\Music::label($video->music) }}</dd></div>
           <div class="vd-stat"><dt>Model</dt><dd>{{ \Ogunsakin01\VideoDemo\Ai\Pricing::model($video->model)['label'] ?? $video->model }}, {{ $video->effort }}</dd></div>

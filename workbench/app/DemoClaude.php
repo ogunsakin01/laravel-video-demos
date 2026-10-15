@@ -39,8 +39,18 @@ class DemoClaude extends Claude
             ]);
         }
 
-        // A voice-over for a plan: lines the way a person talks you through it.
+        // A voice-over for a plan: lines the way a person talks you through it, in the video's language.
         if (isset($params['outputConfig']['format']['schema']['properties']['lines'])) {
+            if (str_contains(json_encode($params['system'] ?? ''), 'Language: French')) {
+                return $this->reply($params['model'], ['lines' => [
+                    ['step' => 1, 'say' => 'Votre offre sera en ligne en moins d’une minute.'],
+                    ['step' => 3, 'say' => 'Tout part du menu en haut.'],
+                    ['step' => 5, 'say' => 'Utilisez les mots que les candidats recherchent vraiment.'],
+                    ['step' => 7, 'say' => 'En télétravail, elle s’ouvre à tout le monde.'],
+                    ['step' => 10, 'say' => 'Et voilà, elle est publiée.'],
+                ]]);
+            }
+
             return $this->reply($params['model'], ['lines' => [
                 ['step' => 1, 'say' => "You'll have a job listed in under a minute."],
                 ['step' => 3, 'say' => 'It starts from the top menu.'],

@@ -11,6 +11,8 @@ use Ogunsakin01\VideoDemo\Enums\VideoStatus;
 use Ogunsakin01\VideoDemo\Events\VideoStatusChanged;
 use Ogunsakin01\VideoDemo\Recording\Devices;
 use Ogunsakin01\VideoDemo\Recording\Recorder;
+use Ogunsakin01\VideoDemo\Support\Language;
+use Ogunsakin01\VideoDemo\Voice\Voices;
 
 /**
  * A video made in the studio, with its plan, recordings, AI usage and log.
@@ -56,6 +58,8 @@ use Ogunsakin01\VideoDemo\Recording\Recorder;
  * @property ?string $voice
  * @property ?string $music
  * @property ?float $music_volume
+ * @property ?string $language
+ * @property ?string $page_language
  */
 class Video extends Model
 {
@@ -179,6 +183,24 @@ class Video extends Model
     public function workPath(string $file = ''): string
     {
         return rtrim(config('video-demo.storage.work_path'), '/')."/{$this->id}".($file !== '' ? "/$file" : '');
+    }
+
+    /**
+     * Get the language the video is written and spoken in: the one chosen,
+     * else the one found on the app's pages, else the app's locale.
+     */
+    public function languageCode(): string
+    {
+        return Language::normalize($this->language) ?? Language::normalize($this->page_language) ?? Language::app();
+    }
+
+    /**
+     * Determine if the video has a voice-over: a voice is chosen and it
+     * speaks the video's language.
+     */
+    public function hasVoiceOver(): bool
+    {
+        return (bool) $this->voice && Voices::speaks($this->voice, $this->languageCode());
     }
 
     /**

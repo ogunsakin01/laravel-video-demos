@@ -66,7 +66,7 @@ class MakeAgainTest extends TestCase
 
         $this->post("/video-demo/studio/{$video->id}/again", $this->form($video, ['sample_data' => '1']))->assertRedirect();
         $this->assertTrue($video->fresh()->sample_data);
-        $this->assertStringContainsString('the user or the data changed', collect($video->fresh()->log)->last()['message']);
+        $this->assertStringContainsString('the user, the data or the language changed', collect($video->fresh()->log)->last()['message']);
         Queue::assertPushed(GenerateVideo::class, fn ($job) => $job->replan);
 
         Queue::fake();

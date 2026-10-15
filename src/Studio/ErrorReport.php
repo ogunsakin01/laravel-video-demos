@@ -282,6 +282,7 @@ class ErrorReport
                 'Model' => trim($video->model.' '.$video->effort),
                 'Length' => $video->target_seconds.'s target',
                 'Playback speed' => $video->playbackSpeed().'×',
+                'Language' => $video->languageCode().($video->language ? '' : ' (the app\'s)'),
                 'Voice' => (string) $video->voice,
                 'Music' => (string) $video->music,
                 'AI cost' => sprintf('$%.4f of $%.2f', $video->cost, $video->spendLimit()),

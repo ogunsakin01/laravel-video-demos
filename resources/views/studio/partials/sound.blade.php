@@ -1,14 +1,32 @@
 {{--
-  The voice-over and background music fields, on the new-video form and in
-  "Make it again". Choosing a style fills in its default voice and music.
-  Expects: $prefix (for ids), $voice, $music and $volume. A style select with
-  data-defaults-for fills them in from its options' data-voice and data-music.
+  The language, voice-over and background music fields, on the new-video
+  form and in "Make it again". Choosing a style fills in its default voice
+  and music; choosing a language lists only the voices that speak it.
+  Expects: $prefix (for ids), $voice, $music, $volume, $language (null for
+  the app's) and $appLanguage (the app's, as far as is known). A style
+  select with data-defaults-for fills them in from its options' data-voice
+  and data-music.
 --}}
 @php
   $voiceGroups = \Ogunsakin01\VideoDemo\Voice\Voices::options();
   $tracks = \Ogunsakin01\VideoDemo\Voice\Music::options();
   $volume = (int) round(($volume ?? config('video-demo.music.volume', 0.25)) * 100);
+  $languages = \Ogunsakin01\VideoDemo\Support\Language::options();
+  $appLanguage = \Ogunsakin01\VideoDemo\Support\Language::normalize($appLanguage ?? null) ?? \Ogunsakin01\VideoDemo\Support\Language::app();
 @endphp
+<div class="vd-field">
+  <label for="{{ $prefix }}-language">Language</label>
+  <select id="{{ $prefix }}-language" name="language" data-sound="language" data-app-language="{{ \Ogunsakin01\VideoDemo\Support\Language::base($appLanguage) }}">
+    <option value="">Same as the app ({{ \Ogunsakin01\VideoDemo\Support\Language::name($appLanguage) }})</option>
+    @foreach ($languages as $code => $name)
+      <option value="{{ $code }}" @selected(($language ?? null) === $code)>{{ $name }}</option>
+    @endforeach
+    @if (($language ?? null) && ! isset($languages[$language]))
+      <option value="{{ $language }}" selected>{{ \Ogunsakin01\VideoDemo\Support\Language::name($language) }}</option>
+    @endif
+  </select>
+  <span class="vd-hint">For the titles, captions and voice-over. The app's language is read from its pages when the video is made.</span>
+</div>
 <div class="vd-row">
   <div>
     <div class="vd-field-head">
@@ -20,7 +38,7 @@
       @foreach ($voiceGroups as $group => $voices)
         <optgroup label="{{ $group }}">
           @foreach ($voices as $key => $label)
-            <option value="{{ $key }}" @selected($voice === $key)>{{ $label }}</option>
+            <option value="{{ $key }}" data-languages="{{ implode(' ', \Ogunsakin01\VideoDemo\Voice\Voices::languages($key)) }}" @selected($voice === $key)>{{ $label }}</option>
           @endforeach
         </optgroup>
       @endforeach
@@ -28,6 +46,7 @@
         <option value="{{ $voice }}" selected>{{ $voice }} (not available here)</option>
       @endif
     </select>
+    <span class="vd-hint vd-warn-text" data-voice-language hidden></span>
     @unless (\Ogunsakin01\VideoDemo\Voice\Voices::localInstalled())
       <span class="vd-hint">Free natural voices: <code>php artisan video-demo:install-voice</code></span>
     @endunless
@@ -58,9 +77,42 @@
 
 @once
   <script>
-    // Play a voice sample or a music track, and fill in a style's default voice and music.
+    // Play a voice sample or a music track, fill in a style's default voice
+    // and music, and list only the voices that speak the chosen language.
+    const languageOf = form => {
+      const field = form.querySelector('[data-sound="language"]');
+      return field ? (field.value || field.dataset.appLanguage).split('-')[0] : '';
+    };
+
     document.addEventListener('DOMContentLoaded', () => {
       let playing = null;
+
+      document.querySelectorAll('select[data-sound="language"]').forEach(field => {
+        const voice = field.form.querySelector('[data-sound="voice"]');
+        const note = voice?.parentElement.querySelector('[data-voice-language]');
+        if (!voice) return;
+        const speaks = (option, lang) => !option.dataset.languages || option.dataset.languages.split(' ').some(l => l === '*' || l === lang);
+        const filter = () => {
+          const lang = languageOf(field.form);
+          const name = field.value ? field.selectedOptions[0].textContent.trim() : field.options[0].textContent.replace(/^.*\((.*)\)$/, '$1');
+          for (const option of voice.querySelectorAll('option[value]:not([value=""])')) {
+            option.hidden = !speaks(option, lang) && !option.selected;
+          }
+          for (const group of voice.querySelectorAll('optgroup')) {
+            group.hidden = [...group.children].every(o => o.hidden);
+          }
+          const chosen = voice.selectedOptions[0];
+          const wrong = chosen && chosen.value && !speaks(chosen, lang);
+          note.hidden = !wrong;
+          if (wrong) note.textContent = chosen.textContent.trim() + " doesn't speak " + name + (field.value
+            ? '. Choose a voice that does, or no voice.'
+            : ", the app's language, so the video would have no voice-over.");
+        };
+        field.addEventListener('change', filter);
+        voice.addEventListener('change', filter);
+        filter();
+      });
+
       document.querySelectorAll('[data-sample]').forEach(button => {
         const select = document.getElementById(button.dataset.for);
         const sync = () => { button.disabled = !select.value; };
@@ -72,7 +124,7 @@
           button.setAttribute('aria-busy', 'true');
           try {
             const url = button.dataset.sample === 'voice'
-              ? @json(route('video-demo.studio.voice-sample')) + '?' + new URLSearchParams({ voice: select.value })
+              ? @json(route('video-demo.studio.voice-sample')) + '?' + new URLSearchParams({ voice: select.value, language: languageOf(select.form) })
               : @json(route('video-demo.studio.music.play', '__KEY__')).replace('__KEY__', encodeURIComponent(select.value));
             const res = await fetch(url, { headers: { Accept: 'audio/*, application/json' } });
             if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'It could not be played.');

@@ -191,7 +191,10 @@ class RecorderTest extends TestCase
             $this->waitForServer($port);
             config(['video-demo.recorder.base_url' => "http://127.0.0.1:$port"]);
 
-            $problems = collect((new Recorder)->checkPages(['/', '/reports', '/settings', '/chart', '/missing', 'not-a-path'], 'guest'))->keyBy('path');
+            $checker = new Recorder;
+            $problems = collect($checker->checkPages(['/', '/reports', '/settings', '/chart', '/missing', 'not-a-path'], 'guest'))->keyBy('path');
+            // The language of each page that works, from its lang attribute.
+            $this->assertSame(['/' => 'fr-FR'], $checker->pageLanguages);
 
             $this->assertSame(['/reports', '/settings', '/chart', '/missing'], $problems->keys()->all());
             $this->assertSame('The page returned HTTP 500', $problems['/reports']['problem']);

@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Ogunsakin01\VideoDemo\Ai\CodeTools;
 use Ogunsakin01\VideoDemo\Ai\CostEstimator;
@@ -33,6 +34,7 @@ use Ogunsakin01\VideoDemo\Studio\Embeds;
 use Ogunsakin01\VideoDemo\Studio\Examples;
 use Ogunsakin01\VideoDemo\Studio\Pages;
 use Ogunsakin01\VideoDemo\Studio\Progress;
+use Ogunsakin01\VideoDemo\Support\Language;
 use Ogunsakin01\VideoDemo\VideoDemo;
 use Ogunsakin01\VideoDemo\VideoDemoServiceProvider;
 use Ogunsakin01\VideoDemo\Voice\Music;
@@ -108,6 +110,7 @@ class VideoController extends Controller
                 'record_as' => $request->query('record_as', config('video-demo.recorder.login_as') ? '' : RecordAs::GUEST),
                 'sample_data' => (bool) $request->query('sample_data', config('video-demo.sample_data.default', true)),
                 'voice' => $request->query('voice', config('video-demo.voice.default')),
+                'language' => $request->query('language'),
                 'music' => $request->query('music', config('video-demo.music.default')),
                 'idea' => $request->query('idea'),
             ],
@@ -372,7 +375,9 @@ class VideoController extends Controller
 
         $recordAs = ($data['record_as'] ?? '') === '' ? null : $data['record_as'];
         $sampleData = $request->boolean('sample_data');
-        $forced = $recordAs !== $video->record_as || $sampleData !== $video->sample_data;
+        // A plan's words are in its language, so another language needs a new plan.
+        $language = Language::normalize($data['language'] ?? null) ?? Language::normalize($video->page_language) ?? Language::app();
+        $forced = $recordAs !== $video->record_as || $sampleData !== $video->sample_data || ! Language::same($language, $video->languageCode());
         $replan = $request->boolean('new_plan') || $forced || empty($video->plan['steps']);
         $style = isset($data['style_id']) ? VideoStyle::find($data['style_id']) : null;
         $estimate = $replan ? $estimator->estimate($data['model'], $data['effort'], (int) $data['target_seconds'], $code->routeCount()) : null;
@@ -400,7 +405,7 @@ class VideoController extends Controller
         ]);
         $video->addLog(match (true) {
             ! $replan => 'Queued to record the same plan again',
-            $forced && ! $request->boolean('new_plan') => 'Queued for a new plan: the user or the data changed, so the old plan may not fit',
+            $forced && ! $request->boolean('new_plan') => 'Queued for a new plan: the user, the data or the language changed, so the old plan may not fit',
             default => 'Queued for a new plan',
         });
         GenerateVideo::dispatch($video, replan: $replan);
@@ -631,20 +636,32 @@ class VideoController extends Controller
             'voice' => ['nullable', 'string', Rule::in([...array_keys(Voices::all()), ...array_filter([$video?->voice])])],
             'music' => ['nullable', 'string', Rule::in([...array_keys(Music::options()), ...array_filter([$video?->music])])],
             'music_volume' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'language' => ['nullable', 'string', Rule::in([...array_keys(Language::options()), ...array_filter([$video?->language])])],
         ];
     }
 
     /**
      * Get the voice-over and music from the form's fields, as they are stored.
      *
-     * @return array{voice: ?string, music: ?string, music_volume: ?float}
+     * A language chosen for the video must be one its voice speaks.
+     *
+     * @return array{voice: ?string, music: ?string, music_volume: ?float, language: ?string}
+     *
+     * @throws ValidationException When the voice doesn't speak the chosen language.
      */
     protected function sound(array $data): array
     {
+        $voice = ($data['voice'] ?? '') ?: null;
+        $language = Language::normalize($data['language'] ?? null);
+        if ($voice && $language && ! Voices::speaks($voice, $language)) {
+            throw ValidationException::withMessages(['voice' => Voices::label($voice).' doesn\'t speak '.Language::name($language).'. Choose a voice that does, or no voice.']);
+        }
+
         return [
-            'voice' => ($data['voice'] ?? '') ?: null,
+            'voice' => $voice,
             'music' => ($data['music'] ?? '') ?: null,
             'music_volume' => isset($data['music_volume']) ? round($data['music_volume'] / 100, 2) : null,
+            'language' => $language,
         ];
     }
 

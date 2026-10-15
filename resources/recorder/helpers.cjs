@@ -48,8 +48,10 @@ const CURSOR_JS = `
 
 // Title cards and captions in the video's style (window.__demoStyle), in solid
 // colours only. With style.art "abstract", cards get line art that draws itself
-// on and drifts, and the words rise into place. Written as a function so it
-// reads as code; it is turned into a string and runs inside the page.
+// on and drifts, and the words rise into place. With "headline", cards and
+// captions are big, left-aligned headlines in two lines (bold, then muted) under
+// a numbered label, like a product promo. Written as a function so it reads as
+// code; it is turned into a string and runs inside the page.
 function overlay() {
   if (window.__demoOverlay) return;
   const style = Object.assign({ theme: 'light', accent: '#171717', captions: 'bottom', art: 'none' }, window.__demoStyle || {});
@@ -59,11 +61,14 @@ function overlay() {
     ? { bg: '#141412', ink: '#fafaf8', muted: 'rgba(250,250,248,.72)', line: 'rgba(255,255,255,.12)', bar: plainAccent ? '#fafaf8' : style.accent, art: 'rgba(250,250,248,.2)', dot: plainAccent ? '#fafaf8' : style.accent }
     : { bg: '#faf8f3', ink: '#171717', muted: '#5f636e', line: '#e5e2dc', bar: style.accent, art: '#c9c4b8', dot: plainAccent ? '#171717' : style.accent };
   const abstract = style.art === 'abstract';
+  const headline = style.art === 'headline';
+  const rises = abstract || headline;
   // Animations run this much slower while recording, to look right once the
   // video is played back faster.
   const S = style.speed || 1;
   const ms = n => Math.round(n * S) + 'ms';
   const font = "'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
+  const mono = "'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace";
   const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]);
 
   const root = document.createElement('div');
@@ -93,7 +98,7 @@ function overlay() {
     if (!document.querySelector('link[data-demo-font]')) {
       const l = document.createElement('link');
       l.rel = 'stylesheet'; l.dataset.demoFont = '';
-      l.href = 'https://fonts.bunny.net/css?family=geist:400,500,600,700&display=swap';
+      l.href = 'https://fonts.bunny.net/css?family=geist:400,500,600,700|geist-mono:500&display=swap';
       document.head.appendChild(l);
     }
   };
@@ -157,6 +162,16 @@ function overlay() {
   // The words of a title, each rising into place a moment after the last.
   const rising = (text, start) => esc(text).split(' ').map((w, i) => '<span class="vd-word" style="--d:' + ms(start + i * 70) + '">' + w + '</span>').join(' ');
 
+  // The numbered label over a headline ("03 —"): the recorder counts the cards and captions.
+  const label = n => '<div style="font-family:' + mono + ';font-size:clamp(13px,1.15vw,22px);font-weight:500;letter-spacing:.14em;color:' + c.dot + ';opacity:0;animation:vdFade ' + ms(400) + ' ease-out ' + ms(100) + ' forwards">' + String(n || 1).padStart(2, '0') + ' \u2014</div>';
+
+  // A headline in two lines: the title in bold, then the sentence muted, each word rising in.
+  const headlineText = (title, sub, big, small, start) => {
+    const subStart = start + title.split(' ').length * 70 + 120;
+    return '<div style="font-size:' + big + ';font-weight:700;letter-spacing:-.035em;line-height:1.05">' + rising(title, start) + '</div>'
+      + (sub ? '<div style="margin-top:.18em;font-size:' + small + ';font-weight:700;letter-spacing:-.03em;line-height:1.1;color:' + c.muted + '">' + rising(sub, subStart) + '</div>' : '');
+  };
+
   let current = null;
   const show = el => {
     // Re-attach after the document is replaced in the same window.
@@ -168,8 +183,18 @@ function overlay() {
   };
 
   window.__demoOverlay = {
-    caption(title, sub) {
+    caption(title, sub, n) {
       const el = document.createElement('div');
+      if (headline) {
+        // On a solid panel at the edge, so the app stays in view beside it.
+        const edge = style.captions === 'top' ? 'top:28px' : 'bottom:32px';
+        el.style.cssText = 'position:absolute;left:32px;' + edge + ';max-width:min(62vw,1200px);display:flex;flex-direction:column;gap:10px;padding:18px 26px 20px;border-radius:12px;'
+          + 'background:' + c.bg + ';color:' + c.ink + ';border:1px solid ' + c.line + ';box-shadow:0 16px 40px -12px rgba(0,0,0,.35);opacity:0;transition:opacity ' + ms(300);
+        el.innerHTML = label(n) + '<div>' + headlineText(title, sub, 'clamp(20px,2.3vw,44px)', 'clamp(16px,1.7vw,32px)', 120) + '</div>';
+        show(el);
+
+        return;
+      }
       const edge = style.captions === 'top' ? 'top:28px' : 'bottom:36px';
       const shift = style.captions === 'top' ? '-10px' : '10px';
       el.style.cssText = 'position:absolute;left:50%;' + edge + ';width:max-content;max-width:min(54vw,1000px);min-width:min(320px,88vw);translate:-50% 0;display:flex;gap:14px;align-items:flex-start;padding:16px 20px 16px 18px;border-radius:12px;'
@@ -182,8 +207,18 @@ function overlay() {
       el.innerHTML = bar + '<div><div style="font-size:clamp(16px,1.5vw,28px);font-weight:600;letter-spacing:-.015em;line-height:1.3">' + head + '</div>' + tail + '</div>';
       show(el);
     },
-    card(title, sub) {
+    card(title, sub, n) {
       const el = document.createElement('div');
+      if (headline) {
+        el.style.cssText = 'position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;gap:22px;padding:0 9vw;overflow:hidden;'
+          + 'background:' + c.bg + ';color:' + c.ink + ';opacity:0;transition:opacity ' + ms(400);
+        el.innerHTML = label(n) + '<div style="max-width:min(80vw,1500px)">' + headlineText(title, sub, 'clamp(34px,5.4vw,108px)', 'clamp(26px,4vw,80px)', 250) + '</div>'
+          // A short accent line at the foot, growing in.
+          + '<div style="position:absolute;left:9vw;bottom:7vh;width:min(120px,12vw);height:3px;border-radius:2px;background:' + c.bar + ';transform-origin:left;animation:vdGrow ' + ms(900) + ' cubic-bezier(.2,.7,.2,1) ' + ms(300) + ' both"></div>';
+        show(el);
+
+        return;
+      }
       el.style.cssText = 'position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:56px;overflow:hidden;'
         + 'background:' + c.bg + ';color:' + c.ink + ';opacity:0;transition:opacity ' + ms(450);
       const words = abstract ? rising(title, 350) : esc(title);

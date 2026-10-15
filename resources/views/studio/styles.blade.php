@@ -22,7 +22,8 @@
         @php($dark = $style->theme === 'dark')
         <article class="vd-card" style="display:grid;grid-template-columns:132px minmax(0,1fr);gap:18px;align-items:start">
           {{-- A small preview of the style's title card. --}}
-          <div aria-hidden="true" style="position:relative;overflow:hidden;aspect-ratio:16/10;border-radius:8px;border:1px solid var(--vd-border);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:{{ $dark ? '#141412' : '#faf8f3' }}">
+          @php($bold = $style->art === 'headline')
+          <div aria-hidden="true" style="position:relative;overflow:hidden;aspect-ratio:16/10;border-radius:8px;border:1px solid var(--vd-border);display:flex;flex-direction:column;align-items:{{ $bold ? 'flex-start' : 'center' }};justify-content:center;gap:6px;{{ $bold ? 'padding:0 16px;' : '' }}background:{{ $dark ? '#141412' : '#faf8f3' }}">
             @if ($style->art === 'abstract')
               <svg viewBox="0 0 160 100" style="position:absolute;inset:0;width:100%;height:100%" fill="none" stroke="{{ $dark ? 'rgba(250,250,248,.22)' : '#d6d2c8' }}" stroke-width="1">
                 @foreach ([10, 18, 26, 34, 42] as $r)
@@ -33,8 +34,8 @@
               </svg>
             @endif
             <span style="position:relative;width:16px;height:2px;border-radius:2px;background:{{ $dark && strtolower($style->accent) === '#171717' ? '#fafaf8' : $style->accent }}"></span>
-            <span style="position:relative;width:62%;height:6px;border-radius:3px;background:{{ $dark ? '#fafaf8' : '#171717' }}"></span>
-            <span style="position:relative;width:44%;height:4px;border-radius:2px;background:{{ $dark ? 'rgba(250,250,248,.5)' : '#b8b5ae' }}"></span>
+            <span style="position:relative;width:{{ $bold ? '78%' : '62%' }};height:{{ $bold ? 9 : 6 }}px;border-radius:3px;background:{{ $dark ? '#fafaf8' : '#171717' }}"></span>
+            <span style="position:relative;width:{{ $bold ? '58%' : '44%' }};height:{{ $bold ? 8 : 4 }}px;border-radius:{{ $bold ? 3 : 2 }}px;background:{{ $dark ? 'rgba(250,250,248,.5)' : '#b8b5ae' }}"></span>
           </div>
           <div>
             <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
@@ -52,6 +53,7 @@
               <span class="vd-pill">Captions at the {{ strtolower(VideoStyle::CAPTIONS[$style->captions] ?? $style->captions) }}</span>
               <span class="vd-pill">{{ VideoStyle::PACES[$style->pace] ?? $style->pace }} pace</span>
               @if ($style->art === 'abstract')<span class="vd-pill">Abstract art</span>@endif
+              @if ($style->art === 'headline')<span class="vd-pill">Bold headlines</span>@endif
               @if ($style->app_theme !== 'auto')<span class="vd-pill">App in {{ strtolower(VideoStyle::APP_THEMES[$style->app_theme] ?? $style->app_theme) }}</span>@endif
               @if ($style->zoom)<span class="vd-pill">Zooms in on each step</span>@endif
               @if ($style->highlight)<span class="vd-pill">Highlights each step</span>@endif
@@ -120,7 +122,7 @@
             <option value="{{ $value }}" @selected(old('art', $form->art) === $value)>{{ $label }}</option>
           @endforeach
         </select>
-        <span class="vd-hint">Abstract line art draws itself behind title cards, and the words rise into place, like an ad.</span>
+        <span class="vd-hint">Abstract line art draws itself behind title cards, and the words rise into place, like an ad. Bold headlines make cards and captions big two-line headlines, like a product promo.</span>
       </div>
       <div>
         <label for="app_theme">App appearance</label>

@@ -6,6 +6,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Ogunsakin01\VideoDemo\Support\Language;
 use Ogunsakin01\VideoDemo\Voice\Music;
 use Ogunsakin01\VideoDemo\Voice\Speaker;
 use Ogunsakin01\VideoDemo\Voice\Voices;
@@ -24,6 +25,33 @@ class SoundController extends Controller
     public const SAMPLE = 'Here is how it works: open the page, fill in the details, and save.';
 
     /**
+     * The sample line in other languages, by language code.
+     */
+    public const SAMPLES = [
+        'ar' => 'هكذا تعمل: افتح الصفحة، واملأ التفاصيل، ثم احفظ.',
+        'da' => 'Sådan virker det: åbn siden, udfyld oplysningerne, og gem.',
+        'de' => 'So funktioniert es: Seite öffnen, Angaben ausfüllen und speichern.',
+        'es' => 'Así funciona: abre la página, completa los datos y guarda.',
+        'fi' => 'Näin se toimii: avaa sivu, täytä tiedot ja tallenna.',
+        'fr' => 'Voici comment ça marche : ouvrez la page, remplissez les détails, puis enregistrez.',
+        'hi' => 'यह ऐसे काम करता है: पेज खोलें, विवरण भरें, और सेव करें।',
+        'id' => 'Begini caranya: buka halamannya, isi detailnya, lalu simpan.',
+        'it' => 'Ecco come funziona: apri la pagina, compila i dati e salva.',
+        'ja' => '使い方はこうです。ページを開いて、詳細を入力し、保存します。',
+        'ko' => '이렇게 하면 됩니다. 페이지를 열고, 내용을 입력한 다음 저장하세요.',
+        'nb' => 'Slik fungerer det: åpne siden, fyll inn detaljene, og lagre.',
+        'nl' => 'Zo werkt het: open de pagina, vul de gegevens in en sla op.',
+        'pl' => 'Tak to działa: otwórz stronę, uzupełnij dane i zapisz.',
+        'pt' => 'É assim que funciona: abra a página, preencha os dados e salve.',
+        'ru' => 'Вот как это работает: откройте страницу, заполните данные и сохраните.',
+        'sv' => 'Så här fungerar det: öppna sidan, fyll i uppgifterna och spara.',
+        'tr' => 'Şöyle çalışıyor: sayfayı açın, bilgileri doldurun ve kaydedin.',
+        'uk' => 'Ось як це працює: відкрийте сторінку, заповніть дані та збережіть.',
+        'vi' => 'Cách làm như sau: mở trang, điền thông tin rồi lưu lại.',
+        'zh' => '操作很简单：打开页面，填写信息，然后保存。',
+    ];
+
+    /**
      * Speak a short sample in the given voice. It is saved like any line,
      * so playing it again is instant, and free for a voice that costs.
      */
@@ -34,9 +62,14 @@ class SoundController extends Controller
             return response()->json(['error' => 'That voice is not available here.'], 404);
         }
 
+        // In the voice's own language, or for a voice that speaks many, the one chosen on the form.
+        $languages = Voices::languages($voice);
+        $language = Language::base($languages === ['*'] ? (string) $request->query('language', '') : $languages[0]);
+        $line = self::SAMPLES[$language] ?? self::SAMPLE;
+
         try {
             // As the voice makes it: no ffmpeg needed, so samples work in any web request.
-            $clip = $speaker->speak($voice, [self::SAMPLE], mixable: false)[self::SAMPLE];
+            $clip = $speaker->speak($voice, [$line], mixable: false)[$line];
         } catch (RuntimeException $e) {
             report($e);
 

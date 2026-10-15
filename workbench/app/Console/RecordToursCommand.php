@@ -67,7 +67,7 @@ class RecordToursCommand extends Command
                 }
 
                 File::ensureDirectoryExists($out);
-                $encoder->encode($result->video, "$out/$name.mp4", "$out/$name.jpg", $result->trimSeconds, Recorder::speed());
+                $encoder->encode($result->video, "$out/$name.mp4", "$out/$name.jpg", $result->trimSeconds, Recorder::speed(), $result->timeline);
                 if (! empty($style['zoom'])) {
                     $screen = Devices::get($device);
                     $keys = Camera::keyframes($result->focus, $screen['width'], $screen['height'], $screen['touch'] ? 1.5 : 1.8);

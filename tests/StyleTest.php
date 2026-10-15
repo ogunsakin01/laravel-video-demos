@@ -34,8 +34,8 @@ class StyleTest extends TestCase
 
         $this->post('/video-demo/studio/styles', $style)->assertRedirect('/video-demo/studio/styles');
         $added = VideoStyle::where('name', 'Onboarding series')->firstOrFail();
-        // The six defaults from config, plus this one.
-        $this->assertSame(7, VideoStyle::count());
+        // The seven defaults from config, plus this one.
+        $this->assertSame(8, VideoStyle::count());
         $this->assertSame('#0f766e', $added->accent);
         $this->assertSame('abstract', $added->art);
         $this->assertSame('abstract', $added->snapshot()['art']);
@@ -46,7 +46,7 @@ class StyleTest extends TestCase
         $this->post('/video-demo/studio/styles', [...$style, 'accent' => 'teal'])->assertSessionHasErrors('accent');
 
         $this->delete("/video-demo/studio/styles/{$added->id}")->assertRedirect();
-        $this->assertSame(6, VideoStyle::count());
+        $this->assertSame(7, VideoStyle::count());
         $this->assertSame('Promo ad', VideoStyle::where('key', 'ad')->value('name'));
     }
 
@@ -66,6 +66,11 @@ class StyleTest extends TestCase
         $this->assertSame(['app_theme' => 'dark', 'zoom' => true, 'highlight' => true], array_intersect_key($spotlight->snapshot(), array_flip(['app_theme', 'zoom', 'highlight'])));
 
         $this->get('/video-demo/studio/styles')->assertSee('Spotlight')->assertSee('Zooms in on each step')->assertSee('App appearance');
+
+        // Promo reel: big headlines over the app in dark mode, zooming in, with upbeat music.
+        $promo = VideoStyle::options()->firstWhere('key', 'promo');
+        $this->assertSame(['Promo reel', 'headline', 'dark', true, true, 'brisk', 'top', 'builtin:upbeat'], [$promo->name, $promo->art, $promo->app_theme, $promo->zoom, $promo->highlight, $promo->pace, $promo->captions, $promo->music]);
+        $this->get('/video-demo/studio/styles')->assertSee('Promo reel')->assertSee('Bold headlines');
 
         // The settings can be turned on for any style.
         $style = VideoStyle::options()->firstWhere('key', 'clean');

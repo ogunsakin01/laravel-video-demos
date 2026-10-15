@@ -24,6 +24,14 @@ class Recorder
     public ?Sandbox $sandbox = null;
 
     /**
+     * The language of each page the last check opened, path => its lang
+     * attribute, such as "fr" or "pt-BR".
+     *
+     * @var array<string, string>
+     */
+    public array $pageLanguages = [];
+
+    /**
      * Record the plan's steps for one version into $dir (an absolute folder).
      *
      * $recordAs is who to sign in as: a user id or email, "guest" for signed
@@ -84,7 +92,7 @@ class Recorder
      *
      * A page fails on an error status, a redirect to sign-in, a JavaScript
      * error, or not loading. It costs no AI, so it runs before planning and
-     * recording.
+     * recording. The language of each page is kept in $pageLanguages.
      *
      * @param  list<mixed>  $paths
      * @return list<array{path: string, problem: string, status: ?int, url: ?string, detail: ?string}>
@@ -92,6 +100,7 @@ class Recorder
     public function checkPages(array $paths, ?string $recordAs = null, string $device = 'desktop', ?Closure $shouldStop = null): array
     {
         $paths = array_values(array_unique(array_filter($paths, fn ($p) => is_string($p) && str_starts_with($p, '/'))));
+        $this->pageLanguages = [];
         if ($paths === []) {
             return [];
         }
@@ -114,6 +123,7 @@ class Recorder
         if (! is_array($result)) {
             throw new RuntimeException('The page check stopped without a result. Check that Node and Playwright work: php artisan video-demo:install');
         }
+        $this->pageLanguages = array_filter((array) ($result['languages'] ?? []), 'is_string');
 
         return $result['problems'] ?? [];
     }

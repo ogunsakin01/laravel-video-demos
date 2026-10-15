@@ -25,7 +25,7 @@
     data-vd-sources='@json($sources)' @if ($device) data-vd-device="{{ $device }}" @endif
     poster="{{ $first['poster'] }}" src="{{ $first['video'] }}" title="{{ $video['title'] }}"
     style="{{ $attributes->get('style', 'width:100%;border-radius:12px;background:#0e0e0d;display:block;max-height:82vh') }};aspect-ratio:{{ $first['width'] }}/{{ $first['height'] }}">
-    @if ($first['subtitles'])<track kind="subtitles" srclang="en" label="Captions" src="{{ $first['subtitles'] }}">@endif
+    @if ($first['subtitles'])<track kind="subtitles" srclang="{{ $video['language'] ?? 'en' }}" label="Captions" src="{{ $first['subtitles'] }}">@endif
   </video>
   @once
     <script>

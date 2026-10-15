@@ -2,7 +2,8 @@
 // page is found before the AI model is asked to plan or repair anything.
 //   node check.cjs <job.json>
 // The job gives the paths, the app's address, the sign-in link and the screen.
-// Writes result.json: { problems: [{ path, problem, status, url, detail }] }.
+// Writes result.json: { problems: [{ path, problem, status, url, detail }], languages: { path: lang } },
+// languages being each page's <html lang>, for the language the video is made in.
 const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
@@ -21,6 +22,7 @@ async function describeError(page) {
 
 (async () => {
   const problems = [];
+  const languages = {};
   const browser = await chromium.launch(job.channel ? { channel: job.channel } : {});
   try {
     const context = await browser.newContext({
@@ -49,6 +51,8 @@ async function describeError(page) {
         await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
         const status = res ? res.status() : null;
         const finalUrl = page.url();
+        const lang = await page.evaluate(() => document.documentElement.lang || '').catch(() => '');
+        const before = problems.length;
 
         if (status && status >= 400) {
           // Laravel's error pages only repeat the status ("404 | Not Found"), so keep only a detail that says more.
@@ -60,6 +64,8 @@ async function describeError(page) {
         } else if (jsErrors.length) {
           problems.push({ path: p, problem: 'The page threw a JavaScript error', status, url: finalUrl, detail: jsErrors.slice(0, 3).join(' · ').slice(0, 400) });
         }
+        // Only a page that works says which language the video is made in.
+        if (lang && problems.length === before) languages[p] = lang;
       } catch (e) {
         problems.push({ path: p, problem: 'The page did not load', status: null, url: null, detail: String(e.message || e).split('\n')[0].slice(0, 300) });
       }
@@ -69,7 +75,7 @@ async function describeError(page) {
     problems.push({ path: '(browser)', problem: 'The page check could not run', status: null, url: null, detail: String(e.message || e).split('\n')[0] });
   } finally {
     await browser.close();
-    fs.writeFileSync(path.join(job.outDir, 'result.json'), JSON.stringify({ problems }, null, 2));
+    fs.writeFileSync(path.join(job.outDir, 'result.json'), JSON.stringify({ problems, languages }, null, 2));
   }
   process.exit(0);
 })();

@@ -184,6 +184,8 @@ class PlannerTest extends TestCase
         $brief = $this->request(1)['body']['messages'][0]['content'];
         $this->assertStringContainsString('at most 3 steps', $brief);
         $this->assertStringContainsString('at most $1.50 on AI requests', $brief);
+        // And the language to write in: the app's, as no page has been checked.
+        $this->assertStringContainsString("Language: English, code en. Write the title, every caption, card and chapter, and every say line in English, the language of the app's pages.", $brief);
 
         // The 5-step plan was refused, with the budget left.
         $answer = end($this->request(2)['body']['messages'])['content'][0];

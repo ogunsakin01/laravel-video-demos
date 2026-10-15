@@ -12,7 +12,7 @@ class Examples
     /**
      * The jsDelivr address of the sample videos, pinned to a release.
      */
-    public const DEFAULT_URL = 'https://cdn.jsdelivr.net/gh/ogunsakin01/laravel-video-demos@v0.7.0';
+    public const DEFAULT_URL = 'https://cdn.jsdelivr.net/gh/ogunsakin01/laravel-video-demos@v0.15.0';
 
     /**
      * Determine if the Examples page should be shown.
@@ -88,6 +88,14 @@ class Examples
                 'style' => 'Spotlight',
                 'style_key' => 'spotlight',
                 'versions' => ['desktop' => $version('docs/examples/example-spotlight', 32)],
+            ],
+            [
+                'key' => 'promo',
+                'title' => 'Promo reel',
+                'about' => 'Like a product promo: big two-line headlines that rise in, the app in dark mode with the camera on each step, at a brisk pace.',
+                'style' => 'Promo reel',
+                'style_key' => 'promo',
+                'versions' => ['desktop' => $version('docs/examples/example-promo', 30)],
             ],
         ];
     }
