@@ -30,18 +30,4 @@
   @endforeach
   <span class="vd-hint">{{ $public ? 'The Blade component picks the version that suits each screen. The HTML plays the '.config('video-demo.devices.'.$first.'.label', $first).' version.' : 'Private videos can only be shown inside this app.' }}</span>
 </div>
-@once
-  <script>
-    document.addEventListener('click', async e => {
-      const b = e.target.closest('[data-copy]');
-      if (!b) return;
-      try {
-        await navigator.clipboard.writeText(b.dataset.copy);
-      } catch {
-        const t = document.createElement('textarea');
-        t.value = b.dataset.copy; document.body.append(t); t.select(); document.execCommand('copy'); t.remove();
-      }
-      const was = b.textContent; b.textContent = 'Copied'; setTimeout(() => { b.textContent = was; }, 1500);
-    });
-  </script>
-@endonce
+@include('video-demo::partials.copy-script')

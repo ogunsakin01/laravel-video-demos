@@ -122,6 +122,10 @@
         </div>
       @endif
 
+      @if ($video->status === \Ogunsakin01\VideoDemo\Enums\VideoStatus::Ready && $video->hasRecording())
+        @include('video-demo::studio.partials.spots')
+      @endif
+
       @if ($video->error)
         <div class="vd-card vd-stack-sm" style="border-color:transparent;background:var(--vd-bad-bg)">
           <h2 style="color:var(--vd-bad);margin:0">What went wrong</h2>

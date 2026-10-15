@@ -19,6 +19,7 @@ use Ogunsakin01\VideoDemo\Ai\FormAssistant;
 use Ogunsakin01\VideoDemo\Ai\PlanningFailed;
 use Ogunsakin01\VideoDemo\Ai\Pricing;
 use Ogunsakin01\VideoDemo\Enums\VideoStatus;
+use Ogunsakin01\VideoDemo\Jobs\FindSpots;
 use Ogunsakin01\VideoDemo\Jobs\GenerateVideo;
 use Ogunsakin01\VideoDemo\Library\Manifest;
 use Ogunsakin01\VideoDemo\Library\Publisher;
@@ -272,6 +273,7 @@ class VideoController extends Controller
             'issues' => $video->issues ?? [],
             'stopping' => $video->stop_requested,
             'progress' => Progress::for($video),
+            'spots' => $video->spots['status'] ?? null,
         ]);
     }
 
@@ -297,6 +299,32 @@ class VideoController extends Controller
         abort_unless(! empty($video->error_details['step']['screenshot']) && $disk->exists($video->workPath('error.jpg')), 404);
 
         return response()->file($disk->path($video->workPath('error.jpg')), ['Cache-Control' => 'no-store']);
+    }
+
+    /**
+     * Queue finding where in the app the video could go.
+     */
+    public function findSpots(Video $video): RedirectResponse
+    {
+        abort_unless($video->status === VideoStatus::Ready && $video->hasRecording(), 409, 'Only a finished video can be placed.');
+
+        if (($video->spots['status'] ?? null) !== 'working') {
+            $video->update(['spots' => ['status' => 'working', 'at' => now()->toIso8601String(), 'items' => $video->spots['items'] ?? []]]);
+            FindSpots::dispatch($video);
+        }
+
+        return redirect()->to(route('video-demo.studio.show', $video).'#vd-spots');
+    }
+
+    /**
+     * Show a screenshot of a spot the video could go in.
+     */
+    public function spotShot(Video $video, string $file): BinaryFileResponse
+    {
+        $disk = Storage::disk(config('video-demo.storage.work_disk'));
+        abort_unless($disk->exists($video->workPath("spots/$file")), 404);
+
+        return response()->file($disk->path($video->workPath("spots/$file")), ['Cache-Control' => 'no-store']);
     }
 
     /**

@@ -61,6 +61,23 @@ class DemoClaude extends Claude
             ]]);
         }
 
+        // "Where to put it" picks sections from the pages it is shown: here, the first panels with a heading.
+        if (isset($params['outputConfig']['format']['schema']['properties']['spots'])) {
+            $content = $params['messages'][0]['content'] ?? '';
+            $prompt = is_string($content) ? $content : implode("\n", array_column(array_map(fn ($b) => (array) $b, (array) $content), 'text'));
+            preg_match_all('~<page path="([^"]+)"[^>]*>(.*?)</page>~s', $prompt, $pages, PREG_SET_ORDER);
+            $spots = [];
+            foreach ($pages as [, $path, $body]) {
+                preg_match_all('~\[(\d+)\] (panel|form|section|aside|empty state|main) "([^"]+)"~', $body, $sections, PREG_SET_ORDER);
+                foreach (array_slice($sections, 0, 1) as [, $id, $kind, $heading]) {
+                    $spots[] = ['path' => $path, 'section' => (int) $id, 'position' => $kind === 'aside' ? 'top' : 'before',
+                        'label' => ($kind === 'aside' ? 'In the ' : 'Above ').$heading, 'why' => 'People who reach this point are about to do what the video shows.'];
+                }
+            }
+
+            return $this->reply($params['model'], ['spots' => array_slice($spots, 0, 3)]);
+        }
+
         // "Suggest videos" asks for a list.
         if (isset($params['outputConfig']['format']['schema']['properties']['suggestions'])) {
             // "Suggest more" lists the ideas already kept; answer with new ones.

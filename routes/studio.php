@@ -40,6 +40,8 @@ Route::middleware(AuthorizeStudio::class)->group(function () {
     Route::get('/{video}/status', [VideoController::class, 'status'])->name('status');
     Route::get('/{video}/file/{device}/{kind}', [VideoController::class, 'file'])->whereIn('kind', ['video', 'poster', 'subtitles'])->name('file');
     Route::get('/{video}/error.jpg', [VideoController::class, 'errorScreenshot'])->name('error-screenshot');
+    Route::post('/{video}/spots', [VideoController::class, 'findSpots'])->name('spots');
+    Route::get('/{video}/spots/{file}', [VideoController::class, 'spotShot'])->where('file', '\d+-[a-z]+\.jpg')->name('spot-shot');
     Route::patch('/{video}', [VideoController::class, 'update'])->name('update');
     Route::post('/{video}/regenerate', [VideoController::class, 'regenerate'])->name('regenerate');
     Route::post('/{video}/rerecord', [VideoController::class, 'rerecord'])->name('rerecord');

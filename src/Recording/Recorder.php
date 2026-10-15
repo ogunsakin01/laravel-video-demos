@@ -162,6 +162,68 @@ class Recorder
     }
 
     /**
+     * List the sections of each page a video could be shown in, as the given
+     * user sees them on a desktop screen.
+     *
+     * @param  list<string>  $paths
+     * @return array{pages: list<array{path: string, title: string, sections: list<array{id: int, selector: string, kind: string, heading: string, text: string, box: array{x: int, y: int, w: int, h: int}}>}>, failed: list<array{path: string, reason: string}>}
+     */
+    public function mapPages(array $paths, ?string $recordAs = null): array
+    {
+        $result = $this->runSpots(['mode' => 'map', 'paths' => $paths, ...$this->browserSettings(Devices::get('desktop'), $recordAs)], 60 + count($paths) * 30);
+
+        return ['pages' => $result['pages'] ?? [], 'failed' => $result['failed'] ?? []];
+    }
+
+    /**
+     * Show a player card for the video in each spot, and take a screenshot of
+     * it on each screen, saved in $outDir as <spot number>-<screen>.jpg.
+     *
+     * @param  list<array{path: string, selector: string, position: string}>  $spots
+     * @param  array{poster: ?string, title: string, length: string, accent?: string}  $card
+     * @param  list<string>  $screens  Device keys, such as desktop and mobile.
+     * @return array{shots: list<array{spot: int, screen: string, file: string}>, missing: list<array{spot: int, screen: string, reason: string}>}
+     */
+    public function shootSpots(array $spots, array $card, string $outDir, array $screens = ['desktop', 'mobile'], ?string $recordAs = null): array
+    {
+        File::ensureDirectoryExists($outDir);
+        $result = $this->runSpots([
+            'mode' => 'shoot', 'spots' => $spots, ...$card, 'outDir' => $outDir,
+            ...$this->browserSettings(Devices::get('desktop'), $recordAs),
+            'screens' => array_map(fn ($key) => ['key' => $key, 'viewport' => ['width' => Devices::get($key)['width'], 'height' => Devices::get($key)['height']], 'touch' => Devices::get($key)['touch']], $screens),
+        ], 60 + count($spots) * count($screens) * 25);
+
+        return ['shots' => $result['shots'] ?? [], 'missing' => $result['missing'] ?? []];
+    }
+
+    /**
+     * Run spots.cjs with the given job and get its result. The result is
+     * written to a temporary folder; screenshots go to the job's outDir.
+     */
+    protected function runSpots(array $job, int $timeout): array
+    {
+        $dir = static::workDir(trim(config('video-demo.storage.work_path'), '/').'/checks/'.uniqid('spots-'));
+        File::ensureDirectoryExists($dir);
+        File::put("$dir/job.json", json_encode(['outDir' => $dir, ...$job, 'resultDir' => $dir], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+
+        try {
+            $this->run(static::script('spots.cjs'), "$dir/job.json", $timeout);
+            $result = File::exists("$dir/result.json") ? json_decode(File::get("$dir/result.json"), true) : null;
+        } finally {
+            File::deleteDirectory($dir);
+        }
+
+        if (! is_array($result)) {
+            throw new RuntimeException('Finding spots for the video stopped without a result. Check that Node and Playwright work: php artisan video-demo:install');
+        }
+        if (! empty($result['error'])) {
+            throw new RuntimeException('Finding spots for the video failed: '.$result['error']);
+        }
+
+        return $result;
+    }
+
+    /**
      * Zoom a finished MP4 in on each step, in place.
      *
      * The frames are drawn through a virtual camera by camera.cjs, between

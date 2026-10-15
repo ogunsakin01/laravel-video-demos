@@ -60,6 +60,7 @@ use Ogunsakin01\VideoDemo\Voice\Voices;
  * @property ?float $music_volume
  * @property ?string $language
  * @property ?string $page_language
+ * @property ?array{status: string, at: string, error?: string, note?: ?string, items: list<array<string, mixed>>} $spots
  */
 class Video extends Model
 {
@@ -95,6 +96,7 @@ class Video extends Model
             'sample_records' => 'array',
             'music_volume' => 'float',
             'status_at' => 'datetime',
+            'spots' => 'array',
         ];
     }
 

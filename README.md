@@ -76,6 +76,7 @@ The plan is stored with the video, so after a redesign you can record it again a
 - **[A studio](https://github.com/ogunsakin01/laravel-video-demos/wiki/The-Studio)** to describe, estimate, stop, review, publish and make videos again. **Ideas** suggests the videos worth making first.
 - **[Sample data](https://github.com/ogunsakin01/laravel-video-demos/wiki/Sample-Data)**: recorded as any type of user (Admin, Member…) on a database made for the video, never your own.
 - **[Voice-over and music](https://github.com/ogunsakin01/laravel-video-demos/wiki/Voice-Over-and-Music)**: a narrator that speaks a line at each step, with free local voices or OpenAI, Gemini and ElevenLabs ones, and background music (four built-in tracks, or your own) that steps aside while the voice speaks. Subtitles come with it. Off unless you choose them.
+- **Where to put it**: for a finished video, two or three spots in your app where it would help, each with a screenshot of the video in place and the line to paste it at.
 - **Your app's language**: titles, captions and the voice-over are written in the language of your app's pages, or one you choose per video.
 - **[Styles and screens](https://github.com/ogunsakin01/laravel-video-demos/wiki/Styles-and-Screens)**: from step-by-step tutorials to the Spotlight feature reel and a Promo reel with bold headlines, on desktop, TV, tablet and mobile, at the speed you choose.
 - **[A help library](https://github.com/ogunsakin01/laravel-video-demos/wiki/The-Library)** for your users, and a Blade tag to put any video on any page.

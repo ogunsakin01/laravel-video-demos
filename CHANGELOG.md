@@ -2,6 +2,14 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/). While the version is 0.x, minor releases may include breaking changes; they will be listed here.
 
+## v0.16.0 - 2026-10-15
+
+Run `php artisan video-demo:install` after updating, for the new column.
+
+### Added
+
+- **Where to put it.** A finished video's page can suggest where in your app the video should go. **Suggest where to put it** opens the pages the video visits, as its user and on its sample data, and the AI picks two or three spots people doing the task would see, such as the top of the form it teaches, an empty state or a help panel, for about a cent. Each spot comes with a screenshot of the video in place on a desktop and a phone screen, the view and line to paste it at (when a view shows that section), and the player tag to paste. With no AI key, or once the video has reached its spending limit, it suggests the top of the page the video starts on.
+
 ## v0.15.0 - 2026-10-15
 
 Run `php artisan video-demo:install` after updating, for the new columns.

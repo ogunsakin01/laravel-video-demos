@@ -304,6 +304,14 @@
   .vd-log-kind { font: 500 11px/1.6 var(--vd-mono); text-transform: uppercase; color: var(--vd-muted-ink); }
   .vd-log-error, .vd-log-exception, .vd-log-failed { color: var(--vd-bad); }
   .vd-log-warning { color: var(--vd-warn); }
+  .vd-spot { display: grid; gap: 12px; padding-top: 16px; border-top: 1px solid var(--vd-border); }
+  .vd-spot-head { display: flex; gap: 12px; align-items: flex-start; }
+  .vd-spot-head h3 { font-size: 15px; color: var(--vd-strong); }
+  .vd-spot-num { flex: none; width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--vd-strong); color: var(--vd-paper); font: 600 13px/1 var(--vd-font); }
+  .vd-spot-shot { display: block; border: 1px solid var(--vd-border); border-radius: var(--vd-radius); overflow: hidden; background: var(--vd-muted); }
+  .vd-spot-shot[hidden] { display: none; }
+  .vd-spot-shot img { display: block; width: 100%; height: auto; }
+  .vd-spot-shot-mobile, .vd-spot-shot-tablet { max-width: 260px; }
   .vd-code { margin: 0; padding: 10px 0; background: var(--vd-muted); border: 1px solid var(--vd-border); border-radius: var(--vd-radius); overflow: auto;
     font: 12px/1.6 var(--vd-mono); color: var(--vd-ink); max-width: 100%; }
   .vd-code > span { display: block; padding: 0 12px; white-space: pre; }

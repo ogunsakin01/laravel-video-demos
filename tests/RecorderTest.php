@@ -49,6 +49,30 @@ class RecorderTest extends TestCase
         return [...['action' => $action, 'why' => '', 'url' => null, 'value' => null, 'title' => null, 'text' => null, 'ms' => null, 'chapter' => null], ...$fields, 'target' => $target];
     }
 
+    public function test_finds_sections_and_shows_the_video_in_one(): void
+    {
+        $recorder = new Recorder;
+        $map = $recorder->mapPages(['/index.html']);
+
+        $sections = collect($map['pages'][0]['sections'])->keyBy('kind');
+        $this->assertSame('Post a job', $map['pages'][0]['title']);
+        $this->assertSame(['header', 'main', 'form'], $sections->keys()->all());
+        $this->assertSame('Post a job', $sections['main']['heading']);
+
+        $poster = $this->out.'/poster.jpg';
+        File::ensureDirectoryExists($this->out);
+        File::put($poster, base64_decode('/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q=='));
+        $shots = $recorder->shootSpots([
+            ['path' => '/index.html', 'selector' => $sections['form']['selector'], 'position' => 'before'],
+            ['path' => '/index.html', 'selector' => '#nowhere', 'position' => 'top'],
+        ], ['poster' => $poster, 'title' => 'Post a <job>', 'length' => '0:42'], $this->out.'/spots', ['desktop', 'mobile']);
+
+        $this->assertSame([[0, 'desktop'], [0, 'mobile']], array_map(fn ($s) => [$s['spot'], $s['screen']], $shots['shots']));
+        $this->assertFileExists($this->out.'/spots/1-desktop.jpg');
+        $this->assertFileExists($this->out.'/spots/1-mobile.jpg');
+        $this->assertSame([[1, 'The section was not on the page'], [1, 'The section was not on the page']], array_map(fn ($m) => [$m['spot'], $m['reason']], $shots['missing']));
+    }
+
     public function test_records_and_encodes_a_plan(): void
     {
         $plan = new Plan('Post a job', 'Posting a job.', [
