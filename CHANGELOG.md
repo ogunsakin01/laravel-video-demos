@@ -2,6 +2,16 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/). While the version is 0.x, minor releases may include breaking changes; they will be listed here.
 
+## v0.17.9 - 2026-10-16
+
+### Changed
+
+- **Easier to find.** A plainer description, the words people search for (walkthrough, product tour, screencast, help center, user guide, knowledge base) in the Composer keywords, and the wiki as the package's homepage. The README now opens with when to use the package.
+
+### Fixed
+
+- **What AI assistants are told is up to date.** `llms.txt` and the Laravel Boost guidelines said videos play at 2× by default (it has been real time, 1×, since 0.14) and that `video-demo:install` copies the config (it hasn't since 0.17.5). `llms.txt` also describes how an app's own config copy works now, and what the built-in styles do.
+
 ## v0.17.8 - 2026-10-16
 
 ### Added

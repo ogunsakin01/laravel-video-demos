@@ -7,6 +7,8 @@
 [![Laravel 12 and 13](https://img.shields.io/badge/laravel-12%20%7C%2013-ff2d20.svg?style=flat-square)](composer.json)
 [![MIT license](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](LICENSE.md)
 
+**Use it when a Laravel app needs how-to videos, a help center, onboarding or product demo videos, kept up to date as the app changes.**
+
 Describe a flow in your Laravel app and get a recorded how-to video of it. An AI model (Claude by default, or OpenAI, Gemini, a local model and others) reads your app's code and plans the walkthrough. Playwright then records it in a real browser against your local copy of the app, with a cursor, captions and title cards, and plays it back at twice the speed so it feels snappy. You choose the length, the style (from step-by-step tutorials to short ads with animated line art) and the screens (desktop, TV, tablet, mobile), and you see the cost before anything is spent.
 
 Videos are made on your machine and published to any Laravel disk. Your production app shows them in a ready-made help library, or inside your own pages with a Blade component.
@@ -42,7 +44,7 @@ The library tours were recorded by the package itself, from the demo app in [`wo
 
 ```bash
 composer require ogunsakin01/laravel-video-demos
-php artisan video-demo:install          # config, migrations, the recorder's browser, the sample database
+php artisan video-demo:install          # migrations, the recorder's browser, the sample database
 ```
 
 Add your AI key to `.env`, and make sure `APP_URL` is the address you open the app at:

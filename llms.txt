@@ -7,8 +7,8 @@ Use it when someone wants: how-to or tutorial videos of their Laravel app, onboa
 ## Install
 
 ```bash
-composer require ogunsakin01/laravel-video-demos
-php artisan video-demo:install   # config, the package's migrations, Playwright and Chromium, the sample database; run it again after upgrading
+composer require ogunsakin01/laravel-video-demos:^0.17
+php artisan video-demo:install   # the package's migrations, Playwright and Chromium, the sample database; run it again after upgrading
 ```
 
 Needs Node.js 18+ and ffmpeg where videos are made (not in production), and `ANTHROPIC_API_KEY` (or `OPENAI_API_KEY`, `GEMINI_API_KEY` or local Ollama through `prism-php/prism`). Set `VIDEO_DEMO_LOGIN_AS` to the user the recorder signs in as by default, and `APP_URL` to the address the app is opened at. Run workers for the package's own queue: `php artisan video-demo:work` makes two videos at once (`--workers=N`, or `VIDEO_DEMO_WORKERS`); a plain `php artisan queue:work video-demo` makes one at a time.
@@ -70,13 +70,13 @@ Library pages: `/help/videos` (public) and `/admin/videos` (private videos too).
 
 ## Key facts
 
-- Configuration: `config/video-demo.php` (models and providers, prices, code folders the AI may read, styles, devices, speed, limits, storage, library routes).
+- Configuration: the package's `config/video-demo.php` (models and providers, prices, code folders the AI may read, styles, devices, speed, limits, storage, library routes), mostly set from `.env`. Install doesn't copy it into the app. An app's own copy (`vendor:publish --tag=video-demo-config`) is laid over it: the app's settings win, and new settings from the package still reach the app; `false` turns off a built-in style, model or device.
 - Plans can be edited by hand on a video's studio page; recording an edited plan is free, and a new AI plan starts from the edits.
 - Videos in other languages are separate videos linked by `source_video_id`, made from the original's plan (the AI translates only the words; targets are found again with the app in that language). The recorder sends the language in a `video_demo_locale` cookie, which the package turns into the app's locale where the studio is enabled.
 - Styles can add a logo in a corner of every frame and an end card after the last step.
 - `VIDEO_DEMO_STATS=true` in production counts plays, quarters watched and library searches that found nothing (daily totals only, no cookies or IPs). The studio reads them from `GET {private prefix}/api/stats` with `library.requests_token`.
-- Videos play at 2x the recorded speed by default, and each video can set its own (1x real time to 3x in the studio); captions and title cards are held longer so they stay readable.
-- Styles set the AI's direction and the look of cards and captions; "ad" has animated abstract line art, and "spotlight" records the app in dark mode, zooms in on each step and highlights it; "promo" does the same with big two-line headline cards and captions (art "headline"), a brisk pace and upbeat music.
+- Videos play at real time (1x) by default (`VIDEO_DEMO_SPEED`), and each video can set its own, up to 3x in the studio, with waits on the app cut out; captions and title cards are held longer at higher speeds so they stay readable.
+- Styles set the AI's direction and the look of cards and captions. Every built-in style outlines what is being used. "showcase" and "ad" also move the camera in on each step and add music; "ad" has animated abstract line art; "spotlight" records the app in dark mode with the camera on each step; "promo" adds big two-line headline cards and captions (art "headline"), a brisk pace and upbeat music.
 - Secrets in code and pages are redacted before anything is sent to the AI. The AI can only read folders in `ai.code.paths`.
 - "Where to put it" on a finished video's studio page (`POST /video-demo/studio/{video}/spots`, queued as `FindSpots`): opens the pages the video visits as its user, the AI picks two or three sections, and the real collapsible player is put in each and checked not to upset the layout (no sideways scrolling, nothing beside it squeezed or pushed, not clipped or covered), minimised and open, on desktop and mobile, trying other positions when one fails. Results are in the video's `spots` column: `items` with `path`, `label`, `why`, `position`, `fits`, `problems`, `shots` (per screen, `closed` and `open`) and `code` (`file`, `line`, `exact`, and an `excerpt` with the tag in place).
 - Plan steps can reach into iframes (embedded payment fields). CAPTCHAs, SMS codes and social logins can't be automated.
