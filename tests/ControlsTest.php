@@ -405,7 +405,7 @@ class ControlsTest extends TestCase
 
         // Recording the same plan again can change the speed, at no AI cost.
         $video->update(['status' => VideoStatus::Ready, 'plan' => ['title' => 'x', 'summary' => '', 'steps' => [['action' => 'goto', 'url' => '/']]]]);
-        $this->post("/video-demo/studio/{$video->id}/rerecord", ['devices' => ['desktop'], 'speed' => '1'])->assertRedirect();
+        $this->post("/video-demo/studio/{$video->id}/again", ['prompt' => $video->prompt, 'target_seconds' => 60, 'devices' => ['desktop'], 'model' => 'claude-sonnet-5-5', 'effort' => 'medium', 'speed' => '1', 'new_plan' => '0'])->assertRedirect();
         $this->assertSame(1.0, $video->fresh()->playbackSpeed());
         Queue::assertPushed(GenerateVideo::class, fn ($job) => ! $job->replan);
 

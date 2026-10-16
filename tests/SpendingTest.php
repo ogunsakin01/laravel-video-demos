@@ -37,6 +37,26 @@ class SpendingTest extends TestCase
         ]);
     }
 
+    public function test_costs_added_at_once_by_two_processes_all_count(): void
+    {
+        // A job and the studio each hold their own copy of the video.
+        $job = $this->video();
+        $studio = Video::findOrFail($job->id);
+
+        $job->addUsage(new Usage(input: 100, cost: 0.10));
+        $studio->addUsage(new Usage(input: 50, cost: 0.05));
+        $job->addUsage(new Usage(output: 10, cost: 0.01));
+
+        $saved = $job->fresh();
+        $this->assertEqualsWithDelta(0.16, $saved->cost, 0.000001);
+        $this->assertSame([150, 10], [$saved->input_tokens, $saved->output_tokens]);
+        // Each copy reads back the total, so the next limit check sees everything.
+        $this->assertEqualsWithDelta(0.16, $job->cost, 0.000001);
+        // A later save of a copy doesn't write an old total back.
+        $studio->update(['title' => 'Renamed']);
+        $this->assertEqualsWithDelta(0.16, $job->fresh()->cost, 0.000001);
+    }
+
     public function test_every_ai_cost_is_added_to_the_total_and_kept_after_a_delete(): void
     {
         $video = $this->video();

@@ -6,6 +6,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\Jobs\SyncJob;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\File;
 use Ogunsakin01\VideoDemo\Ai\Translator;
@@ -41,7 +42,8 @@ class TranslateVideo implements ShouldQueue
     public int $tries = 1;
 
     /**
-     * The number of seconds the job can run before timing out.
+     * The number of seconds the job can run before timing out: translating
+     * and checking the steps. The recording is a job of its own.
      */
     public int $timeout = 3600;
 
@@ -89,11 +91,21 @@ class TranslateVideo implements ShouldQueue
             return;
         }
 
-        try {
-            GenerateVideo::dispatchSync($video->fresh(), replan: false);
-        } catch (Throwable) {
-            // The job saves the error on the video.
+        // On a queue the recording is a job of its own, with the time a
+        // recording of its length and versions needs; run directly (queue:
+        // false), it runs straight after.
+        if ($this->job === null || $this->job instanceof SyncJob) {
+            try {
+                GenerateVideo::dispatchSync($video->fresh(), replan: false);
+            } catch (Throwable) {
+                // The job saves the error on the video.
+            }
+
+            return;
         }
+
+        $video->moveTo(VideoStatus::Queued, "Queued to record the $language version");
+        GenerateVideo::dispatch($video->fresh(), replan: false);
     }
 
     /**

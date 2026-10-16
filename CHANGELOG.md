@@ -2,6 +2,19 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/). While the version is 0.x, minor releases may include breaking changes; they will be listed here.
 
+## v0.17.3 - 2026-10-16
+
+### Fixed
+
+- **AI costs and copies made at the same moment all count.** A video's AI cost is now added in the database, so requests made at once by a job and the studio are all counted against its spending limit. The state of each GIF, square or vertical copy, and the log, are changed with the row locked, so two copies made at once no longer lose each other's state.
+- **Pressing a button twice starts the work once.** A copy, a "Does it still work?" check or a "Where to put it" search is no longer started twice by a quick second press.
+- **Long translated videos are no longer cut short.** The recording of a translation is now a queued job of its own, with the time its length and versions need, instead of running inside the translation's one-hour job.
+- **Every recorder script opens the app the same way.** The recorder scripts share one setup (`resources/recorder/browser.cjs`). "Where to put it" now treats a tablet as a tablet, not a phone. Finding start pages and spots now reports a failed sign-in instead of quietly working signed out. Every script recognises `/signin` and `/sign-in` as sign-in pages, not only `/login`.
+
+### Removed
+
+- The studio's `regenerate` and `rerecord` routes, which nothing used since **Make it again** replaced them. `VideoDemo::rerecord()` stays.
+
 ## v0.17.2 - 2026-10-16
 
 ### Fixed

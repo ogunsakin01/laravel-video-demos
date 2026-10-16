@@ -345,8 +345,8 @@ class VideoController extends Controller
             'device' => ['nullable', Rule::in($video->recordedDevices())],
         ]);
 
-        if ((($video->exports ?? [])[$data['format']]['status'] ?? null) !== 'working') {
-            $video->forceFill(['exports' => [...($video->exports ?? []), $data['format'] => ['status' => 'working', 'at' => now()->toIso8601String()]]])->save();
+        // Started once, even when the button is pressed twice.
+        if ($video->startExport($data['format'])) {
             ExportVideo::dispatch($video, $data['format'], $data['device'] ?? null);
         }
 
@@ -420,10 +420,13 @@ class VideoController extends Controller
     public function verify(Video $video): RedirectResponse
     {
         abort_if($video->status->isWorking(), 409, 'This video is still being made.');
-        abort_if(empty($video->plan['steps']), 422, 'This video has no plan to check yet.');
+        abort_unless($video->hasPlan(), 422, 'This video has no plan to check yet.');
 
-        if (($video->verify_result['status'] ?? null) !== 'working') {
-            $video->forceFill(['verify_result' => ['status' => 'working', 'at' => now()->toIso8601String()]])->save();
+        // Started once, even when the button is pressed twice.
+        $started = $video->changeSaved('verify_result', fn (array $check) => ($check['status'] ?? null) === 'working'
+            ? null
+            : ['status' => 'working', 'at' => now()->toIso8601String()]);
+        if ($started) {
             VerifyVideo::dispatch($video);
         }
 
@@ -448,8 +451,11 @@ class VideoController extends Controller
     {
         abort_unless($video->isFinished(), 409, 'Only a finished video can be placed.');
 
-        if (($video->spots['status'] ?? null) !== 'working') {
-            $video->update(['spots' => ['status' => 'working', 'at' => now()->toIso8601String(), 'items' => $video->spots['items'] ?? []]]);
+        // Started once, even when the button is pressed twice.
+        $started = $video->changeSaved('spots', fn (array $spots) => ($spots['status'] ?? null) === 'working'
+            ? null
+            : ['status' => 'working', 'at' => now()->toIso8601String(), 'items' => $spots['items'] ?? []]);
+        if ($started) {
             FindSpots::dispatch($video);
         }
 
@@ -478,38 +484,6 @@ class VideoController extends Controller
         ]));
 
         return back()->with('status', $video->isPublished() ? 'Saved. Publish again to update the library.' : 'Saved.');
-    }
-
-    /**
-     * Queue the given video to be planned and recorded again.
-     */
-    public function regenerate(Request $request, Video $video): RedirectResponse
-    {
-        abort_if($video->status->isWorking(), 409, 'This video is still being made.');
-
-        // A new style is copied onto the video, like on the new-video form.
-        $style = $request->filled('style_id') ? VideoStyle::find($request->validate(['style_id' => ['integer', Rule::exists(VideoStyle::class, 'id')]])['style_id']) : null;
-
-        $video->update([
-            ...($style ? ['style' => $style->snapshot()] : []),
-            ...$request->validate([
-                'prompt' => ['required', 'string', 'max:4000'],
-                'target_seconds' => ['required', 'integer', 'min:10', 'max:'.config('video-demo.limits.max_seconds', 300)],
-                'effort' => ['required', Rule::in(Pricing::EFFORTS)],
-                'max_cost' => ['nullable', 'numeric', 'min:0.01', 'max:100'],
-                'max_steps' => ['nullable', 'integer', 'min:3', 'max:250'],
-                'speed' => ['nullable', 'numeric', 'min:0.25', 'max:4'],
-                'sample_data' => ['nullable', 'boolean'],
-            ]),
-            'sample_data' => $request->has('sample_data') ? $request->boolean('sample_data') : $video->sample_data,
-            'status' => VideoStatus::Queued,
-            'error' => null,
-            'stop_requested' => false,
-        ]);
-        $video->addLog('Queued for a new plan');
-        GenerateVideo::dispatch($video);
-
-        return redirect()->route('video-demo.studio.show', $video);
     }
 
     /**
@@ -577,33 +551,6 @@ class VideoController extends Controller
             default => 'Queued for a new plan',
         });
         GenerateVideo::dispatch($video, replan: $replan);
-
-        return redirect()->route('video-demo.studio.show', $video);
-    }
-
-    /**
-     * Queue the given video's plan to be recorded again.
-     */
-    public function rerecord(Request $request, Video $video): RedirectResponse
-    {
-        abort_if($video->status->isWorking(), 409, 'This video is still being made.');
-        abort_if(empty($video->plan['steps']), 422, 'This video has no plan to record yet.');
-
-        $data = $request->validate([
-            'devices' => ['required', 'array', 'min:1'],
-            'devices.*' => ['string', Rule::in(Devices::keys())],
-            'speed' => ['nullable', 'numeric', 'min:0.25', 'max:4'],
-        ]);
-
-        $video->update([
-            'status' => VideoStatus::Queued,
-            'error' => null,
-            'stop_requested' => false,
-            'devices' => array_values(array_intersect(Devices::keys(), $data['devices'])),
-            'speed' => $data['speed'] ?? $video->speed,
-        ]);
-        $video->addLog('Queued to record the same plan again');
-        GenerateVideo::dispatch($video, replan: false);
 
         return redirect()->route('video-demo.studio.show', $video);
     }

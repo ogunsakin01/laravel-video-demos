@@ -7,10 +7,11 @@
 // Writes result.json: { pages: [{ path, title }], skipped: [{ path, reason }] }.
 const fs = require('fs');
 const path = require('path');
-const { chromium } = require('playwright');
+const browserKit = require('./browser.cjs');
+const { launch, newContext, signIn, firstLine } = browserKit;
 
 const job = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
-const url = p => job.baseUrl.replace(/\/$/, '') + '/' + String(p).replace(/^\//, '');
+const url = p => browserKit.url(job, p);
 
 const decode = s => s
   .replace(/<[^>]+>/g, ' ')
@@ -30,15 +31,9 @@ function titleOf(html) {
   const skipped = [];
   let browser, error = null;
   try {
-    browser = await chromium.launch(job.channel ? { channel: job.channel } : {});
-    const context = await browser.newContext({ ignoreHTTPSErrors: !!job.ignoreHttpsErrors });
-    // Sample data: the cookie sends every request to the video's own database.
-    if (job.cookies?.length) await context.addCookies(job.cookies);
-    if (job.loginPath) {
-      const page = await context.newPage();
-      await page.goto(url(job.loginPath), { waitUntil: 'domcontentloaded', timeout: 60000 });
-      await page.close();
-    }
+    browser = await launch(job);
+    const context = await newContext(browser, job);
+    await signIn(context, job);
 
     const check = async p => {
       try {
@@ -59,7 +54,7 @@ function titleOf(html) {
       while (queue.length) await check(queue.shift());
     }));
   } catch (e) {
-    error = String(e.message || e).split('\n')[0];
+    error = firstLine(e);
   } finally {
     await browser?.close();
     fs.writeFileSync(path.join(job.outDir, 'result.json'), JSON.stringify({ pages, skipped, error }, null, 2));

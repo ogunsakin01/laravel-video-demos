@@ -108,7 +108,7 @@ class StudioTest extends TestCase
             'status' => VideoStatus::Ready, 'devices' => ['desktop'], 'plan' => ['title' => 'x', 'summary' => '', 'steps' => [['action' => 'pause']]],
         ]);
 
-        $this->post("/video-demo/studio/{$video->id}/rerecord", ['devices' => ['tv', 'desktop', 'tablet']])->assertRedirect();
+        $this->post("/video-demo/studio/{$video->id}/again", ['prompt' => 'x', 'target_seconds' => 60, 'devices' => ['tv', 'desktop', 'tablet'], 'model' => 'claude-opus-5-5', 'effort' => 'high', 'new_plan' => '0'])->assertRedirect();
 
         $this->assertSame(['desktop', 'tv', 'tablet'], $video->fresh()->devices);
         Queue::assertPushed(GenerateVideo::class, fn ($job) => ! $job->replan);
@@ -152,16 +152,16 @@ class StudioTest extends TestCase
             ->assertSee('value="'.$clean->id.'" data-direction="'.e($clean->direction).'" data-voice="" data-music="" selected', false)
             ->assertSee('Spotlight');
 
-        $form = ['prompt' => 'x', 'target_seconds' => 30, 'effort' => 'high'];
-        $this->post("/video-demo/studio/{$video->id}/regenerate", [...$form, 'style_id' => $spotlight->id])->assertRedirect();
+        $form = ['prompt' => 'x', 'target_seconds' => 30, 'devices' => ['desktop'], 'model' => 'claude-sonnet-5-5', 'effort' => 'high', 'new_plan' => '1'];
+        $this->post("/video-demo/studio/{$video->id}/again", [...$form, 'style_id' => $spotlight->id])->assertRedirect();
         $this->assertSame(['Spotlight', true], [$video->fresh()->style['name'], $video->fresh()->style['zoom']]);
         Queue::assertPushed(GenerateVideo::class, fn ($job) => $job->video->is($video) && $job->replan);
 
         // Without a choice, the style stays as it was; a style that doesn't exist is refused.
         $video->refresh()->update(['status' => VideoStatus::Ready]);
-        $this->post("/video-demo/studio/{$video->id}/regenerate", [...$form, 'style_id' => ''])->assertRedirect();
+        $this->post("/video-demo/studio/{$video->id}/again", [...$form, 'style_id' => ''])->assertRedirect();
         $this->assertSame('Spotlight', $video->fresh()->style['name']);
         $video->refresh()->update(['status' => VideoStatus::Ready]);
-        $this->post("/video-demo/studio/{$video->id}/regenerate", [...$form, 'style_id' => 999])->assertSessionHasErrors('style_id');
+        $this->post("/video-demo/studio/{$video->id}/again", [...$form, 'style_id' => 999])->assertSessionHasErrors('style_id');
     }
 }

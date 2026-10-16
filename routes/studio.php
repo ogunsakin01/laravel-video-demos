@@ -46,8 +46,6 @@ Route::middleware(AuthorizeStudio::class)->group(function () {
     Route::post('/{video}/spots', [VideoController::class, 'findSpots'])->name('spots');
     Route::get('/{video}/spots/{file}', [VideoController::class, 'spotShot'])->where('file', '\d+-[a-z]+(-(closed|open))?\.jpg')->name('spot-shot');
     Route::patch('/{video}', [VideoController::class, 'update'])->name('update');
-    Route::post('/{video}/regenerate', [VideoController::class, 'regenerate'])->name('regenerate');
-    Route::post('/{video}/rerecord', [VideoController::class, 'rerecord'])->name('rerecord');
     Route::post('/{video}/again', [VideoController::class, 'again'])->name('again');
     Route::post('/{video}/improve', [VideoController::class, 'improve'])->name('improve');
     Route::post('/{video}/retry', [VideoController::class, 'retry'])->name('retry');

@@ -7,7 +7,7 @@
 // width. Writes done.json next to the GIF: its size and frame count.
 const fs = require('fs');
 const path = require('path');
-const { chromium } = require('playwright');
+const { launch } = require('./browser.cjs');
 
 const job = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 // gifenc is a CommonJS file; it runs in the page as a plain script.
@@ -16,7 +16,7 @@ const GIFENC = fs.readFileSync(require.resolve('gifenc'), 'utf8');
 (async () => {
   const frames = fs.readdirSync(job.framesDir).filter(f => f.endsWith('.jpg')).sort();
   if (!frames.length) throw new Error('The video has no frames.');
-  const browser = await chromium.launch(job.channel ? { channel: job.channel } : {});
+  const browser = await launch(job);
   try {
     const page = await browser.newPage();
     await page.setContent('<canvas></canvas>');

@@ -8,7 +8,7 @@
 // and no cursor, captions or cards, to check that every step still works.
 const fs = require('fs');
 const path = require('path');
-const { chromium } = require('playwright');
+const browserKit = require('./browser.cjs');
 const { CURSOR_JS, OVERLAY_JS, HIGHLIGHT_JS, setPace, typingDelay, pause, glide, click, scrollBy, scrollTo } = require('./helpers.cjs');
 
 const job = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
@@ -59,7 +59,7 @@ async function wide(page) {
 }
 const SNAPSHOT_LIMIT = 12000;
 
-const url = p => job.baseUrl.replace(/\/$/, '') + '/' + String(p).replace(/^\//, '');
+const url = p => browserKit.url(job, p);
 
 // Build a locator for a plan target, inside an iframe when target.frame is set.
 function locate(page, t) {
@@ -92,12 +92,11 @@ async function find(page, t) {
 }
 
 // Wait for the page to load and its network to go quiet, without failing if it never does:
-// a slow image or script from another site must not stop the video.
+// a slow image or script from another site must not stop the video. A recording
+// waits a little longer for quiet than a check, so pages are shown finished.
+const RECORDING_QUIET = 4000;
 async function settle(page) {
-  await waiting(async () => {
-    await page.waitForLoadState('load', { timeout: 10000 }).catch(() => {});
-    await page.waitForLoadState('networkidle', { timeout: 4000 }).catch(() => {});
-  });
+  await waiting(() => browserKit.settle(page, RECORDING_QUIET));
 }
 
 async function run(page, step, isLast) {
@@ -108,7 +107,7 @@ async function run(page, step, isLast) {
       // Only the page itself must arrive; images and scripts get settle()'s grace period.
       await waiting(() => page.goto(url(step.url), { waitUntil: 'domcontentloaded', timeout: 60000 }));
       await settle(page);
-      if (/\/login\b/.test(new URL(page.url()).pathname) && !/\/login\b/.test(step.url)) {
+      if (browserKit.isSignIn(page.url()) && !browserKit.isSignIn(url(step.url))) {
         throw new Error(`Opening ${step.url} went to the sign-in page instead. ${job.loginPath ? "The recorder's user may not have access." : 'The recorder is signed out; set video-demo.recorder.login_as.'}`);
       }
       // Time to take in the new page before anything moves.
@@ -253,35 +252,21 @@ async function snapshot(page) {
   // Started inside the try, so a browser that won't start is reported in the result.
   let browser, page;
   try {
-    browser = await chromium.launch(job.channel ? { channel: job.channel } : {});
+    browser = await browserKit.launch(job);
     // Playwright records at the page's own size, so each version is recorded at its screen size.
-    const common = {
-      viewport: job.viewport,
-      hasTouch: !!job.touch,
-      // Phones get mobile layout handling (the page's meta viewport).
-      isMobile: !!job.touch && job.viewport.width < 600,
-      // Record the app in light or dark mode, for apps that follow the system setting.
-      ...(style.app_theme === 'dark' || style.app_theme === 'light' ? { colorScheme: style.app_theme } : {}),
-      ignoreHTTPSErrors: !!job.ignoreHttpsErrors,
-      // A video in another language opens the app in that language.
-      ...(job.locale ? { locale: job.locale } : {}),
-    };
+    // The app is recorded in light or dark mode, for apps that follow the system setting.
+    const theme = style.app_theme === 'dark' || style.app_theme === 'light' ? { colorScheme: style.app_theme } : {};
 
     // Sign in first, outside the recording.
     let storageState;
     if (job.loginPath) {
-      const ctx = await browser.newContext(common);
-      if (job.cookies?.length) await ctx.addCookies(job.cookies);
-      const p = await ctx.newPage();
-      const res = await p.goto(url(job.loginPath), { waitUntil: 'domcontentloaded', timeout: 60000 });
-      if (!res || res.status() >= 400) throw new Error(`Signing in failed with HTTP ${res ? res.status() : 'no response'}. Is the studio enabled and the app running at ${job.baseUrl}?`);
+      const ctx = await browserKit.newContext(browser, job, job, theme);
+      await browserKit.signIn(ctx, job);
       storageState = await ctx.storageState();
       await ctx.close();
     }
 
-    const context = await browser.newContext({ ...common, storageState, ...(DRY ? {} : { recordVideo: { dir: job.outDir, size: job.viewport } }) });
-    // Sample data: the cookie sends every request to the video's own database.
-    if (job.cookies?.length) await context.addCookies(job.cookies);
+    const context = await browserKit.newContext(browser, job, job, { ...theme, storageState, ...(DRY ? {} : { recordVideo: { dir: job.outDir, size: job.viewport } }) });
     await context.addInitScript(`window.__demoStyle = ${JSON.stringify(style)};`);
     // Touch screens show where a finger taps instead of a cursor.
     if (job.touch) await context.addInitScript('window.__demoTouch = true;');

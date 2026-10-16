@@ -7,7 +7,7 @@
 // and the keyframes: [{ s: start second, z: zoom, x, y: centre }].
 const fs = require('fs');
 const path = require('path');
-const { chromium } = require('playwright');
+const { launch } = require('./browser.cjs');
 
 const job = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const { width: W, height: H, fps, keys } = job;
@@ -27,7 +27,7 @@ function cameraAt(t) {
 (async () => {
   const frames = fs.readdirSync(job.framesDir).filter(f => f.endsWith('.jpg')).sort();
   fs.mkdirSync(job.outDir, { recursive: true });
-  const browser = await chromium.launch(job.channel ? { channel: job.channel } : {});
+  const browser = await launch(job);
   try {
     const page = await browser.newPage();
     await page.setContent(`<canvas width="${W}" height="${H}"></canvas>`);

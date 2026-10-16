@@ -64,8 +64,7 @@ class ExportVideo implements ShouldQueue
      */
     protected function save(array $state): void
     {
-        $video = $this->video->fresh() ?? $this->video;
-        $video->forceFill(['exports' => [...($video->exports ?? []), $this->format => [...$state, 'at' => now()->toIso8601String()]]])->save();
+        $this->video->setExport($this->format, $state);
     }
 
     /**

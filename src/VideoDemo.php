@@ -387,10 +387,10 @@ class VideoDemo
         }
 
         $file = app(Exporter::class)->export($video, $format, $device);
-        $video->forceFill(['exports' => [...($video->exports ?? []), $format => [
-            'status' => 'ready', 'device' => $device ?? $video->primaryDevice(), 'version' => $video->version, 'at' => now()->toIso8601String(),
+        $video->setExport($format, [
+            'status' => 'ready', 'device' => $device ?? $video->primaryDevice(), 'version' => $video->version,
             'bytes' => Storage::disk(config('video-demo.storage.work_disk'))->size($file),
-        ]]])->save();
+        ]);
 
         return Storage::disk(config('video-demo.storage.work_disk'))->path($file);
     }

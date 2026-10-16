@@ -9,7 +9,7 @@
 // accent), and focus: where each step happened, [{ t, x, y, w, h } or { t, wide }].
 const fs = require('fs');
 const path = require('path');
-const { chromium } = require('playwright');
+const { launch } = require('./browser.cjs');
 
 const job = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const { width: W, height: H, srcWidth: SW, srcHeight: SH, fps } = job;
@@ -49,7 +49,7 @@ function centreAt(t) {
 (async () => {
   const frames = fs.readdirSync(job.framesDir).filter(f => f.endsWith('.jpg')).sort();
   fs.mkdirSync(job.outDir, { recursive: true });
-  const browser = await chromium.launch(job.channel ? { channel: job.channel } : {});
+  const browser = await launch(job);
   try {
     const page = await browser.newPage();
     await page.setContent(`<html><head><link rel="stylesheet" href="https://fonts.bunny.net/css?family=geist:500,700|geist-mono:500&display=swap"></head><body><canvas width="${W}" height="${H}"></canvas></body></html>`, { waitUntil: 'load', timeout: 8000 }).catch(() => {});

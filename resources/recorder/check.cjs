@@ -6,11 +6,11 @@
 // languages being each page's <html lang>, for the language the video is made in.
 const fs = require('fs');
 const path = require('path');
-const { chromium } = require('playwright');
+const browserKit = require('./browser.cjs');
+const { TIMEOUTS, isSignIn, launch, newContext, signIn, settle, firstLine } = browserKit;
 
 const job = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
-const url = p => job.baseUrl.replace(/\/$/, '') + '/' + String(p).replace(/^\//, '');
-const isSignIn = u => /\/(login|signin|sign-in)\b/.test(new URL(u).pathname);
+const url = p => browserKit.url(job, p);
 
 // Read the error a page shows, preferring Laravel's exception message.
 async function describeError(page) {
@@ -25,22 +25,14 @@ async function describeError(page) {
   const languages = {};
   let browser;
   try {
-    browser = await chromium.launch(job.channel ? { channel: job.channel } : {});
-    const context = await browser.newContext({
-      viewport: job.viewport, hasTouch: !!job.touch,
-      isMobile: !!job.touch && job.viewport.width < 600, ignoreHTTPSErrors: !!job.ignoreHttpsErrors,
-      ...(job.locale ? { locale: job.locale } : {}),
-    });
-    // Sample data: the cookie sends every request to the video's own database.
-    if (job.cookies?.length) await context.addCookies(job.cookies);
-    const page = await context.newPage();
-
-    if (job.loginPath) {
-      const res = await page.goto(url(job.loginPath), { waitUntil: 'domcontentloaded', timeout: 60000 });
-      if (!res || res.status() >= 400) {
-        problems.push({ path: '(sign in)', problem: `Signing the recorder in failed with HTTP ${res ? res.status() : 'no response'}`, status: res ? res.status() : null, url: null, detail: 'Is the studio enabled and the app running at ' + job.baseUrl + '?' });
-      }
+    browser = await launch(job);
+    const context = await newContext(browser, job);
+    try {
+      await signIn(context, job);
+    } catch (e) {
+      problems.push({ path: '(sign in)', problem: 'Signing the recorder in failed', status: null, url: null, detail: firstLine(e) });
     }
+    const page = await context.newPage();
 
     for (const p of job.paths) {
       const jsErrors = [];
@@ -48,9 +40,8 @@ async function describeError(page) {
       page.on('pageerror', onError);
       try {
         // A slow image or script from another site doesn't make the page broken.
-        const res = await page.goto(url(p), { waitUntil: 'domcontentloaded', timeout: 30000 });
-        await page.waitForLoadState('load', { timeout: 10000 }).catch(() => {});
-        await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+        const res = await page.goto(url(p), { waitUntil: 'domcontentloaded', timeout: TIMEOUTS.page });
+        await settle(page);
         const status = res ? res.status() : null;
         const finalUrl = page.url();
         const lang = await page.evaluate(() => document.documentElement.lang || '').catch(() => '');
@@ -69,12 +60,12 @@ async function describeError(page) {
         // Only a page that works says which language the video is made in.
         if (lang && problems.length === before) languages[p] = lang;
       } catch (e) {
-        problems.push({ path: p, problem: 'The page did not load', status: null, url: null, detail: String(e.message || e).split('\n')[0].slice(0, 300) });
+        problems.push({ path: p, problem: 'The page did not load', status: null, url: null, detail: firstLine(e).slice(0, 300) });
       }
       page.off('pageerror', onError);
     }
   } catch (e) {
-    problems.push({ path: '(browser)', problem: 'The page check could not run', status: null, url: null, detail: String(e.message || e).split('\n')[0] });
+    problems.push({ path: '(browser)', problem: 'The page check could not run', status: null, url: null, detail: firstLine(e) });
   } finally {
     await browser?.close();
     fs.writeFileSync(path.join(job.outDir, 'result.json'), JSON.stringify({ problems, languages }, null, 2));

@@ -356,11 +356,11 @@ class SampleDataTest extends TestCase
         $this->get("/video-demo/studio/{$video->id}")->assertDontSee('Try again on sample data')->assertSee('Sample data');
 
         // "Make it again" can switch it off and on.
-        $form = ['prompt' => 'x', 'target_seconds' => 30, 'effort' => 'high'];
-        $this->post("/video-demo/studio/{$video->id}/regenerate", [...$form, 'sample_data' => '0'])->assertRedirect();
+        $form = ['prompt' => 'x', 'target_seconds' => 30, 'devices' => ['desktop'], 'model' => $video->model, 'effort' => 'high'];
+        $this->post("/video-demo/studio/{$video->id}/again", [...$form, 'sample_data' => '0'])->assertRedirect();
         $this->assertFalse($video->fresh()->sample_data);
         $video->refresh()->update(['status' => VideoStatus::Failed]);
-        $this->post("/video-demo/studio/{$video->id}/regenerate", [...$form, 'sample_data' => '1'])->assertRedirect();
+        $this->post("/video-demo/studio/{$video->id}/again", [...$form, 'sample_data' => '1'])->assertRedirect();
         $this->assertTrue($video->fresh()->sample_data);
 
         // And from code.

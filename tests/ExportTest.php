@@ -131,6 +131,27 @@ class ExportTest extends TestCase
         $this->get("/video-demo/studio/{$video->id}")->assertSee('Made from an older recording.');
     }
 
+    public function test_copies_made_at_once_keep_each_others_state_and_start_once(): void
+    {
+        Queue::fake();
+        $video = $this->video();
+
+        // Pressed twice: one job.
+        $this->post("/video-demo/studio/{$video->id}/exports", ['format' => 'gif'])->assertRedirect();
+        $this->post("/video-demo/studio/{$video->id}/exports", ['format' => 'gif'])->assertRedirect();
+        Queue::assertPushed(ExportVideo::class, 1);
+
+        // Two workers, each with the video as it was when its job was queued.
+        $square = new ExportVideo(Video::findOrFail($video->id), 'square');
+        $gif = new ExportVideo(Video::findOrFail($video->id), 'gif');
+        $this->fakeTools();
+        $square->handle(app(Exporter::class));
+        $gif->handle(app(Exporter::class));
+
+        $exports = $video->fresh()->exports;
+        $this->assertSame(['ready', 'ready'], [$exports['square']['status'], $exports['gif']['status']]);
+    }
+
     public function test_a_failed_copy_says_why(): void
     {
         $this->fakeTools();

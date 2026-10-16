@@ -3,6 +3,7 @@
 namespace Ogunsakin01\VideoDemo\Tests;
 
 use Closure;
+use Illuminate\Contracts\Queue\Job;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\File;
@@ -12,6 +13,7 @@ use Illuminate\Support\Facades\Storage;
 use InvalidArgumentException;
 use Ogunsakin01\VideoDemo\Enums\VideoStatus;
 use Ogunsakin01\VideoDemo\Facades\VideoDemo;
+use Ogunsakin01\VideoDemo\Jobs\GenerateVideo;
 use Ogunsakin01\VideoDemo\Jobs\TranslateVideo;
 use Ogunsakin01\VideoDemo\Library\Manifest;
 use Ogunsakin01\VideoDemo\Models\Spend;
@@ -162,6 +164,29 @@ class TranslateTest extends TestCase
             $this->assertGreaterThan(0, $french->cost);
             $this->assertSame(2, Spend::where('kind', 'translate')->where('video_id', $french->id)->count());
             $this->assertSame(0.0, $original->fresh()->cost);
+        } finally {
+            $this->stopFakeAnthropic();
+        }
+    }
+
+    public function test_on_a_queue_the_recording_is_a_job_of_its_own(): void
+    {
+        $this->startFakeAnthropic();
+        try {
+            $this->reply(1, $this->translation());
+            $recorder = $this->fakeBrowser(fn () => true);
+            Queue::fake();
+            $french = VideoDemo::translate($this->original(), 'fr');
+
+            // Run the queued job as a worker would.
+            $job = Queue::pushed(TranslateVideo::class)->first();
+            $job->setJob(\Mockery::mock(Job::class));
+            app()->call([$job, 'handle']);
+
+            // Translated and checked here; recorded by its own job, with the time a recording needs.
+            $this->assertSame([['verify', 'fr']], $recorder->locales);
+            $this->assertSame(VideoStatus::Queued, $french->fresh()->status);
+            Queue::assertPushed(GenerateVideo::class, fn (GenerateVideo $g) => $g->video->is($french));
         } finally {
             $this->stopFakeAnthropic();
         }

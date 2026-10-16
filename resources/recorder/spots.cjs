@@ -17,25 +17,11 @@
 // { spots: [{ found, position, ok, problems: [{ screen, state, problem }], shots: { screen: { closed, open } } }] }.
 const fs = require('fs');
 const path = require('path');
-const { chromium } = require('playwright');
+const browserKit = require('./browser.cjs');
+const { launch, newContext, signIn, firstLine } = browserKit;
 
 const job = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
-const url = p => job.baseUrl.replace(/\/$/, '') + '/' + String(p).replace(/^\//, '');
-
-async function open(context, p) {
-  const page = await context.newPage();
-  const res = await page.goto(url(p), { waitUntil: 'domcontentloaded', timeout: 30000 });
-  await page.waitForLoadState('load', { timeout: 10000 }).catch(() => {});
-  await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
-  return { page, status: res ? res.status() : null };
-}
-
-async function signIn(context) {
-  if (!job.loginPath) return;
-  const page = await context.newPage();
-  await page.goto(url(job.loginPath), { waitUntil: 'domcontentloaded', timeout: 60000 });
-  await page.close();
-}
+const open = (context, p) => browserKit.open(context, job, p);
 
 // Runs in the page: the sections worth putting a video in, each with a selector
 // that finds it again.
@@ -186,11 +172,10 @@ function outline(accent) {
   const out = { pages: [], failed: [], spots: [] };
   let browser;
   try {
-    browser = await chromium.launch(job.channel ? { channel: job.channel } : {});
+    browser = await launch(job);
     if (job.mode === 'map') {
-      const context = await browser.newContext({ viewport: job.viewport, ignoreHTTPSErrors: !!job.ignoreHttpsErrors });
-      if (job.cookies?.length) await context.addCookies(job.cookies);
-      await signIn(context);
+      const context = await newContext(browser, job, { viewport: job.viewport });
+      await signIn(context, job);
       for (const p of job.paths) {
         try {
           const { page, status } = await open(context, p);
@@ -198,15 +183,14 @@ function outline(accent) {
           else out.pages.push({ path: p, ...(await page.evaluate(sections)) });
           await page.close();
         } catch (e) {
-          out.failed.push({ path: p, reason: String(e.message || e).split('\n')[0].slice(0, 200) });
+          out.failed.push({ path: p, reason: firstLine(e).slice(0, 200) });
         }
       }
     } else {
       const contexts = {};
       for (const screen of job.screens) {
-        contexts[screen.key] = await browser.newContext({ viewport: screen.viewport, hasTouch: !!screen.touch, isMobile: !!screen.touch, ignoreHTTPSErrors: !!job.ignoreHttpsErrors });
-        if (job.cookies?.length) await contexts[screen.key].addCookies(job.cookies);
-        await signIn(contexts[screen.key]);
+        contexts[screen.key] = await newContext(browser, job, screen);
+        await signIn(contexts[screen.key], job);
       }
 
       for (const [i, spot] of job.spots.entries()) {
@@ -265,7 +249,7 @@ function outline(accent) {
       }
     }
   } catch (e) {
-    out.error = String(e.message || e).split('\n')[0];
+    out.error = firstLine(e);
   } finally {
     await browser?.close();
     fs.writeFileSync(path.join(job.resultDir || job.outDir, 'result.json'), JSON.stringify(out, null, 2));

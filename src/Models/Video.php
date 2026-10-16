@@ -2,6 +2,7 @@
 
 namespace Ogunsakin01\VideoDemo\Models;
 
+use Closure;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -156,9 +157,69 @@ class Video extends Model
      */
     public function addLog(string $message): void
     {
-        $saved = $this->exists ? static::whereKey($this->id)->first(['id', 'log'])?->log : null;
-        $this->log = [...($saved ?? $this->log ?? []), ['at' => now()->toIso8601String(), 'message' => $message]];
+        $this->changeSaved('log', fn (array $log) => [...$log, ['at' => now()->toIso8601String(), 'message' => $message]]);
         $this->save();
+    }
+
+    /**
+     * Change a JSON column from its saved value, with the row locked, so a job
+     * and the studio (or two jobs) changing it at once don't overwrite each
+     * other. Returns false, changing nothing, when $change returns null.
+     *
+     * @param  Closure(array): ?array  $change
+     */
+    public function changeSaved(string $column, Closure $change): bool
+    {
+        if (! $this->exists) {
+            $value = $change($this->{$column} ?? []);
+            if ($value !== null) {
+                $this->{$column} = $value;
+            }
+
+            return $value !== null;
+        }
+
+        $value = $this->getConnection()->transaction(function () use ($column, $change) {
+            $saved = static::whereKey($this->getKey())->lockForUpdate()->firstOrFail([$this->getKeyName(), $column]);
+            $value = $change($saved->{$column} ?? []);
+            if ($value !== null) {
+                // Quietly: this copy holds only the one column, so the model's
+                // own saving rules, which read others, must not run on it.
+                $saved->{$column} = $value;
+                $saved->saveQuietly();
+            }
+
+            return $value;
+        });
+
+        if ($value === null) {
+            return false;
+        }
+        $this->{$column} = $value;
+        $this->syncOriginalAttribute($column);
+
+        return true;
+    }
+
+    /**
+     * Save the state of one copy (GIF, square, vertical), keeping the others'.
+     *
+     * @param  array<string, mixed>  $state
+     */
+    public function setExport(string $format, array $state): void
+    {
+        $this->changeSaved('exports', fn (array $exports) => [...$exports, $format => [...$state, 'at' => now()->toIso8601String()]]);
+    }
+
+    /**
+     * Mark a copy as being made, unless it already is. Returns false when it
+     * already was, so it is started only once.
+     */
+    public function startExport(string $format): bool
+    {
+        return $this->changeSaved('exports', fn (array $exports) => ($exports[$format]['status'] ?? null) === 'working'
+            ? null
+            : [...$exports, $format => ['status' => 'working', 'at' => now()->toIso8601String()]]);
     }
 
     /**
@@ -186,12 +247,24 @@ class Video extends Model
     public function addUsage(Usage $usage, string $kind = 'plan'): void
     {
         Spend::record($kind, $usage->cost, $this->id, $kind === 'voice' ? $this->voice : $this->model);
-        $this->input_tokens += $usage->input;
-        $this->cache_write_tokens += $usage->cacheWrite;
-        $this->cache_read_tokens += $usage->cacheRead;
-        $this->output_tokens += $usage->output;
-        $this->cost = round($this->cost + $usage->cost, 6);
-        $this->save();
+        $totals = ['input_tokens' => $usage->input, 'cache_write_tokens' => $usage->cacheWrite, 'cache_read_tokens' => $usage->cacheRead, 'output_tokens' => $usage->output, 'cost' => $usage->cost];
+
+        if (! $this->exists) {
+            foreach ($totals as $column => $amount) {
+                $this->{$column} += $amount;
+            }
+
+            return;
+        }
+
+        // Added in the database, so requests made at once by a job and the
+        // studio all count against the limit; then read back.
+        static::whereKey($this->getKey())->incrementEach($totals);
+        $saved = static::whereKey($this->getKey())->first(array_keys($totals));
+        foreach (array_keys($totals) as $column) {
+            $this->{$column} = $column === 'cost' ? round((float) $saved->cost, 6) : $saved->{$column};
+            $this->syncOriginalAttribute($column);
+        }
     }
 
     /**
