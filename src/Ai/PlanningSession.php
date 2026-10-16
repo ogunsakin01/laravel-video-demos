@@ -39,6 +39,12 @@ class PlanningSession
     public int $repairs = 0;
 
     /**
+     * What the last request cost, to judge whether the next one fits the
+     * video's limit. Kept across repairs, whose first request is the largest.
+     */
+    public float $lastCost = 0.0;
+
+    /**
      * The tools for the video's sample database, when it is recorded on sample data.
      */
     public ?SampleDataTools $sampleData = null;

@@ -43,8 +43,8 @@ class CleanCommand extends Command
 
         if ($this->option('browser')) {
             $modules = (string) config('video-demo.recorder.node_modules');
-            if ($modules !== '' && is_dir($modules) && str_starts_with(realpath($modules) ?: '', realpath(storage_path()) ?: '//')) {
-                $remove[] = ['path' => dirname($modules), 'why' => 'the Playwright install and its browser'];
+            if ($this->insideStorage($modules)) {
+                $remove[] = ['path' => dirname(realpath($modules)), 'why' => 'the Playwright install and its browser'];
             } elseif ($modules !== '') {
                 $this->components->warn("Playwright at [$modules] is outside this app's storage folder, so it was left alone.");
             }
@@ -98,6 +98,22 @@ class CleanCommand extends Command
     }
 
     /**
+     * Determine if a Playwright install (its node_modules folder) is inside a
+     * folder of its own in this app's storage, so removing that folder can't
+     * take storage itself, or anything outside it, with it.
+     */
+    protected function insideStorage(string $modules): bool
+    {
+        $modules = $modules !== '' ? realpath($modules) : false;
+        $storage = realpath(storage_path());
+        if ($modules === false || $storage === false || basename($modules) !== 'node_modules') {
+            return false;
+        }
+
+        return str_starts_with(dirname($modules), $storage.DIRECTORY_SEPARATOR);
+    }
+
+    /**
      * Find working files nothing needs: temporary folders, the folders of
      * deleted videos, and raw recordings left by runs that stopped early.
      *
@@ -114,13 +130,14 @@ class CleanCommand extends Command
             return [];
         }
 
-        $videos = Video::query()->get(['id', 'status'])->keyBy('id');
+        $videos = Video::query()->get(['id', 'status', 'verify_result', 'spots', 'exports'])->keyBy('id');
         $remove = [];
 
         foreach (File::directories($root) as $dir) {
             $name = basename($dir);
 
-            // Sample databases of videos still being made are in use.
+            // Sample databases are in use while anything runs for their video:
+            // making it, checking it, or finding spots.
             if ($name === 'sandbox') {
                 $current = 'base-'.Sandbox::fingerprint().'.sqlite';
                 foreach (File::files($dir) as $file) {
@@ -134,7 +151,7 @@ class CleanCommand extends Command
                         continue;
                     }
                     $id = (int) strtok($name, '-');
-                    if (! $videos->get($id)?->status->isWorking()) {
+                    if (! $videos->get($id)?->isBusy()) {
                         $remove[] = ['path' => $file->getPathname(), 'why' => 'sample database of video #'.$id];
                     }
                 }
@@ -159,10 +176,19 @@ class CleanCommand extends Command
                 continue;
             }
 
-            // Raw browser recordings are only needed while a video is being made.
-            if (! $video->status->isWorking()) {
+            // Raw browser recordings and working folders are only needed while
+            // something runs. Copies (exports) and spot pictures (spots) are the
+            // video's own files and stay.
+            if (! $video->isBusy()) {
                 foreach (File::directories($dir) as $raw) {
-                    $remove[] = ['path' => $raw, 'why' => "raw recording of video #$name (".basename($raw).')'];
+                    $folder = basename($raw);
+                    if ($folder === 'exports') {
+                        foreach (File::directories($raw) as $work) {
+                            $remove[] = ['path' => $work, 'why' => "temporary files of video #$name (exports/".basename($work).')'];
+                        }
+                    } elseif ($folder !== 'spots') {
+                        $remove[] = ['path' => $raw, 'why' => "raw recording of video #$name ($folder)"];
+                    }
                 }
             }
         }

@@ -219,6 +219,44 @@ class PlannerTest extends TestCase
         $this->assertLessThan(0.06, $video->fresh()->cost);
     }
 
+    public function test_hides_secrets_in_everything_it_sends_and_refuses_tool_calls_missing_input(): void
+    {
+        // A key in the developer's notes and in the request, which the brief carries.
+        config(['video-demo.ai.notes' => 'Staging key: sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123']);
+        $this->respond(1, [['type' => 'tool_use', 'id' => 'tu_list', 'name' => 'list_files', 'input' => []]]);
+        $this->respond(2, [$this->submit('tu_plan', [$this->step('goto', ['url' => '/'])])]);
+
+        $video = $this->video();
+        $video->update(['prompt' => 'Show the billing page. AWS key AKIAABCDEFGHIJKLMNOP is set.']);
+        app(Planner::class)->plan($video);
+
+        $brief = $this->request(1)['body']['messages'][0]['content'];
+        $this->assertStringNotContainsString('sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123', $brief);
+        $this->assertStringNotContainsString('AKIAABCDEFGHIJKLMNOP', $brief);
+        $this->assertStringContainsString('[redacted: Anthropic API key]', $brief);
+        $this->assertStringContainsString('[redacted: AWS access key]', $brief);
+
+        // A tool call without its path is answered with an error, not a crash.
+        $answer = end($this->request(2)['body']['messages'])['content'][0];
+        $this->assertTrue($answer['is_error']);
+        $this->assertStringContainsString('path is required.', $answer['content']);
+    }
+
+    public function test_sends_nothing_for_a_video_already_at_its_limit(): void
+    {
+        $this->respond(1, [$this->submit('tu_plan', [$this->step('goto', ['url' => '/'])])]);
+        $video = $this->video();
+        $video->update(['max_cost' => 0.05, 'cost' => 0.05]);
+
+        try {
+            app(Planner::class)->plan($video);
+            $this->fail('Expected the spending limit to stop planning.');
+        } catch (PlanningFailed $e) {
+            $this->assertStringContainsString('this video has reached its $0.05 limit', $e->getMessage());
+        }
+        $this->assertFalse($this->sent(1));
+    }
+
     public function test_stop_ends_planning_before_the_next_request(): void
     {
         $this->respond(1, [['type' => 'tool_use', 'id' => 'tu_1', 'name' => 'list_files', 'input' => ['path' => 'resources/views']]]);

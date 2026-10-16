@@ -75,12 +75,6 @@
 @once
   <script>
     document.addEventListener('DOMContentLoaded', () => {
-      document.querySelectorAll('#vd-check [data-busy-form]').forEach(form => form.addEventListener('submit', () => {
-        const b = form.querySelector('button');
-        b.setAttribute('aria-busy', 'true');
-        b.disabled = true;
-      }));
-
       // While the check runs, look now and then, and show the result once it's in.
       if (document.querySelector('[data-check-working]')) {
         const poll = setInterval(async () => {

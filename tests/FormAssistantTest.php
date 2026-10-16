@@ -35,7 +35,7 @@ class FormAssistantTest extends TestCase
             'target_seconds' => 900,
         ])]], 'end_turn', ['input_tokens' => 2_000, 'output_tokens' => 300, 'cache_creation_input_tokens' => 0, 'cache_read_input_tokens' => 0], 'claude-sonnet-5-5');
 
-        $this->postJson('/video-demo/studio/complete', ['prompt' => 'approve holiday', 'model' => 'claude-sonnet-5-5'])
+        $this->postJson('/video-demo/studio/complete', ['prompt' => 'approve holiday, token ghp_abcdefghijklmnopqrstuvwxyz0123456789', 'model' => 'claude-sonnet-5-5'])
             ->assertOk()
             ->assertJson([
                 'title' => 'Approve a holiday request',
@@ -51,6 +51,9 @@ class FormAssistantTest extends TestCase
         $this->assertSame('low', $body['output_config']['effort']);
         $this->assertSame('json_schema', $body['output_config']['format']['type']);
         $this->assertStringContainsString('approve holiday', $body['messages'][0]['content']);
+        // Secrets are hidden in one-off requests too.
+        $this->assertStringNotContainsString('ghp_abcdefghijklmnopqrstuvwxyz0123456789', $body['messages'][0]['content']);
+        $this->assertStringContainsString('[redacted: GitHub token]', $body['messages'][0]['content']);
     }
 
     public function test_explains_when_claude_cannot_be_reached(): void

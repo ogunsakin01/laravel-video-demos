@@ -96,7 +96,7 @@ class VideoDemo
         }
 
         $effort = $options['effort'] ?? config('video-demo.ai.effort');
-        if (! in_array($effort, ['low', 'medium', 'high', 'xhigh', 'max'], true)) {
+        if (! in_array($effort, Pricing::EFFORTS, true)) {
             throw new InvalidArgumentException("Unknown effort [$effort]. Choose low, medium, high, xhigh or max.");
         }
 
@@ -428,8 +428,10 @@ class VideoDemo
         if ($video->isPublished()) {
             $this->publisher->unpublish($video);
         }
-        Storage::disk(config('video-demo.storage.work_disk'))->deleteDirectory($video->workPath());
+        // The idea it was made from can be made again.
+        VideoIdea::where('video_id', $video->id)->update(['video_id' => null]);
         $video->delete();
+        Storage::disk(config('video-demo.storage.work_disk'))->deleteDirectory($video->workPath());
     }
 
     /**

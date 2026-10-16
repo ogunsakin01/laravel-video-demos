@@ -250,12 +250,6 @@
         }));
       });
 
-      document.querySelectorAll('[data-busy-form]').forEach(form => form.addEventListener('submit', () => {
-        const b = form.querySelector('button');
-        b.setAttribute('aria-busy', 'true');
-        b.disabled = true;
-      }));
-
       // While spots are being found: the bar and the stages follow the
       // server, the time left counts down in between, and the page shows the
       // spots once they're ready.

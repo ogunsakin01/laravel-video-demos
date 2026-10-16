@@ -56,11 +56,6 @@ use Throwable;
 class VideoController extends Controller
 {
     /**
-     * The effort levels a video can be planned with.
-     */
-    protected const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
-
-    /**
      * Display the studio's list of videos.
      */
     public function index(): View
@@ -103,7 +98,7 @@ class VideoController extends Controller
             'models' => Pricing::options(),
             'styles' => VideoStyle::options(),
             'devices' => Devices::all(),
-            'efforts' => self::EFFORTS,
+            'efforts' => Pricing::EFFORTS,
             'defaults' => [
                 'prompt' => $request->query('prompt', ''),
                 'title' => $request->query('title', ''),
@@ -257,7 +252,7 @@ class VideoController extends Controller
         return view('video-demo::studio.show', [
             'video' => $video,
             'devices' => Devices::all(),
-            'efforts' => self::EFFORTS,
+            'efforts' => Pricing::EFFORTS,
             'styles' => VideoStyle::options(),
             'recordAs' => RecordAs::options() + [$video->record_as ?? '' => $video->record_as_label ?: RecordAs::label($video->record_as)],
             'models' => Pricing::options(),
@@ -344,7 +339,7 @@ class VideoController extends Controller
      */
     public function export(Request $request, Video $video): RedirectResponse
     {
-        abort_unless($video->status === VideoStatus::Ready && $video->hasRecording(), 409, 'Only a finished video can be copied.');
+        abort_unless($video->isFinished(), 409, 'Only a finished video can be copied.');
         $data = $request->validate([
             'format' => ['required', Rule::in(array_keys(Exporter::FORMATS))],
             'device' => ['nullable', Rule::in($video->recordedDevices())],
@@ -383,7 +378,7 @@ class VideoController extends Controller
         try {
             $translation = $demo->translate($video, $data['language'], ['voice' => $data['voice'] ?? null]);
         } catch (InvalidArgumentException $e) {
-            return redirect()->to(route('video-demo.studio.show', $video).'#vd-languages')->withInput()->withErrors([str_contains($e->getMessage(), 'speak') ? 'voice' : 'language' => $e->getMessage()]);
+            return redirect()->to(route('video-demo.studio.show', $video).'#vd-languages')->withInput()->withErrors([str_contains(Str::lower($e->getMessage()), 'voice') || str_contains($e->getMessage(), 'speak') ? 'voice' : 'language' => $e->getMessage()]);
         }
 
         return redirect()->route('video-demo.studio.show', $translation);
@@ -451,7 +446,7 @@ class VideoController extends Controller
      */
     public function findSpots(Video $video): RedirectResponse
     {
-        abort_unless($video->status === VideoStatus::Ready && $video->hasRecording(), 409, 'Only a finished video can be placed.');
+        abort_unless($video->isFinished(), 409, 'Only a finished video can be placed.');
 
         if (($video->spots['status'] ?? null) !== 'working') {
             $video->update(['spots' => ['status' => 'working', 'at' => now()->toIso8601String(), 'items' => $video->spots['items'] ?? []]]);
@@ -500,7 +495,7 @@ class VideoController extends Controller
             ...$request->validate([
                 'prompt' => ['required', 'string', 'max:4000'],
                 'target_seconds' => ['required', 'integer', 'min:10', 'max:'.config('video-demo.limits.max_seconds', 300)],
-                'effort' => ['required', Rule::in(self::EFFORTS)],
+                'effort' => ['required', Rule::in(Pricing::EFFORTS)],
                 'max_cost' => ['nullable', 'numeric', 'min:0.01', 'max:100'],
                 'max_steps' => ['nullable', 'integer', 'min:3', 'max:250'],
                 'speed' => ['nullable', 'numeric', 'min:0.25', 'max:4'],
@@ -539,7 +534,7 @@ class VideoController extends Controller
             'start_path' => ['nullable', 'string', 'max:255', 'starts_with:/'],
             'sample_data' => ['nullable', 'boolean'],
             'model' => ['required', Rule::in(array_keys(config('video-demo.ai.models')))],
-            'effort' => ['required', Rule::in(self::EFFORTS)],
+            'effort' => ['required', Rule::in(Pricing::EFFORTS)],
             'max_cost' => ['nullable', 'numeric', 'min:0.01', 'max:100'],
             'max_steps' => ['nullable', 'integer', 'min:3', 'max:250'],
             ...$this->soundRules($video),
@@ -661,6 +656,8 @@ class VideoController extends Controller
         try {
             $publisher->publish($video);
         } catch (Throwable $e) {
+            report($e);
+
             return back()->with('error', 'Could not publish: '.$e->getMessage());
         }
 
@@ -681,14 +678,16 @@ class VideoController extends Controller
         ], ['videos.required' => 'Tick at least one video.']);
 
         if ($data['action'] === 'delete') {
-            $deleted = 0;
+            $deleted = $kept = 0;
             foreach (Video::whereKey($data['videos'])->get() as $video) {
-                if (! $video->status->isWorking()) {
-                    app(VideoDemo::class)->delete($video);
-                    $deleted++;
+                if ($video->status->isWorking()) {
+                    $kept++;
+
+                    continue;
                 }
+                app(VideoDemo::class)->delete($video);
+                $deleted++;
             }
-            $kept = count($data['videos']) - $deleted;
 
             return redirect()->route('video-demo.studio.index')->with('status', trim(
                 ($deleted === 1 ? 'Deleted 1 video.' : "Deleted $deleted videos.").($kept ? " $kept still being made ".($kept === 1 ? 'was' : 'were').' kept; stop them first.' : '')
@@ -711,7 +710,7 @@ class VideoController extends Controller
             }
 
             $live = $video->isPublished() && ($manifest->find($video->slug, 'private')['version'] ?? null) === $video->version;
-            if ($video->status !== VideoStatus::Ready || ! $video->hasRecording() || $live) {
+            if (! $video->isFinished() || $live) {
                 $skipped++;
 
                 continue;
@@ -721,6 +720,7 @@ class VideoController extends Controller
                 $publisher->publish($video);
                 $done++;
             } catch (Throwable $e) {
+                report($e);
                 $failed[] = ($video->title ?: $video->slug).': '.$e->getMessage();
             }
         }
@@ -786,7 +786,11 @@ class VideoController extends Controller
 
         if ($production && $token) {
             $url = rtrim($production, '/').'/'.trim(config('video-demo.library.private.prefix'), '/').'/api/requests';
-            $response = Http::withToken($token)->acceptJson()->timeout(10)->get($url);
+            try {
+                $response = Http::withToken($token)->acceptJson()->timeout(10)->get($url);
+            } catch (Throwable $e) {
+                return response()->json(['source' => $production, 'error' => 'Production could not be reached: '.$e->getMessage()], 502);
+            }
 
             return $response->successful()
                 ? response()->json(['source' => $production, 'requests' => $response->json('requests', [])])
@@ -845,7 +849,7 @@ class VideoController extends Controller
     {
         $rules = [
             'model' => ['required', Rule::in(array_keys(config('video-demo.ai.models')))],
-            'effort' => ['required', Rule::in(self::EFFORTS)],
+            'effort' => ['required', Rule::in(Pricing::EFFORTS)],
             'target_seconds' => ['required', 'integer', 'min:10', 'max:'.config('video-demo.limits.max_seconds', 300)],
         ];
 

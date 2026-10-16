@@ -147,10 +147,7 @@ class ViewFinder
         $q = preg_quote($tag, '/');
         for ($i = $open; $i < count($lines); $i++) {
             $depth += preg_match_all('/<'.$q.'[\s>]/i', $lines[$i]) - preg_match_all('/<\/'.$q.'\s*>/i', $lines[$i]);
-            if ($i > $open && $depth <= 0) {
-                return $i;
-            }
-            if ($i === $open && $depth <= 0) {
+            if ($depth <= 0) {
                 return $i;
             }
         }

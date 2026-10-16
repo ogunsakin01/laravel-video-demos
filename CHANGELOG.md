@@ -2,6 +2,25 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/). While the version is 0.x, minor releases may include breaking changes; they will be listed here.
 
+## v0.17.2 - 2026-10-16
+
+### Fixed
+
+- **Secrets are hidden in everything sent to the AI.** The planner's first message (the description, your `video-demo.ai.notes`, page errors on sample data), "Complete with AI", ideas and tool errors went out without the redactor. Both drivers now hide secrets in every message they send.
+- `video-demo:clean` deleted a finished video's GIF, square and vertical copies and its "Where to put it" pictures, and the sample database of a video being checked or placed. It now keeps them.
+- `video-demo:clean --browser` could remove `storage/` itself when Playwright was installed straight into it. It now only removes a `node_modules` folder's own parent inside storage.
+- A logo is stored with the extension of what it is, not what its name says, and an SVG logo is served so no script in it can run.
+- The planner no longer sends a request for a video already at its spending limit, and checks the limit before a repair's first request too.
+- A tool call from the model without its path is answered with an error instead of failing the video.
+- When a recorder script ends without a result, the error now includes what it printed (such as Playwright's own message) instead of only "check that Node and Playwright work". A browser that won't start, or a page scan that fails, is reported as such.
+- One page that fails to load no longer ends "Where to put it" for every spot; that position is skipped.
+- "Where to put it" sees a translated video's pages in its language.
+- The start-page list no longer skips routes that merely begin with "up", such as `/uploads`.
+- The studio's video list no longer errors when production can't be reached for requests.
+- Deleting a video frees the idea it was made from, so the idea can be made again.
+- A copy button pressed twice quickly no longer stays on "Copied".
+- The "Other languages" button shows that it's working, like the others.
+
 ## v0.17.1 - 2026-10-16
 
 ### Changed

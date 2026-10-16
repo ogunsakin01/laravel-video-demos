@@ -58,6 +58,12 @@ class BrandingTest extends TestCase
         $this->put("/video-demo/studio/styles/{$style->id}", $this->form(['logo_position' => 'top-right']))->assertRedirect();
         $this->assertSame('top-right', $style->fresh()->logo_position);
         $this->assertNotNull($style->fresh()->logo);
+        // A file's name doesn't choose its type: it is kept as the image it is,
+        // and served so nothing in it can run.
+        $this->put("/video-demo/studio/styles/{$style->id}", $this->form(['logo' => UploadedFile::fake()->image('logo.html', 60, 20)]))->assertRedirect();
+        $this->assertStringEndsWith('.png', $style->fresh()->logo);
+        $this->assertStringContainsString('sandbox', $this->get("/video-demo/studio/styles/{$style->id}/logo")->headers->get('Content-Security-Policy'));
+
         $this->put("/video-demo/studio/styles/{$style->id}", $this->form(['remove_logo' => '1', 'logo_position' => 'top-right']))->assertRedirect();
         $this->assertNull($style->fresh()->logo);
         $this->assertSame('none', $style->fresh()->logo_position);

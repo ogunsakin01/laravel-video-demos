@@ -2,8 +2,10 @@
 
 namespace Ogunsakin01\VideoDemo\Tests;
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use InvalidArgumentException;
@@ -13,6 +15,7 @@ use Ogunsakin01\VideoDemo\Facades\VideoDemo;
 use Ogunsakin01\VideoDemo\Jobs\GenerateVideo;
 use Ogunsakin01\VideoDemo\Library\Manifest;
 use Ogunsakin01\VideoDemo\Models\Video;
+use Ogunsakin01\VideoDemo\Models\VideoIdea;
 use Ogunsakin01\VideoDemo\Recording\Camera;
 use Ogunsakin01\VideoDemo\Support\Favicon;
 
@@ -85,16 +88,63 @@ class ApiTest extends TestCase
         $work->put($kept->workPath('desktop/raw.webm'), str_repeat('r', 4096));
         $work->put('video-demo/work/999/video-desktop.mp4', 'old');
         $work->put('video-demo/work/checks/abc/job.json', '{}');
+        // A finished video's copies and spot pictures are its own files; a copy's working folder isn't.
+        $work->put($kept->workPath('exports/gif.gif'), 'gif');
+        $work->put($kept->workPath('exports/work-gif/frame.png'), 'frame');
+        $work->put($kept->workPath('spots/1-desktop-closed.jpg'), 'jpg');
+        // A sample database is in use while its video is being checked.
+        $checking = Video::create(['prompt' => 'x', 'target_seconds' => 30, 'model' => 'claude-sonnet-5-5', 'effort' => 'high', 'status' => VideoStatus::Ready, 'verify_result' => ['status' => 'working']]);
+        $work->put("video-demo/work/sandbox/{$checking->id}-abc.sqlite", 'db');
+        $work->put("video-demo/work/sandbox/{$kept->id}-abc.sqlite", 'db');
 
         $this->artisan('video-demo:clean', ['--dry-run' => true])->expectsOutputToContain('Would free')->assertSuccessful();
         $work->assertExists('video-demo/work/999/video-desktop.mp4');
 
         $this->artisan('video-demo:clean')->expectsOutputToContain('Freed')->assertSuccessful();
         // The finished video stays; its raw recording, a deleted video's files and temporary files go.
-        $work->assertExists($kept->workFile('desktop'));
-        $work->assertMissing([$kept->workPath('desktop/raw.webm'), 'video-demo/work/999/video-desktop.mp4', 'video-demo/work/checks/abc/job.json']);
+        $work->assertExists([$kept->workFile('desktop'), $kept->workPath('exports/gif.gif'), $kept->workPath('spots/1-desktop-closed.jpg'), "video-demo/work/sandbox/{$checking->id}-abc.sqlite"]);
+        $work->assertMissing([$kept->workPath('desktop/raw.webm'), $kept->workPath('exports/work-gif/frame.png'), 'video-demo/work/999/video-desktop.mp4', 'video-demo/work/checks/abc/job.json', "video-demo/work/sandbox/{$kept->id}-abc.sqlite"]);
 
         $this->artisan('video-demo:clean')->expectsOutputToContain('Nothing to clean up')->assertSuccessful();
+    }
+
+    public function test_clean_never_removes_storage_itself_with_the_browser(): void
+    {
+        // A fake disk, so the clean looks at no real working files.
+        Storage::fake('local');
+        // Playwright set up straight in storage: its parent folder is storage itself.
+        $modules = storage_path('node_modules');
+        File::ensureDirectoryExists($modules);
+        config(['video-demo.recorder.node_modules' => $modules]);
+
+        try {
+            $this->artisan('video-demo:clean', ['--browser' => true])->expectsOutputToContain('was left alone')->assertSuccessful();
+            $this->assertDirectoryExists(storage_path('framework'));
+            $this->assertDirectoryExists($modules);
+        } finally {
+            File::deleteDirectory($modules);
+        }
+    }
+
+    public function test_deleting_a_video_frees_the_idea_it_was_made_from(): void
+    {
+        Storage::fake('local');
+        $video = Video::create(['prompt' => 'x', 'target_seconds' => 30, 'model' => 'claude-sonnet-5-5', 'effort' => 'high', 'status' => VideoStatus::Ready]);
+        $idea = VideoIdea::create(['title' => 'Post a job', 'prompt' => 'How to post a job', 'target_seconds' => 60, 'video_id' => $video->id]);
+
+        VideoDemo::delete($video);
+
+        $this->assertNull($idea->fresh()->video_id);
+    }
+
+    public function test_the_studio_explains_when_production_cant_be_reached(): void
+    {
+        config(['video-demo.studio.production_url' => 'https://example.test', 'video-demo.library.requests_token' => 'token']);
+        Http::fake(fn () => throw new ConnectionException('Connection refused'));
+
+        $this->getJson('/video-demo/studio/requests')
+            ->assertStatus(502)
+            ->assertJsonPath('error', 'Production could not be reached: Connection refused');
     }
 
     public function test_pages_have_their_own_favicon(): void

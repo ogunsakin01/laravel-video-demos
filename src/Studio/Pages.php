@@ -16,9 +16,10 @@ use Ogunsakin01\VideoDemo\Recording\Recorder;
 class Pages
 {
     /**
-     * URI prefixes of routes that are never pages, or that change something when opened.
+     * The first URI segment of routes that are never pages, or that change
+     * something when opened. Any route starting with "_" is skipped too.
      */
-    protected const SKIP_URIS = ['_', 'api/', 'sanctum/', 'telescope', 'horizon', 'livewire', 'broadcasting/', 'storage/', 'up', 'video-demo'];
+    protected const SKIP_SEGMENTS = ['api', 'sanctum', 'telescope', 'horizon', 'livewire', 'broadcasting', 'storage', 'up', 'video-demo'];
 
     /**
      * Words in a route's URI or name that mark it as unsafe to open or not a page.
@@ -44,7 +45,8 @@ class Pages
             $name = $route->getName();
 
             if (! in_array('GET', $route->methods(), true)
-                || Str::startsWith($uri, self::SKIP_URIS)
+                || str_starts_with($uri, '_')
+                || in_array(Str::before($uri, '/'), self::SKIP_SEGMENTS, true)
                 || Str::startsWith($name ?? '', ['video-demo.studio.', 'ignition.', 'debugbar.', 'sanctum.', 'livewire.', 'telescope', 'horizon'])
                 || preg_match(self::SKIP_WORDS, $uri.' '.$name)
                 || preg_match('/\.(json|xml|txt|csv|pdf|js|css|map|ico|png|jpe?g|svg|webp)$/i', $uri)

@@ -57,7 +57,7 @@
               <tr data-video="{{ $video->id }}" data-working="{{ $video->status->isWorking() ? 1 : 0 }}">
                 <td class="vd-check"><input type="checkbox" name="videos[]" value="{{ $video->id }}" data-row
                   aria-label="Select {{ $video->title ?: \Illuminate\Support\Str::limit($video->prompt, 60) }}"
-                  data-ready="{{ $video->status === \Ogunsakin01\VideoDemo\Enums\VideoStatus::Ready ? 1 : 0 }}" data-published="{{ $video->isPublished() ? 1 : 0 }}"></td>
+                  data-ready="{{ $video->isReady() ? 1 : 0 }}" data-published="{{ $video->isPublished() ? 1 : 0 }}"></td>
                 <td>
                   <a href="{{ route('video-demo.studio.show', $video) }}">{{ $video->title ?: \Illuminate\Support\Str::limit($video->prompt, 60) }}</a>
                   <div class="vd-small vd-muted">{{ $video->updated_at->diffForHumans() }}@if ($video->source_video_id) · {{ \Ogunsakin01\VideoDemo\Support\Language::name($video->languageCode()) }} version @endif</div>

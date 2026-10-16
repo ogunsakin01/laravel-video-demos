@@ -28,8 +28,9 @@ function titleOf(html) {
 (async () => {
   const pages = [];
   const skipped = [];
-  const browser = await chromium.launch(job.channel ? { channel: job.channel } : {});
+  let browser, error = null;
   try {
+    browser = await chromium.launch(job.channel ? { channel: job.channel } : {});
     const context = await browser.newContext({ ignoreHTTPSErrors: !!job.ignoreHttpsErrors });
     // Sample data: the cookie sends every request to the video's own database.
     if (job.cookies?.length) await context.addCookies(job.cookies);
@@ -57,9 +58,11 @@ function titleOf(html) {
     await Promise.all(Array.from({ length: 4 }, async () => {
       while (queue.length) await check(queue.shift());
     }));
+  } catch (e) {
+    error = String(e.message || e).split('\n')[0];
   } finally {
-    await browser.close();
-    fs.writeFileSync(path.join(job.outDir, 'result.json'), JSON.stringify({ pages, skipped }, null, 2));
+    await browser?.close();
+    fs.writeFileSync(path.join(job.outDir, 'result.json'), JSON.stringify({ pages, skipped, error }, null, 2));
   }
   process.exit(0);
 })();

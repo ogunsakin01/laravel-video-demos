@@ -106,7 +106,7 @@ class Worker
      */
     protected static function ours(?string $connection, string $queues): bool
     {
-        return in_array(config('video-demo.queue.name') ?: 'video-demo', explode(',', $queues), true);
+        return in_array(VideoDemoServiceProvider::queueName(), explode(',', $queues), true);
     }
 
     protected static function remember(string $key, int $value): void

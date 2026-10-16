@@ -5,7 +5,7 @@
 @php
   use Ogunsakin01\VideoDemo\Recording\Exporter;
   $exports = $video->exports ?? [];
-  $working = collect($exports)->contains(fn ($e) => ($e['status'] ?? null) === 'working');
+  $working = $video->isExporting();
   $size = fn (?int $bytes) => $bytes === null ? '' : ($bytes >= 1_048_576 ? number_format($bytes / 1_048_576, 1).' MB' : max(1, round($bytes / 1024)).' KB');
   $uses = ['gif' => 'For READMEs, changelogs, emails and chat, which don’t play videos.', 'square' => 'For social feeds, with the title above the app.', 'vertical' => 'For Stories, Reels and Shorts, with the title above the app.'];
   $made = collect(Exporter::FORMATS)->filter(fn ($info, $format) => Exporter::isCurrent($video, $format))->map(fn ($info) => $info['label'])->values();
@@ -65,11 +65,6 @@
 @once
   <script>
     document.addEventListener('DOMContentLoaded', () => {
-      document.querySelectorAll('#vd-downloads [data-busy-form]').forEach(form => form.addEventListener('submit', () => {
-        const b = form.querySelector('button');
-        b.setAttribute('aria-busy', 'true');
-        b.disabled = true;
-      }));
       // While a copy is being made, look now and then, and show it once it's done.
       if (document.querySelector('[data-exports-working]')) {
         const poll = setInterval(async () => {

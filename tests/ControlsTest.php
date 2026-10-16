@@ -366,6 +366,10 @@ class ControlsTest extends TestCase
         Route::get('/sitemap.xml', fn () => 'x');
         Route::get('/invoices/export', fn () => 'x');
         Route::get('/verify', fn () => 'x')->middleware('signed');
+        // Skipped by whole segment: /up is the health check, /uploads a page.
+        Route::get('/up', fn () => 'x');
+        Route::get('/uploads', fn () => 'x');
+        Route::get('/_debugbar/open', fn () => 'x');
         app('router')->getRoutes()->refreshNameLookups();
 
         $paths = array_keys(app(Pages::class)->candidates());
@@ -373,7 +377,8 @@ class ControlsTest extends TestCase
         $this->assertContains('/dashboard', $paths);
         $this->assertContains('/reports', $paths);
         $this->assertContains('/help/videos', $paths);
-        foreach (['/jobs/{job}', '/jobs', '/logout', '/api/users', '/sitemap.xml', '/invoices/export', '/verify', '/video-demo/studio'] as $left) {
+        $this->assertContains('/uploads', $paths);
+        foreach (['/jobs/{job}', '/jobs', '/logout', '/api/users', '/sitemap.xml', '/invoices/export', '/verify', '/video-demo/studio', '/up', '/_debugbar/open'] as $left) {
             $this->assertNotContains($left, $paths);
         }
     }

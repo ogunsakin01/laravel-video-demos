@@ -184,8 +184,9 @@ function outline(accent) {
 
 (async () => {
   const out = { pages: [], failed: [], spots: [] };
-  const browser = await chromium.launch(job.channel ? { channel: job.channel } : {});
+  let browser;
   try {
+    browser = await chromium.launch(job.channel ? { channel: job.channel } : {});
     if (job.mode === 'map') {
       const context = await browser.newContext({ viewport: job.viewport, ignoreHTTPSErrors: !!job.ignoreHttpsErrors });
       if (job.cookies?.length) await context.addCookies(job.cookies);
@@ -213,8 +214,10 @@ function outline(accent) {
         for (const position of spot.positions) {
           const tried = { found: true, position, ok: true, problems: [], shots: {} };
           for (const screen of job.screens) {
-            const { page } = await open(contexts[screen.key], spot.path);
+            // A page that fails to load rules out this position, not the whole search.
+            let page;
             try {
+              ({ page } = await open(contexts[screen.key], spot.path));
               if (!(await page.evaluate(measure, [spot.selector, position]))) { tried.found = false; tried.ok = false; break; }
               await page.evaluate(place, [spot.selector, position, job.html]);
               await page.waitForTimeout(250);
@@ -232,8 +235,12 @@ function outline(accent) {
                 await page.evaluate(() => { const p = document.querySelector('[data-video-demo-spot]'); if (p) p.style.outline = ''; document.querySelector('[data-video-demo-label]')?.remove(); });
               }
               tried.shots[screen.key] = shots;
+            } catch (e) {
+              tried.found = false;
+              tried.ok = false;
+              break;
             } finally {
-              await page.close();
+              await page?.close();
             }
           }
           tried.ok = tried.found && tried.problems.length === 0;
@@ -260,7 +267,7 @@ function outline(accent) {
   } catch (e) {
     out.error = String(e.message || e).split('\n')[0];
   } finally {
-    await browser.close();
+    await browser?.close();
     fs.writeFileSync(path.join(job.resultDir || job.outDir, 'result.json'), JSON.stringify(out, null, 2));
   }
   process.exit(0);

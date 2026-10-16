@@ -9,7 +9,7 @@
   $translations = $video->source_video_id ? collect() : $video->translations()->orderBy('language')->get();
   $taken = $translations->map(fn ($t) => Language::base($t->languageCode()))->push(Language::base($video->languageCode()))->all();
   $choices = collect(Language::options())->reject(fn ($name, $code) => in_array(Language::base($code), $taken, true));
-  $canAdd = ! $video->source_video_id && ! $video->status->isWorking() && ! empty($video->plan['steps']);
+  $canAdd = ! $video->source_video_id && ! $video->status->isWorking() && $video->hasPlan();
   $summary = $video->source_video_id
       ? 'The '.Language::name($video->languageCode()).' version of '.($video->source ? ($video->source->title ?: $video->source->slug) : 'a deleted video')
       : ($translations->isNotEmpty() ? $translations->map(fn ($t) => Language::name($t->languageCode()))->implode(', ') : 'None yet. The AI translates the words, for about a cent.');

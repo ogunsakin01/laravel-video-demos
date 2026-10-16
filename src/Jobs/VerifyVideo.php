@@ -34,8 +34,8 @@ class VerifyVideo implements ShouldQueue
      */
     public function __construct(public Video $video)
     {
-        $this->onConnection(config('video-demo.queue.connection') ?: VideoDemoServiceProvider::QUEUE_CONNECTION);
-        $this->onQueue(config('video-demo.queue.name'));
+        $this->onConnection(VideoDemoServiceProvider::queueConnection());
+        $this->onQueue(VideoDemoServiceProvider::queueName());
     }
 
     /**

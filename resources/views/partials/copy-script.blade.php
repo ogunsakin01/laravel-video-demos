@@ -10,7 +10,11 @@
         const t = document.createElement('textarea');
         t.value = b.dataset.copy; document.body.append(t); t.select(); document.execCommand('copy'); t.remove();
       }
-      const was = b.textContent; b.textContent = 'Copied'; setTimeout(() => { b.textContent = was; }, 1500);
+      // The label is kept on the button, so pressing it again while it says Copied still comes back.
+      b.dataset.label ??= b.textContent;
+      b.textContent = 'Copied';
+      clearTimeout(b.vdCopied);
+      b.vdCopied = setTimeout(() => { b.textContent = b.dataset.label; }, 1500);
     });
   </script>
 @endonce

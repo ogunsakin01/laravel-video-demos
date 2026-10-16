@@ -117,7 +117,8 @@ class MakeAgainTest extends TestCase
                 ->assertSee('Not published, and not shown on any page in your code.')
                 ->assertSee('Still being made, so it will be kept.');
 
-            $this->post('/video-demo/studio/bulk', ['action' => 'delete', 'videos' => [$video->id, $quiet->id, $busy->id]])
+            // An id deleted in another tab is not counted as kept.
+            $this->post('/video-demo/studio/bulk', ['action' => 'delete', 'videos' => [$video->id, $quiet->id, $busy->id, 999_999]])
                 ->assertRedirect('/video-demo/studio')
                 ->assertSessionHas('status', 'Deleted 2 videos. 1 still being made was kept; stop them first.');
             $this->assertSame(['Busy'], Video::pluck('title')->all());

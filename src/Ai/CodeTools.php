@@ -100,11 +100,25 @@ class CodeTools
     public function run(string $tool, array $input): string
     {
         return $this->redactor->redact(match ($tool) {
-            'list_files' => $this->listFiles((string) $input['path']),
-            'read_file' => $this->readFile((string) $input['path'], (int) ($input['from_line'] ?? 1)),
-            'search_code' => $this->search((string) $input['pattern'], ($input['path'] ?? '') !== '' ? $input['path'] : null),
+            'list_files' => $this->listFiles($this->required($input, 'path')),
+            'read_file' => $this->readFile($this->required($input, 'path'), (int) ($input['from_line'] ?? 1)),
+            'search_code' => $this->search($this->required($input, 'pattern'), ($input['path'] ?? '') !== '' ? (string) $input['path'] : null),
             default => throw new RuntimeException("Unknown tool $tool"),
         });
+    }
+
+    /**
+     * Get a tool input the model must give, refusing the call when it's missing.
+     *
+     * @throws RuntimeException
+     */
+    protected function required(array $input, string $key): string
+    {
+        if (! isset($input[$key]) || ! is_scalar($input[$key])) {
+            throw new RuntimeException("$key is required.");
+        }
+
+        return (string) $input[$key];
     }
 
     /**

@@ -23,8 +23,9 @@ async function describeError(page) {
 (async () => {
   const problems = [];
   const languages = {};
-  const browser = await chromium.launch(job.channel ? { channel: job.channel } : {});
+  let browser;
   try {
+    browser = await chromium.launch(job.channel ? { channel: job.channel } : {});
     const context = await browser.newContext({
       viewport: job.viewport, hasTouch: !!job.touch,
       isMobile: !!job.touch && job.viewport.width < 600, ignoreHTTPSErrors: !!job.ignoreHttpsErrors,
@@ -75,7 +76,7 @@ async function describeError(page) {
   } catch (e) {
     problems.push({ path: '(browser)', problem: 'The page check could not run', status: null, url: null, detail: String(e.message || e).split('\n')[0] });
   } finally {
-    await browser.close();
+    await browser?.close();
     fs.writeFileSync(path.join(job.outDir, 'result.json'), JSON.stringify({ problems, languages }, null, 2));
   }
   process.exit(0);

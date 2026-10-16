@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Str;
 use Ogunsakin01\VideoDemo\Ai\VideoStopped;
 use Ogunsakin01\VideoDemo\Models\VideoStyle;
 use Ogunsakin01\VideoDemo\SampleData\Sandbox;
@@ -82,10 +83,10 @@ class Recorder
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
         File::delete("$dir/result.json");
 
-        $this->run(static::script('record.cjs'), "$dir/job.json", static::timeoutFor($plan, $speed), $shouldStop);
+        $output = $this->run(static::script('record.cjs'), "$dir/job.json", static::timeoutFor($plan, $speed), $shouldStop);
 
         if (! File::exists("$dir/result.json")) {
-            throw new RuntimeException('The recorder stopped without a result. Check that Node and Playwright work: php artisan video-demo:install');
+            throw static::noResult('The recorder', $output);
         }
 
         $result = json_decode(File::get("$dir/result.json"), true) ?: [];
@@ -125,10 +126,10 @@ class Recorder
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
         File::delete("$dir/result.json");
 
-        $this->run(static::script('record.cjs'), "$dir/job.json", 120 + count($plan->steps) * 20, $shouldStop);
+        $output = $this->run(static::script('record.cjs'), "$dir/job.json", 120 + count($plan->steps) * 20, $shouldStop);
 
         if (! File::exists("$dir/result.json")) {
-            throw new RuntimeException('The check stopped without a result. Check that Node and Playwright work: php artisan video-demo:install');
+            throw static::noResult('The check', $output);
         }
 
         return RecordingResult::fromArray(json_decode(File::get("$dir/result.json"), true) ?: [], $device);
@@ -161,14 +162,14 @@ class Recorder
         ], JSON_UNESCAPED_SLASHES));
 
         try {
-            $this->run(static::script('check.cjs'), "$dir/job.json", 60 + count($paths) * 20, $shouldStop);
+            $output = $this->run(static::script('check.cjs'), "$dir/job.json", 60 + count($paths) * 20, $shouldStop);
             $result = File::exists("$dir/result.json") ? json_decode(File::get("$dir/result.json"), true) : null;
         } finally {
             File::deleteDirectory($dir);
         }
 
         if (! is_array($result)) {
-            throw new RuntimeException('The page check stopped without a result. Check that Node and Playwright work: php artisan video-demo:install');
+            throw static::noResult('The page check', $output);
         }
         $this->pageLanguages = array_filter((array) ($result['languages'] ?? []), 'is_string');
 
@@ -195,14 +196,17 @@ class Recorder
         ], JSON_UNESCAPED_SLASHES));
 
         try {
-            $this->run(static::script('pages.cjs'), "$dir/job.json", 60 + count($paths) * 5);
+            $output = $this->run(static::script('pages.cjs'), "$dir/job.json", 60 + count($paths) * 5);
             $result = File::exists("$dir/result.json") ? json_decode(File::get("$dir/result.json"), true) : null;
         } finally {
             File::deleteDirectory($dir);
         }
 
         if (! is_array($result)) {
-            throw new RuntimeException('The page scan stopped without a result. Check that Node and Playwright work: php artisan video-demo:install');
+            throw static::noResult('The page scan', $output);
+        }
+        if (! empty($result['error'])) {
+            throw new RuntimeException('The page scan failed: '.$result['error']);
         }
 
         return ['pages' => $result['pages'] ?? [], 'skipped' => $result['skipped'] ?? []];
@@ -256,14 +260,14 @@ class Recorder
         File::put("$dir/job.json", json_encode(['outDir' => $dir, ...$job, 'resultDir' => $dir], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
 
         try {
-            $this->run(static::script('spots.cjs'), "$dir/job.json", $timeout);
+            $output = $this->run(static::script('spots.cjs'), "$dir/job.json", $timeout);
             $result = File::exists("$dir/result.json") ? json_decode(File::get("$dir/result.json"), true) : null;
         } finally {
             File::deleteDirectory($dir);
         }
 
         if (! is_array($result)) {
-            throw new RuntimeException('Finding spots for the video stopped without a result. Check that Node and Playwright work: php artisan video-demo:install');
+            throw static::noResult('Finding spots for the video', $output);
         }
         if (! empty($result['error'])) {
             throw new RuntimeException('Finding spots for the video failed: '.$result['error']);
@@ -443,6 +447,19 @@ class Recorder
         }
 
         return $output;
+    }
+
+    /**
+     * Build the error for a script that ended without writing its result,
+     * with the end of what it printed, which says why.
+     */
+    protected static function noResult(string $what, string $output): RuntimeException
+    {
+        $output = trim($output);
+
+        return new RuntimeException($output === ''
+            ? "$what stopped without a result. Check that Node and Playwright work: php artisan video-demo:install"
+            : "$what stopped without a result: ".Str::limit($output, 600).' If this keeps happening, check that Node and Playwright work: php artisan video-demo:install');
     }
 
     /**

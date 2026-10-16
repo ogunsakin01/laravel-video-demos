@@ -303,6 +303,7 @@ async function scrollTo(page, locator) {
 async function glide(page, locator) {
   await scrollTo(page, locator);
   const box = await locator.boundingBox();
+  if (!box) throw new Error('The element moved or disappeared before it could be used.');
   const x = box.x + box.width / 2, y = box.y + box.height / 2;
   const ms = await page.evaluate(([x, y]) => (window.__demoCursor ? window.__demoCursor.move(x, y) : 0), [x, y]);
   // Arrive, then rest a moment on the target, as a person does before clicking.

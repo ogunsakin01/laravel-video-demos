@@ -63,8 +63,8 @@ class FindSpots implements ShouldQueue
      */
     public function __construct(public Video $video)
     {
-        $this->onConnection(config('video-demo.queue.connection') ?: VideoDemoServiceProvider::QUEUE_CONNECTION);
-        $this->onQueue(config('video-demo.queue.name'));
+        $this->onConnection(VideoDemoServiceProvider::queueConnection());
+        $this->onQueue(VideoDemoServiceProvider::queueName());
     }
 
     /**
@@ -80,13 +80,11 @@ class FindSpots implements ShouldQueue
         try {
             if ($video->sample_data) {
                 $this->stage($video, 'data');
-                $sandbox = Sandbox::create($video);
-                $sandbox->prepare($video->record_as);
-                if ($video->sample_records) {
-                    $sandbox->seed($video->sample_records);
-                }
+                $sandbox = Sandbox::prepareFor($video, true, fn () => null);
                 $recorder->sandbox = $sandbox;
             }
+            // A translated video's pages are seen in its language, as it was recorded.
+            $recorder->locale = $video->recordingLocale();
 
             $this->stage($video, 'pages');
             $map = $recorder->mapPages(static::paths($video), $video->record_as);
@@ -140,10 +138,12 @@ class FindSpots implements ShouldQueue
 
             $video->update(['spots' => ['status' => 'ready', 'at' => $started, 'note' => $note, 'items' => $items, 'cost' => round($video->cost - $costBefore, 6)]]);
         } catch (Throwable $e) {
+            report($e);
             $video->update(['spots' => ['status' => 'failed', 'at' => $started, 'error' => $e->getMessage(), 'items' => [], 'cost' => round($video->cost - $costBefore, 6)]]);
         } finally {
             $sandbox?->delete();
             $recorder->sandbox = null;
+            $recorder->locale = null;
         }
     }
 

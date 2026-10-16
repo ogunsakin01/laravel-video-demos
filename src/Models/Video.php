@@ -326,6 +326,67 @@ class Video extends Model
     }
 
     /**
+     * Determine if the video has a plan to record.
+     */
+    public function hasPlan(): bool
+    {
+        return ! empty($this->plan['steps']);
+    }
+
+    /**
+     * Determine if the video is ready.
+     */
+    public function isReady(): bool
+    {
+        return $this->status === VideoStatus::Ready;
+    }
+
+    /**
+     * Determine if the video is ready and its recording is on disk, so it can
+     * be played, published, checked or copied.
+     */
+    public function isFinished(): bool
+    {
+        return $this->isReady() && $this->hasRecording();
+    }
+
+    /**
+     * Determine if "Does it still work?" is checking the video now.
+     */
+    public function isChecking(): bool
+    {
+        return ($this->verify_result['status'] ?? null) === 'working';
+    }
+
+    /**
+     * Determine if "Where to put it" is looking for spots now.
+     */
+    public function isFindingSpots(): bool
+    {
+        return ($this->spots['status'] ?? null) === 'working';
+    }
+
+    /**
+     * Determine if a copy (GIF, square, vertical) is being made now, of the
+     * given format or of any.
+     */
+    public function isExporting(?string $format = null): bool
+    {
+        $exports = $format === null ? (array) $this->exports : [$this->exports[$format] ?? null];
+
+        return collect($exports)->contains(fn ($e) => ($e['status'] ?? null) === 'working');
+    }
+
+    /**
+     * Determine if anything is running for the video: making it, checking it,
+     * finding spots or making a copy.
+     */
+    public function isBusy(): bool
+    {
+        return $this->status->isWorking() || $this->isChecking() || $this->isFindingSpots() || $this->isExporting();
+    }
+
+    /**
      * Determine if the last check found that the video's plan no longer
      * works in the app.
      */

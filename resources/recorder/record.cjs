@@ -250,9 +250,10 @@ async function snapshot(page) {
     browserLog.push({ kind, text: String(text).slice(0, 1000), t: started ? Date.now() - started : 0, ...extra });
     if (browserLog.length > 60) browserLog.shift();
   };
-  const browser = await chromium.launch(job.channel ? { channel: job.channel } : {});
-  let page;
+  // Started inside the try, so a browser that won't start is reported in the result.
+  let browser, page;
   try {
+    browser = await chromium.launch(job.channel ? { channel: job.channel } : {});
     // Playwright records at the page's own size, so each version is recorded at its screen size.
     const common = {
       viewport: job.viewport,
@@ -355,7 +356,7 @@ async function snapshot(page) {
   } catch (e) {
     result.error = String(e.message || e).split('\n')[0];
   } finally {
-    await browser.close();
+    await browser?.close();
     result.browserLog = browserLog;
     fs.writeFileSync(path.join(job.outDir, 'result.json'), JSON.stringify(result, null, 2));
   }

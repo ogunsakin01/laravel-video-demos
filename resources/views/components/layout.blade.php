@@ -33,6 +33,19 @@
       {{ $slot }}
     </div>
   </main>
+  <script>
+    // Forms marked data-busy-form show their button as busy once sent, so it
+    // isn't pressed twice. The pressed button's value is kept as it's disabled.
+    document.addEventListener('submit', e => {
+      const form = e.target;
+      if (!form.matches?.('[data-busy-form]') || e.defaultPrevented) return;
+      const button = e.submitter || form.querySelector('button');
+      if (!button) return;
+      if (button.name) form.append(Object.assign(document.createElement('input'), { type: 'hidden', name: button.name, value: button.value }));
+      button.setAttribute('aria-busy', 'true');
+      button.disabled = true;
+    });
+  </script>
   {{ $scripts ?? '' }}
 </body>
 </html>

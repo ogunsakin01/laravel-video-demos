@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Storage;
 use Ogunsakin01\VideoDemo\Models\Video;
 use Ogunsakin01\VideoDemo\Recording\Devices;
 use Ogunsakin01\VideoDemo\Recording\RecordingFailed;
+use Ogunsakin01\VideoDemo\VideoDemoServiceProvider;
 use Throwable;
 
 /**
@@ -294,7 +295,7 @@ class ErrorReport
                 'Laravel' => Application::VERSION,
                 'laravel-video-demos' => (string) (InstalledVersions::isInstalled('ogunsakin01/laravel-video-demos') ? InstalledVersions::getPrettyVersion('ogunsakin01/laravel-video-demos') : 'unknown'),
                 'Browser' => (string) (config('video-demo.recorder.channel') ?: 'Playwright Chromium'),
-                'Queue' => (string) (config('video-demo.queue.connection') ?: 'video-demo'),
+                'Queue' => VideoDemoServiceProvider::queueConnection(),
             ],
         ];
     }

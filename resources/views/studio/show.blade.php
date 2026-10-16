@@ -1,3 +1,4 @@
+@use('Ogunsakin01\VideoDemo\Enums\VideoStatus')
 <x-video-demo::layout :title="$video->title ?: 'Video'" badge="Studio · local" :home="route('video-demo.studio.index')">
   <x-slot:nav>
     @include('video-demo::studio.partials.nav', ['active' => null])
@@ -9,7 +10,7 @@
       <p class="vd-eyebrow">Video</p>
       <h1>{{ $video->title ?: \Illuminate\Support\Str::limit($video->prompt, 70) }}</h1>
       <p class="vd-sub" style="display:flex;flex-wrap:wrap;align-items:center;gap:8px">
-        <span id="vd-status">@include('video-demo::studio.partials.status', ['status' => $video->status])</span>
+        <span id="vd-status" aria-live="polite">@include('video-demo::studio.partials.status', ['status' => $video->status])</span>
         @if ($video->isPublished())
           <span class="vd-pill">{{ $video->visibility === 'public' ? 'Public' : 'Private' }} · published {{ $video->published_at->diffForHumans() }}</span>
           @if (config('video-demo.library.public.enabled') && $video->visibility === 'public')
@@ -24,8 +25,8 @@
         </div>
       @endif
     </div>
-    @if (in_array($video->status, [\Ogunsakin01\VideoDemo\Enums\VideoStatus::Failed, \Ogunsakin01\VideoDemo\Enums\VideoStatus::Stopped], true))
-        @php($hasPlan = ! empty($video->plan['steps']))
+    @if (in_array($video->status, [VideoStatus::Failed, VideoStatus::Stopped], true))
+        @php($hasPlan = $video->hasPlan())
         <div class="vd-actions">
           <form method="post" action="{{ route('video-demo.studio.retry', $video) }}">@csrf
             <input type="hidden" name="mode" value="plan">
@@ -44,7 +45,7 @@
         <button class="vd-btn vd-btn-danger" @disabled($video->stop_requested)>{{ $video->stop_requested ? 'Stopping…' : 'Stop' }}</button>
       </form>
     @endif
-    @if ($video->status === \Ogunsakin01\VideoDemo\Enums\VideoStatus::Ready)
+    @if ($video->isReady())
       <div class="vd-actions">
         @if ($video->isPublished())
           <form method="post" action="{{ route('video-demo.studio.unpublish', $video) }}">@csrf
@@ -125,15 +126,15 @@
         </div>
       @endif
 
-      @if ($video->status === \Ogunsakin01\VideoDemo\Enums\VideoStatus::Ready && $video->hasRecording())
+      @if ($video->isFinished())
         @include('video-demo::studio.partials.spots')
       @endif
 
-      @if (! $video->status->isWorking() && ! empty($video->plan['steps']) && ($video->status === \Ogunsakin01\VideoDemo\Enums\VideoStatus::Ready || $video->verify_result))
+      @if (! $video->status->isWorking() && $video->hasPlan() && ($video->isReady() || $video->verify_result))
         @include('video-demo::studio.partials.check')
       @endif
 
-      @if ($video->status === \Ogunsakin01\VideoDemo\Enums\VideoStatus::Ready && $video->hasRecording())
+      @if ($video->isFinished())
         @include('video-demo::studio.partials.downloads')
       @endif
 
@@ -141,7 +142,7 @@
         @include('video-demo::studio.partials.watching')
       @endif
 
-      @if ($video->source_video_id || ($video->status === \Ogunsakin01\VideoDemo\Enums\VideoStatus::Ready && ! empty($video->plan['steps'])) || $video->translations()->exists())
+      @if ($video->source_video_id || ($video->isReady() && $video->hasPlan()) || $video->translations()->exists())
         @include('video-demo::studio.partials.translations')
       @endif
 
@@ -153,9 +154,9 @@
             <div><button type="button" class="vd-btn" data-open-error>View full error</button></div>
             @include('video-demo::studio.partials.error-details')
           @endif
-          @if ($video->status === \Ogunsakin01\VideoDemo\Enums\VideoStatus::Failed)
+          @if ($video->status === VideoStatus::Failed)
             <p class="vd-small" style="margin:0;color:var(--vd-bad)">Trying again uses the same description, style, versions and model. To change any of them, use "Make it again" below.</p>
-            @php($hasPlan = ! empty($video->plan['steps']))
+            @php($hasPlan = $video->hasPlan())
         <div class="vd-actions">
           <form method="post" action="{{ route('video-demo.studio.retry', $video) }}">@csrf
             <input type="hidden" name="mode" value="plan">
@@ -172,7 +173,7 @@
         </div>
       @endif
 
-      @if (! empty($video->plan['steps']))
+      @if ($video->hasPlan())
         @include('video-demo::studio.partials.plan-editor')
       @endif
 
@@ -203,7 +204,7 @@
       </details>
 
       @unless ($video->status->isWorking())
-        @php($hasPlan = ! empty($video->plan['steps']))
+        @php($hasPlan = $video->hasPlan())
         @php($currentStyle = $styles->first(fn ($s) => $s->key === ($video->style['key'] ?? null)) ?? $styles->first(fn ($s) => $s->name === ($video->style['name'] ?? null)))
         <details class="vd-card vd-fold" id="vd-again-fold" data-fold="again" @if ($errors->any() && old('prompt') !== null) open data-fold-keep @endif>
           <summary>
@@ -392,7 +393,7 @@
 
       @if ($video->isPublished() && ($entry = app(\Ogunsakin01\VideoDemo\Library\Manifest::class)->find($video->slug, 'private')))
         @include('video-demo::partials.embed', ['entry' => $entry])
-      @elseif ($video->status === \Ogunsakin01\VideoDemo\Enums\VideoStatus::Ready)
+      @elseif ($video->isReady())
         <div class="vd-card">
           <h2>Embed</h2>
           <p class="vd-small vd-muted" style="margin:0">Publish the video to get code that shows it on any page.</p>
@@ -407,7 +408,7 @@
           </span>
         </summary>
         <div class="vd-fold-body">
-        <ul class="vd-log" id="vd-log">
+        <ul class="vd-log" id="vd-log" role="log">
           @foreach (array_slice($video->log ?? [], -40) as $entry)
             <li><time datetime="{{ $entry['at'] }}">{{ \Illuminate\Support\Carbon::parse($entry['at'])->format('H:i:s') }}</time><span>{{ $entry['message'] }}</span></li>
           @endforeach

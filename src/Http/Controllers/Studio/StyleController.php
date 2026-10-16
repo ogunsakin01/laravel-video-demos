@@ -20,6 +20,11 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 class StyleController extends Controller
 {
     /**
+     * The image types a logo may be.
+     */
+    protected const LOGO_TYPES = ['png', 'jpg', 'jpeg', 'webp', 'svg'];
+
+    /**
      * Display the styles, and the one being edited.
      */
     public function index(Request $request): View
@@ -78,7 +83,12 @@ class StyleController extends Controller
         $disk = Storage::disk(config('video-demo.storage.work_disk'));
         abort_unless($style->logo && $disk->exists($style->logo), 404);
 
-        return response()->file($disk->path($style->logo), ['Cache-Control' => 'no-store']);
+        // An SVG can carry script: it is shown as an image only, never run.
+        return response()->file($disk->path($style->logo), [
+            'Cache-Control' => 'no-store',
+            'Content-Security-Policy' => "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 
     /**
@@ -87,7 +97,7 @@ class StyleController extends Controller
     protected function validated(Request $request, ?VideoStyle $style = null): array
     {
         $request->validate([
-            'logo' => ['nullable', 'file', 'mimes:png,jpg,jpeg,webp,svg', 'max:'.VideoStyle::LOGO_MAX_KB],
+            'logo' => ['nullable', 'file', 'mimes:'.implode(',', self::LOGO_TYPES), 'max:'.VideoStyle::LOGO_MAX_KB],
             'logo_position' => ['nullable', Rule::in(array_keys(VideoStyle::LOGO_POSITIONS))],
             'end_title' => ['nullable', 'string', 'max:120'],
             'end_text' => ['nullable', 'string', 'max:200'],
@@ -98,7 +108,9 @@ class StyleController extends Controller
         $logo = $style?->logo;
         if ($request->hasFile('logo')) {
             $file = $request->file('logo');
-            $logo = 'video-demo/logos/'.Str::lower(Str::random(16)).'.'.strtolower($file->getClientOriginalExtension() ?: 'png');
+            // The extension comes from the file's content, not its name, so it is always an image's.
+            $extension = in_array($file->extension(), self::LOGO_TYPES, true) ? $file->extension() : 'png';
+            $logo = 'video-demo/logos/'.Str::lower(Str::random(16)).'.'.$extension;
             Storage::disk(config('video-demo.storage.work_disk'))->put($logo, $file->get());
         } elseif ($request->boolean('remove_logo')) {
             $logo = null;

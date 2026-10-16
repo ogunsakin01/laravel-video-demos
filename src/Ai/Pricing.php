@@ -12,6 +12,11 @@ use Ogunsakin01\VideoDemo\Ai\Drivers\Drivers;
 class Pricing
 {
     /**
+     * How hard the model thinks, from least to most. Only Claude models take it.
+     */
+    public const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
+
+    /**
      * Get a model's settings, or fail when the model is not configured.
      *
      * @return array{label?: string, provider?: string, reliable?: bool, input?: ?float, output?: ?float, cache_read?: ?float, long_context?: array{above: int, multiplier: float|int}}

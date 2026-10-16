@@ -21,6 +21,11 @@ use RuntimeException;
 class Planner
 {
     /**
+     * How much more each request costs than the last, as the conversation grows.
+     */
+    protected const GROWTH = 1.2;
+
+    /**
      * Create a new planner instance.
      */
     public function __construct(protected Drivers $drivers, protected CodeTools $code) {}
@@ -112,7 +117,6 @@ class Planner
         $maxCost = $video->spendLimit();
         $driver = $this->drivers->for($video->model);
         $tools = [...$this->code->definitions(), ...($session->sampleData?->definitions() ?? []), $this->submitTool()];
-        $lastCost = 0.0;
 
         while ($session->turns < $maxTurns) {
             if ($video->stopRequested()) {
@@ -120,15 +124,18 @@ class Planner
             }
             // Each request costs a little more than the last as the conversation grows,
             // so stop before one that would take the video over its limit.
-            $nextCost = $lastCost * 1.2;
-            if ($lastCost > 0 && $video->cost + $nextCost > $maxCost) {
+            if ($video->cost >= $maxCost) {
+                throw new PlanningFailed(sprintf('Stopped at $%.2f: this video has reached its $%.2f limit. Raise the limit to plan it again.', $video->cost, $maxCost));
+            }
+            $nextCost = $session->lastCost * self::GROWTH;
+            if ($session->lastCost > 0 && $video->cost + $nextCost > $maxCost) {
                 throw new PlanningFailed(sprintf('Stopped at $%.2f: the next request would take this video past its $%.2f limit. Raise the limit, or ask for a shorter video.', $video->cost, $maxCost));
             }
 
             $session->turns++;
             $turn = $driver->send($session->messages, $this->systemPrompt(), $tools, $video->model, $video->effort, $this->longCache($video));
             $video->addUsage($turn->usage);
-            $lastCost = $turn->usage->cost;
+            $session->lastCost = $turn->usage->cost;
 
             if ($turn->stop === Turn::REFUSAL) {
                 throw new PlanningFailed('The model declined this request'.($turn->refusal ? ': '.$turn->refusal : '.'));
@@ -182,7 +189,7 @@ class Planner
                 return;
             }
 
-            $driver->addToolOutputs($session->messages, $this->withBudget($results, $video, $lastCost, $maxCost));
+            $driver->addToolOutputs($session->messages, $this->withBudget($results, $video, $session->lastCost, $maxCost));
         }
 
         throw new PlanningFailed("No plan after $maxTurns requests to the model. Try a narrower description, or raise video-demo.limits.max_turns.");
@@ -213,7 +220,7 @@ class Planner
             return $results;
         }
 
-        $left = max(0, (int) floor(($maxCost - $video->cost) / ($lastCost * 1.2)));
+        $left = max(0, (int) floor(($maxCost - $video->cost) / ($lastCost * self::GROWTH)));
         $note = $left <= 2
             ? "\n\n[Budget: about $left more request(s) before this video's spending limit. Submit the plan now with what you know.]"
             : "\n\n[Budget: about $left more requests before this video's spending limit.]";
@@ -282,9 +289,9 @@ class Planner
     protected function describeToolCall(string $name, array $input): string
     {
         return match ($name) {
-            'read_file' => 'Read '.$input['path'],
-            'list_files' => 'Listed '.$input['path'],
-            'search_code' => 'Searched for "'.$input['pattern'].'"',
+            'read_file' => 'Read '.($input['path'] ?? ''),
+            'list_files' => 'Listed '.($input['path'] ?? ''),
+            'search_code' => 'Searched for "'.($input['pattern'] ?? '').'"',
             default => $name,
         };
     }

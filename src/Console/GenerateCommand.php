@@ -3,6 +3,7 @@
 namespace Ogunsakin01\VideoDemo\Console;
 
 use Illuminate\Console\Command;
+use Illuminate\Support\Str;
 use Ogunsakin01\VideoDemo\Ai\Pricing;
 use Ogunsakin01\VideoDemo\Enums\VideoStatus;
 use Ogunsakin01\VideoDemo\Jobs\GenerateVideo;
@@ -75,7 +76,7 @@ class GenerateCommand extends Command
         }
 
         if (! $this->option('json')) {
-            $this->components->info("Making \"{$video->title}\". This takes a few minutes.");
+            $this->components->info('Making "'.($video->title ?: Str::limit($video->prompt, 60)).'". This takes a few minutes.');
         }
 
         try {

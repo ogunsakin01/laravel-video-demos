@@ -35,6 +35,22 @@ class VideoDemoServiceProvider extends ServiceProvider
     public const QUEUE_CONNECTION = 'video-demo';
 
     /**
+     * Get the queue the package's jobs run on, and its workers listen to.
+     */
+    public static function queueName(): string
+    {
+        return config('video-demo.queue.name') ?: 'video-demo';
+    }
+
+    /**
+     * Get the queue connection the package's jobs run on.
+     */
+    public static function queueConnection(): string
+    {
+        return config('video-demo.queue.connection') ?: self::QUEUE_CONNECTION;
+    }
+
+    /**
      * Register any package services.
      */
     public function register(): void
@@ -135,7 +151,7 @@ class VideoDemoServiceProvider extends ServiceProvider
             'retry_after' => (int) config('video-demo.queue.retry_after', 7200),
             // Its own queue, so the app's workers (with their shorter
             // retry_after) never pick up a long video and start it again.
-            'queue' => config('video-demo.queue.name') ?: 'video-demo',
+            'queue' => self::queueName(),
         ]]);
     }
 
@@ -144,7 +160,7 @@ class VideoDemoServiceProvider extends ServiceProvider
      */
     public static function queueWarning(): ?string
     {
-        $connection = config('video-demo.queue.connection') ?: self::QUEUE_CONNECTION;
+        $connection = self::queueConnection();
         $settings = config("queue.connections.$connection", []);
 
         if (($settings['driver'] ?? null) === 'sync') {

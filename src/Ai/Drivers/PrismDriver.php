@@ -20,6 +20,8 @@ use Prism\Prism\ValueObjects\ToolResult;
  */
 class PrismDriver implements Driver
 {
+    use RedactsSecrets;
+
     protected const MAX_TOKENS = 16_000;
 
     /**
@@ -37,7 +39,7 @@ class PrismDriver implements Driver
      */
     public function addUserText(array &$messages, string $text): void
     {
-        $messages[] = new UserMessage($text);
+        $messages[] = new UserMessage($this->redact($text));
     }
 
     /**
@@ -75,7 +77,7 @@ class PrismDriver implements Driver
     public function addToolOutputs(array &$messages, array $outputs): void
     {
         $messages[] = new ToolResultMessage(array_map(
-            fn (ToolOutput $o) => new ToolResult($o->id, $o->name, $o->input, $o->isError ? 'Error: '.$o->content : $o->content),
+            fn (ToolOutput $o) => new ToolResult($o->id, $o->name, $o->input, ($o->isError ? 'Error: ' : '').$this->redact($o->content)),
             $outputs,
         ));
     }
@@ -88,7 +90,7 @@ class PrismDriver implements Driver
         $response = Prism::structured()
             ->using($this->provider, $model)
             ->withSystemPrompt($system)
-            ->withPrompt($prompt)
+            ->withPrompt($this->redact($prompt))
             ->withSchema(new RawSchema('answer', $schema))
             ->withMaxTokens(4_000)
             ->withClientOptions(['timeout' => 120])

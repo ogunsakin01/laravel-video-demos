@@ -3,6 +3,7 @@
 namespace Ogunsakin01\VideoDemo\Tests;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\File;
 use Ogunsakin01\VideoDemo\VideoDemoServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
 use Prism\Prism\PrismServiceProvider;
@@ -15,6 +16,11 @@ abstract class TestCase extends Orchestra
     use RefreshDatabase {
         migrateFreshUsing as baseMigrateFreshUsing;
     }
+
+    /**
+     * The folder holding this test's local and public disks.
+     */
+    protected string $disks;
 
     protected function getPackageProviders($app): array
     {
@@ -40,6 +46,13 @@ abstract class TestCase extends Orchestra
         $app['config']->set('video-demo.recorder.check_pages', false);
         // Sample data is on by default; tests of other features record on the test database.
         $app['config']->set('video-demo.sample_data.default', false);
+
+        // Files go to a folder of the test's own, never the demo app's storage:
+        // a test video #1 deleting its files must not take the demo's video #1 with it.
+        $this->disks = sys_get_temp_dir().'/video-demo-test-disks-'.uniqid();
+        $app['config']->set('filesystems.disks.local.root', $this->disks.'/local');
+        $app['config']->set('filesystems.disks.public.root', $this->disks.'/public');
+        $this->beforeApplicationDestroyed(fn () => File::deleteDirectory($this->disks));
     }
 
     /**

@@ -36,8 +36,8 @@ class ExportVideo implements ShouldQueue
      */
     public function __construct(public Video $video, public string $format, public ?string $device = null)
     {
-        $this->onConnection(config('video-demo.queue.connection') ?: VideoDemoServiceProvider::QUEUE_CONNECTION);
-        $this->onQueue(config('video-demo.queue.name'));
+        $this->onConnection(VideoDemoServiceProvider::queueConnection());
+        $this->onQueue(VideoDemoServiceProvider::queueName());
     }
 
     /**
@@ -52,6 +52,7 @@ class ExportVideo implements ShouldQueue
             $file = $exporter->export($video, $this->format, $device);
             $this->save(['status' => 'ready', 'device' => $device, 'version' => $video->version, 'bytes' => Storage::disk(config('video-demo.storage.work_disk'))->size($file)]);
         } catch (Throwable $e) {
+            report($e);
             $this->save(['status' => 'failed', 'device' => $device, 'error' => $e->getMessage()]);
         }
     }

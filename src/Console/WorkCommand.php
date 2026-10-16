@@ -44,9 +44,9 @@ class WorkCommand extends Command
     public function handle(): int
     {
         $count = max(1, min(16, (int) ($this->option('workers') ?: config('video-demo.queue.workers', 2))));
-        $connection = config('video-demo.queue.connection') ?: VideoDemoServiceProvider::QUEUE_CONNECTION;
+        $connection = VideoDemoServiceProvider::queueConnection();
         $command = [(new PhpExecutableFinder)->find(false) ?: 'php', base_path('artisan'), 'queue:work', $connection,
-            '--queue='.(config('video-demo.queue.name') ?: 'video-demo'), ...($this->option('stop-when-empty') ? ['--stop-when-empty'] : [])];
+            '--queue='.VideoDemoServiceProvider::queueName(), ...($this->option('stop-when-empty') ? ['--stop-when-empty'] : [])];
 
         if ($warning = VideoDemoServiceProvider::queueWarning()) {
             $this->components->warn($warning);
@@ -103,7 +103,7 @@ class WorkCommand extends Command
     protected function waiting(string $connection): int
     {
         try {
-            return Queue::connection($connection)->size(config('video-demo.queue.name') ?: 'video-demo');
+            return Queue::connection($connection)->size(VideoDemoServiceProvider::queueName());
         } catch (Throwable) {
             return 0;
         }

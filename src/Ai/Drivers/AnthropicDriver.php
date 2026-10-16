@@ -12,6 +12,8 @@ use Ogunsakin01\VideoDemo\Ai\Usage;
  */
 class AnthropicDriver implements Driver
 {
+    use RedactsSecrets;
+
     protected const MAX_TOKENS = 16_000;
 
     /**
@@ -24,7 +26,7 @@ class AnthropicDriver implements Driver
      */
     public function addUserText(array &$messages, string $text): void
     {
-        $messages[] = ['role' => 'user', 'content' => $text];
+        $messages[] = ['role' => 'user', 'content' => $this->redact($text)];
     }
 
     /**
@@ -64,7 +66,7 @@ class AnthropicDriver implements Driver
         $messages[] = ['role' => 'user', 'content' => array_map(fn (ToolOutput $o) => array_filter([
             'type' => 'tool_result',
             'toolUseID' => $o->id,
-            'content' => $o->content,
+            'content' => $this->redact($o->content),
             'isError' => $o->isError ?: null,
         ], fn ($v) => $v !== null), $outputs)];
     }
@@ -79,7 +81,7 @@ class AnthropicDriver implements Driver
             'maxTokens' => 4_000,
             'system' => $system,
             'outputConfig' => ['effort' => 'low', 'format' => ['type' => 'json_schema', 'schema' => $schema]],
-            'messages' => [['role' => 'user', 'content' => $prompt]],
+            'messages' => [['role' => 'user', 'content' => $this->redact($prompt)]],
         ]);
 
         $turn = $this->turn($response, $model);
