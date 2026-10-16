@@ -394,26 +394,26 @@ class SampleDataTest extends TestCase
         }
     }
 
-    public function test_install_warns_about_an_old_copy_of_the_config(): void
+    public function test_install_removes_a_copy_of_the_config_nobody_edited(): void
     {
-        // A copy published by an older version: no Promo reel, no stats settings.
-        $old = require __DIR__.'/../config/video-demo.php';
-        unset($old['styles']['promo'], $old['library']['stats']);
-        File::put(config_path('video-demo.php'), '<?php return '.var_export($old, true).';');
+        // A copy an older version of install made, never edited.
+        File::put(config_path('video-demo.php'), File::get(__DIR__.'/../config/video-demo.php'));
 
         try {
             $this->artisan('video-demo:install', ['--no-browser' => true, '--no-sample-data' => true])
-                ->expectsOutputToContain('config/video-demo.php is a copy from an older version, without library.stats, styles.promo.')
+                ->expectsOutputToContain('Removed config/video-demo.php: an unedited copy of the package\'s config')
                 ->assertSuccessful();
+            $this->assertFileDoesNotExist(config_path('video-demo.php'));
+
+            // An edited copy is the app's, and stays.
+            File::put(config_path('video-demo.php'), File::get(__DIR__.'/../config/video-demo.php')."\n// Our own change\n");
+            $this->artisan('video-demo:install', ['--no-browser' => true, '--no-sample-data' => true])
+                ->doesntExpectOutputToContain('Removed config/video-demo.php')
+                ->assertSuccessful();
+            $this->assertFileExists(config_path('video-demo.php'));
         } finally {
             File::delete([config_path('video-demo.php'), storage_path('video-demo/.gitignore')]);
         }
-
-        // An up-to-date copy, or none, says nothing.
-        $this->artisan('video-demo:install', ['--no-browser' => true, '--no-sample-data' => true])
-            ->doesntExpectOutputToContain('is a copy from an older version')
-            ->assertSuccessful();
-        File::delete(storage_path('video-demo/.gitignore'));
     }
 
     public function test_install_keeps_an_existing_gitignore(): void

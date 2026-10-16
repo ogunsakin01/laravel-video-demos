@@ -28,4 +28,5 @@ Recording tests run only with Playwright available: `VIDEO_DEMO_TEST_NODE_MODULE
 - UI: Geist, the warm paper palette in `resources/views/partials/styles.blade.php`, light and dark mode, phone width. Solid colours only: no gradients, anywhere, including the recorder's overlay.
 - Plain, specific wording in UI text and docs.
 - Add a line under "Unreleased" in `CHANGELOG.md` for user-facing changes.
+- After changing `config/video-demo.php`, add its new fingerprint to `PackageConfig::RELEASED` (a test says which), so `video-demo:install` can still tell an unedited copy of it.
 - Commits have no co-author or AI attribution trailers.

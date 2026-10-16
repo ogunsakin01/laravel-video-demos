@@ -2,6 +2,15 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/). While the version is 0.x, minor releases may include breaking changes; they will be listed here.
 
+## v0.17.6 - 2026-10-16
+
+Run `php artisan video-demo:install` after updating.
+
+### Changed
+
+- **Updating the package now updates your settings, even with your own copy of the config.** An app's `config/video-demo.php` used to replace whole sections of the package's config, so new styles, models and devices never reached it. Now your copy is laid over the package's config: every setting in it still wins, and anything it doesn't have comes from the package. Plain lists, such as middleware, are still yours alone. To turn off a built-in style, model or device, set it to `false`, such as `'promo' => false` under `styles`.
+- **`video-demo:install` removes a copy of the config that nobody edited.** Older versions of the command made one in every app. It is recognised by matching a version the package shipped exactly, and install says what it removed. A copy you edited stays.
+
 ## v0.17.5 - 2026-10-16
 
 Run `php artisan video-demo:install` after updating.

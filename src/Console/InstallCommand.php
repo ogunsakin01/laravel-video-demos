@@ -3,9 +3,11 @@
 namespace Ogunsakin01\VideoDemo\Console;
 
 use Illuminate\Console\Command;
+use Illuminate\Contracts\Foundation\CachesConfiguration;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use Ogunsakin01\VideoDemo\SampleData\Sandbox;
+use Ogunsakin01\VideoDemo\Support\PackageConfig;
 use Throwable;
 
 /**
@@ -39,47 +41,27 @@ class InstallCommand extends Command
     protected const PLAYWRIGHT = '1.64.0';
 
     /**
-     * Warn when the app has its own copy of the config that lacks settings
-     * the package has now. Laravel reads a section such as "styles" from the
-     * app's copy alone, so an older copy hides what was added since, like
-     * new styles and models.
+     * Remove the app's copy of the config when nobody edited it: older
+     * versions of this command made it. It holds nothing of the app's, and
+     * settings now come from the package and .env. An edited copy stays;
+     * what it lacks comes from the package.
      */
-    protected function warnAboutStaleConfig(): void
+    protected function removeUneditedConfig(): void
     {
         $file = config_path('video-demo.php');
-        if (! is_file($file)) {
+        $version = PackageConfig::uneditedVersion($file);
+        if ($version === null) {
             return;
         }
 
-        $missing = $this->missingKeys(require __DIR__.'/../../config/video-demo.php', (array) require $file);
-        if ($missing === []) {
-            return;
+        File::delete($file);
+        if ($this->laravel instanceof CachesConfiguration && $this->laravel->configurationIsCached()) {
+            $this->callSilently('config:clear');
         }
-
-        $this->components->warn(sprintf(
-            'config/video-demo.php is a copy from an older version, without %s. Until it has them, this app gets none of them. If you never edited it, delete it: every setting can be made in .env. Otherwise copy the new parts from vendor/ogunsakin01/laravel-video-demos/config/video-demo.php.',
-            implode(', ', array_slice($missing, 0, 6)).(count($missing) > 6 ? ' and '.(count($missing) - 6).' more' : ''),
+        $this->components->info(sprintf(
+            'Removed config/video-demo.php: an unedited copy of the package\'s config%s, made by an older version of this command. Settings come from the package and .env now; publish it again with --tag=video-demo-config to change more.',
+            $version === 'current' ? '' : " from $version",
         ));
-    }
-
-    /**
-     * Find the settings in the package's config that the app's copy lacks,
-     * as dotted names such as "styles.promo".
-     *
-     * @return list<string>
-     */
-    protected function missingKeys(array $package, array $app, string $prefix = ''): array
-    {
-        $missing = [];
-        foreach ($package as $key => $value) {
-            if (! array_key_exists($key, $app)) {
-                $missing[] = $prefix.$key;
-            } elseif (is_array($value) && ! array_is_list($value) && is_array($app[$key])) {
-                array_push($missing, ...$this->missingKeys($value, $app[$key], "$prefix$key."));
-            }
-        }
-
-        return $missing;
     }
 
     /**
@@ -92,10 +74,9 @@ class InstallCommand extends Command
      */
     public function handle(): int
     {
-        // The config isn't copied into the app: everything is set from .env,
-        // and a copy would keep the app on this version's defaults after
-        // upgrades. Publish it with --tag=video-demo-config to change more.
-        $this->warnAboutStaleConfig();
+        // The config isn't copied into the app: everything is set from .env.
+        // Publish it with --tag=video-demo-config to change more.
+        $this->removeUneditedConfig();
 
         // Laravel ignores only the storage folders it makes itself, so keep
         // the package's tools out of the app's repository and its deploys.

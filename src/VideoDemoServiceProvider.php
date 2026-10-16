@@ -3,6 +3,7 @@
 namespace Ogunsakin01\VideoDemo;
 
 use Anthropic\Client;
+use Illuminate\Contracts\Foundation\CachesConfiguration;
 use Illuminate\Routing\Events\RouteMatched;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
@@ -25,6 +26,7 @@ use Ogunsakin01\VideoDemo\Library\Manifest;
 use Ogunsakin01\VideoDemo\Recording\Recorder;
 use Ogunsakin01\VideoDemo\SampleData\Sandbox;
 use Ogunsakin01\VideoDemo\Support\Language;
+use Ogunsakin01\VideoDemo\Support\PackageConfig;
 use Ogunsakin01\VideoDemo\Support\Worker;
 
 class VideoDemoServiceProvider extends ServiceProvider
@@ -55,7 +57,12 @@ class VideoDemoServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->mergeConfigFrom(__DIR__.'/../config/video-demo.php', 'video-demo');
+        // The app's own copy of the config, if it has one, laid over the
+        // package's, so settings added in an upgrade reach it too.
+        if (! ($this->app instanceof CachesConfiguration && $this->app->configurationIsCached())) {
+            $config = $this->app->make('config');
+            $config->set('video-demo', PackageConfig::merge(PackageConfig::defaults(), (array) $config->get('video-demo', [])));
+        }
 
         // Before anything reads the database, so the whole request uses the sample data.
         Sandbox::activateFor($this->app);
