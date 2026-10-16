@@ -14,6 +14,7 @@ php artisan video-demo:generate "Show off posting a job" --style=ad --publish --
 php artisan video-demo:list --json
 php artisan video-demo:publish post-a-job
 php artisan video-demo:refresh   # record published videos again after UI changes, no AI cost
+php artisan video-demo:refresh --changed=<commit before> --fix --json   # in a deploy pipeline: only the videos the change touched
 php artisan video-demo:verify --changed=origin/main --json   # after changing the UI: which videos it broke (no recording, no AI)
 php artisan video-demo:translate post-a-job fr es --json   # the same video in other languages, from its plan
 php artisan video-demo:export post-a-job --format=gif --out=docs/post-a-job.gif   # gif, square or vertical

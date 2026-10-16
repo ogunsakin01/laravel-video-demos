@@ -136,8 +136,9 @@ class Verifier
 
     /**
      * Determine which of a video's files are among the changed ones. A video
-     * with none known (made before files were noted) may be affected by any
-     * change, so it returns null.
+     * planned before the files it was made from were noted is matched on the
+     * controllers and route files behind its pages; one with no files known
+     * at all may be affected by any change, so it returns null.
      *
      * @param  list<string>  $changed
      * @return ?list<string>
@@ -145,7 +146,7 @@ class Verifier
     public static function touched(Video $video, array $changed): ?array
     {
         $files = static::sourceFiles($video);
-        if ($video->source_files === null) {
+        if ($video->source_files === null && $files === []) {
             return null;
         }
 

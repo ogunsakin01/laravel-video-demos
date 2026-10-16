@@ -179,6 +179,14 @@ class VerifyTest extends TestCase
             $this->assertSame(['app/Http/Controllers/VerifyJobsController.php', 'resources/views/jobs/index.blade.php'], Verifier::sourceFiles($video));
             $this->assertSame([], Verifier::touched($video, ['README.md']));
             $this->assertSame(['app/Http/Controllers/VerifyJobsController.php'], Verifier::touched($video, ['app/Http/Controllers/VerifyJobsController.php']));
+
+            // A video planned before files were noted is matched on its pages' files,
+            // so it isn't checked (or recorded on deploy) after every change.
+            $old = $this->video('Close a job', ['source_files' => null]);
+            $this->assertSame([], Verifier::touched($old, ['README.md']));
+            $this->assertSame(['app/Http/Controllers/VerifyJobsController.php'], Verifier::touched($old, ['app/Http/Controllers/VerifyJobsController.php']));
+            // With no files known at all, any change may affect it.
+            $this->assertNull(Verifier::touched($this->video('Elsewhere', ['source_files' => null, 'plan' => ['title' => 'x', 'summary' => '', 'steps' => [['action' => 'goto', 'url' => '/nowhere']]]]), ['README.md']));
         } finally {
             File::delete($file);
         }

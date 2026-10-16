@@ -2,6 +2,23 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/). While the version is 0.x, minor releases may include breaking changes; they will be listed here.
 
+## v0.17.8 - 2026-10-16
+
+### Added
+
+- **Update videos on deploy.** `video-demo:refresh` takes three new options:
+  - `--changed=<ref>` records again only the published videos made from code that changed since that commit.
+  - `--fix` gives a video whose plan no longer works a new plan from the AI, then records and publishes it.
+  - `--json` prints the result for CI. It exits non-zero when a video can't be made.
+  - A video whose code isn't known at all is skipped with `--changed`, saying how to record it, so it isn't recorded after every change.
+
+  The wiki's [On deploy](https://github.com/ogunsakin01/laravel-video-demos/wiki/Keeping-Videos-Up-To-Date#on-deploy) section has a GitHub Actions workflow that runs it after each push to `main`, and says what the job needs: the studio's database, the disk production reads, and an AI key for `--fix`. It can also suggest ideas for new videos with `video-demo:suggest`.
+
+### Fixed
+
+- `--changed` (on `verify` and `refresh`) matches a video planned before v0.17.0 on the controllers and route files behind its pages, instead of treating it as changed by every commit. Only a video with no files known at all is always included. Planning it again gives it the full list.
+- `video-demo:refresh` no longer records a video that is being made at the same moment, and refuses to run where the studio is disabled (recording signs in through it), as `video-demo:generate` does.
+
 ## v0.17.7 - 2026-10-16
 
 ### Changed

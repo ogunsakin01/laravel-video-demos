@@ -24,6 +24,7 @@ php artisan video-demo:generate "Show off posting a job" --style=ad --publish --
 php artisan video-demo:list --json
 php artisan video-demo:publish post-a-job [--unpublish]
 php artisan video-demo:refresh        # re-record published videos from their saved plans, no AI cost
+php artisan video-demo:refresh --changed=<commit before> --fix --json  # on deploy: only videos made from changed code; a new plan where one no longer works
 php artisan video-demo:verify --json  # check published videos still work (no recording, no AI); exits non-zero when one is broken
 php artisan video-demo:verify --changed=origin/main --json  # only videos made from code that differs from the ref (for CI)
 php artisan video-demo:verify --fix   # new plan for each broken video, recorded and republished
