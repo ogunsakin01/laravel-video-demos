@@ -6,7 +6,8 @@
     "accent": "#c4532d",
     "captions": "bottom",
     "pace": "normal",
-    "art": "abstract"
+    "art": "abstract",
+    "highlight": true
   },
   "devices": [
     "desktop",
