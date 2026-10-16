@@ -25,7 +25,9 @@ const finish = result => { fs.writeFileSync(resultFile, JSON.stringify(result));
 
   // Outside the project, so the model is never committed and is shared by every project.
   env.cacheDir = job.cacheDir;
-  const tts = await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX', { dtype: 'q8', device: 'cpu' });
+  // The full model, not the compressed (q8) one: that one sounds harsher and more
+  // robotic, and on a computer's processor it is slower too.
+  const tts = await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX', { dtype: 'fp32', device: 'cpu' });
   try {
     if (job.warmup) return finish({ ok: true, voices: Object.keys(tts.voices) });
     if (!tts.voices[job.voice]) return finish({ ok: false, error: `There is no local voice [${job.voice}].` });

@@ -2,7 +2,14 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/). While the version is 0.x, minor releases may include breaking changes; they will be listed here.
 
-## Unreleased
+## v0.17.10 - 2026-10-16
+
+### Changed
+
+- **A more natural local voice.** The free local voices now use the full Kokoro model rather than its compressed copy, which sounded harsher and more robotic. The full model is also faster on a computer's processor. It is a one-time download of about 330 MB, made the first time a video uses a local voice or when you run `php artisan video-demo:install-voice` again. Lines spoken by the old model are spoken again the next time their video is recorded.
+- **The local voice comes with your videos.** On a teammate's machine or a CI runner, `video-demo:install` now installs the free local voice by itself when a video or style there uses it. Before, you had to know to add `--with-voice`. The wiki's deploy workflow keeps the voice's model between runs.
+- **`video-demo:refresh` won't publish a video without its voice.** When a video's voice isn't available where it runs, such as a local voice that isn't installed or a cloud voice without its key, that video fails and the message says how to get the voice. Before, it was recorded again silent and published.
+- **Natural voices come first in the voice list:** OpenAI, Gemini and ElevenLabs, then the local voices, and the computer's own robotic voices last. Without a natural voice, the form says how to get one.
 
 ### Fixed
 

@@ -6,8 +6,11 @@ use Illuminate\Console\Command;
 use Illuminate\Contracts\Foundation\CachesConfiguration;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
+use Ogunsakin01\VideoDemo\Models\Video;
+use Ogunsakin01\VideoDemo\Models\VideoStyle;
 use Ogunsakin01\VideoDemo\SampleData\Sandbox;
 use Ogunsakin01\VideoDemo\Support\PackageConfig;
+use Ogunsakin01\VideoDemo\Voice\Voices;
 use Throwable;
 
 /**
@@ -26,7 +29,7 @@ class InstallCommand extends Command
     protected $signature = 'video-demo:install
         {--no-browser : Skip installing Playwright and Chromium}
         {--no-sample-data : Skip building the sample database}
-        {--with-voice : Also install the free local voice for voice-overs (about 250 MB, once)}';
+        {--with-voice : Also install the free local voice for voice-overs (about 500 MB, once). It is installed anyway when a video or style here uses it}';
 
     /**
      * The console command description.
@@ -65,6 +68,24 @@ class InstallCommand extends Command
     }
 
     /**
+     * Whether the app's default voice, a video or a style uses a local voice.
+     */
+    protected function localVoiceUsed(): bool
+    {
+        if (str_starts_with((string) config('video-demo.voice.default'), 'kokoro:')) {
+            return true;
+        }
+
+        try {
+            return Video::query()->where('voice', 'like', 'kokoro:%')->exists()
+                || VideoStyle::query()->where('voice', 'like', 'kokoro:%')->exists();
+        } catch (Throwable) {
+            // The tables aren't there, as when the migrations failed.
+            return false;
+        }
+    }
+
+    /**
      * The GIF encoder the recorder uses for GIF copies of videos.
      */
     protected const GIFENC = '1.0.3';
@@ -98,6 +119,10 @@ class InstallCommand extends Command
         }
 
         if ($this->option('with-voice')) {
+            $this->call('video-demo:install-voice');
+        } elseif (! Voices::localInstalled() && $this->localVoiceUsed()) {
+            // A teammate's machine or a CI runner gets the voice its videos are made with.
+            $this->components->info('Installing the local voice: videos or styles here use it.');
             $this->call('video-demo:install-voice');
         }
 

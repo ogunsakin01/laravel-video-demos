@@ -27,7 +27,7 @@ class InstallVoiceCommand extends Command
      *
      * @var string
      */
-    protected $description = 'Install the free local voice that narrates videos on this machine (about 250 MB, once)';
+    protected $description = 'Install the free local voice that narrates videos on this machine (about 500 MB, once)';
 
     /**
      * The kokoro-js version the package is tested with.
@@ -62,7 +62,7 @@ class InstallVoiceCommand extends Command
         $this->components->task('Removing the copies for other systems', fn () => $this->prune($modules));
 
         $voices = null;
-        $this->components->task('Downloading the voice model (about 100 MB, once)', function () use (&$voices) {
+        $this->components->task('Downloading the voice model (about 330 MB, once)', function () use (&$voices) {
             $dir = Recorder::workDir(trim((string) config('video-demo.storage.work_path'), '/').'/voice/warmup-'.uniqid());
             File::ensureDirectoryExists($dir);
             try {

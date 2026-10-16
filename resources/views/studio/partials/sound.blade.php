@@ -48,7 +48,11 @@
     </select>
     <span class="vd-hint vd-warn-text" data-voice-language hidden></span>
     @unless (\Ogunsakin01\VideoDemo\Voice\Voices::localInstalled())
-      <span class="vd-hint">Free natural voices: <code>php artisan video-demo:install-voice</code></span>
+      @if (collect(['openai', 'gemini', 'elevenlabs'])->contains(fn ($provider) => \Ogunsakin01\VideoDemo\Voice\Voices::providerKey($provider)))
+        <span class="vd-hint">Free natural voices: <code>php artisan video-demo:install-voice</code></span>
+      @else
+        <span class="vd-hint">This computer's voices sound robotic. For natural ones, run <code>php artisan video-demo:install-voice</code> (free), or set an OpenAI, Gemini or ElevenLabs key.</span>
+      @endif
     @endunless
   </div>
   <div>

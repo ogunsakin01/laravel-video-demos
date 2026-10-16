@@ -25,6 +25,12 @@ class Speaker
     public float $cost = 0.0;
 
     /**
+     * The local voice's model, part of what makes its clips: lines spoken by
+     * an older one (the compressed model, before v0.17.10) are spoken again.
+     */
+    protected const LOCAL_MODEL = 'kokoro-82m-fp32';
+
+    /**
      * Create a new speaker instance.
      */
     public function __construct(protected Encoder $encoder) {}
@@ -70,7 +76,8 @@ class Speaker
         foreach ($order as $i => $text) {
             // Cloud voices hear the lines around each one, so those are part of what makes a clip.
             $around = in_array($provider, ['openai', 'elevenlabs'], true) ? "\n".($order[$i - 1] ?? '')."\n".($order[$i + 1] ?? '') : '';
-            $file = "$dir/".($mixable ? '' : 'raw-').sha1("$voice\n$tone\n$text$around").".$extension";
+            $model = $provider === 'kokoro' ? "\n".self::LOCAL_MODEL : '';
+            $file = "$dir/".($mixable ? '' : 'raw-').sha1("$voice\n$tone\n$text$around$model").".$extension";
             $clips[$text] = $file;
             if (! is_file($file)) {
                 $missing[$text] = $file;

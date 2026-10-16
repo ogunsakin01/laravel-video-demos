@@ -144,4 +144,18 @@ class RefreshTest extends TestCase
         config(['video-demo.studio.enabled' => false]);
         $this->artisan('video-demo:refresh')->expectsOutputToContain('The studio is disabled here')->assertExitCode(1);
     }
+
+    public function test_a_video_whose_voice_is_missing_here_fails_rather_than_going_silent(): void
+    {
+        $recorder = $this->fakeApp();
+        config(['video-demo.recorder.node_modules' => '/nowhere']);
+        $this->video('Post a job', 'Post job', ['resources/views/jobs.blade.php'])->update(['voice' => 'kokoro:af_heart']);
+
+        $this->assertSame(1, Artisan::call('video-demo:refresh', ['--json' => true]));
+        $row = json_decode(Artisan::output(), true)['videos'][0];
+
+        $this->assertSame(['failed', 'kokoro:af_heart'], [$row['status'], $row['voice']]);
+        $this->assertStringContainsString("Its voice, Heart, warm (US), isn't available here, so it would be published without one. Run php artisan video-demo:install-voice first", $row['error']);
+        $this->assertSame([], $recorder->recorded);
+    }
 }

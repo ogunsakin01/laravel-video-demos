@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use InvalidArgumentException;
 use Ogunsakin01\VideoDemo\Ai\Narrator;
+use Ogunsakin01\VideoDemo\Console\InstallVoiceCommand;
 use Ogunsakin01\VideoDemo\Enums\VideoStatus;
 use Ogunsakin01\VideoDemo\Http\Controllers\Studio\SoundController;
 use Ogunsakin01\VideoDemo\Jobs\GenerateVideo;
@@ -588,12 +589,17 @@ class VoiceTest extends TestCase
         $this->assertSame([], Voices::options());
 
         config(['video-demo.voice.providers.openai.key' => 'sk-test', 'video-demo.voice.providers.elevenlabs.key' => 'xi-test']);
+        // The most natural voices come first, the computer's robotic ones last.
+        Voices::flush(['Samantha' => 'Samantha (en US)']);
+        File::ensureDirectoryExists($this->root.'/recorder/node_modules/kokoro-js');
+        File::put($this->root.'/recorder/node_modules/kokoro-js/package.json', '{}');
         Http::fake(['api.elevenlabs.io/v2/voices*' => Http::response(['voices' => [
             ['voice_id' => 'JBFqnCBsd6RMkjVDRZzb', 'name' => 'George', 'category' => 'premade'],
             ['voice_id' => 'abc123', 'name' => 'My brand voice', 'category' => 'cloned'],
         ], 'has_more' => false])]);
 
         $options = Voices::options();
+        $this->assertSame(['OpenAI voices, about $0.02 a minute', 'ElevenLabs voices, about $0.07 a minute', 'Local voices, free', "This computer's voice: robotic, for drafts only"], array_keys($options));
         $this->assertSame('Marin, natural', $options['OpenAI voices, about $0.02 a minute']['openai:marin']);
         $this->assertSame(['elevenlabs:JBFqnCBsd6RMkjVDRZzb' => 'George', 'elevenlabs:abc123' => 'My brand voice (yours)'], $options['ElevenLabs voices, about $0.07 a minute']);
         $this->assertSame(0.017, Voices::price('openai:marin'));
@@ -721,5 +727,27 @@ class VoiceTest extends TestCase
 
         $this->assertSame('Heart, warm (US)', Voices::label('kokoro:af_heart'));
         $this->assertSame('openai:nobody', Voices::label('openai:nobody'));
+    }
+
+    public function test_install_adds_the_local_voice_when_videos_here_use_it(): void
+    {
+        Process::fake();
+
+        try {
+            // Nothing here uses it: not installed, as it is a large download.
+            $this->artisan('video-demo:install', ['--no-browser' => true, '--no-sample-data' => true])
+                ->doesntExpectOutputToContain('Installing the local voice')
+                ->assertSuccessful();
+            Process::assertDidntRun(fn ($process) => in_array('kokoro-js@'.InstallVoiceCommand::KOKORO, (array) $process->command, true));
+
+            // A style uses it, as on a teammate's machine or a CI runner.
+            VideoStyle::create(['key' => 'narrated', 'name' => 'Narrated', 'direction' => 'Calm.', 'voice' => 'kokoro:af_heart']);
+            $this->artisan('video-demo:install', ['--no-browser' => true, '--no-sample-data' => true])
+                ->expectsOutputToContain('Installing the local voice: videos or styles here use it.')
+                ->assertSuccessful();
+            Process::assertRan(fn ($process) => in_array('kokoro-js@'.InstallVoiceCommand::KOKORO, (array) $process->command, true));
+        } finally {
+            File::delete([config_path('video-demo.php'), storage_path('video-demo/.gitignore')]);
+        }
     }
 }

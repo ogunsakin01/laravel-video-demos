@@ -10,6 +10,7 @@ use Ogunsakin01\VideoDemo\Library\Publisher;
 use Ogunsakin01\VideoDemo\Models\Video;
 use Ogunsakin01\VideoDemo\Recording\Verifier;
 use Ogunsakin01\VideoDemo\VideoDemoServiceProvider;
+use Ogunsakin01\VideoDemo\Voice\Voices;
 use RuntimeException;
 use Throwable;
 
@@ -83,6 +84,13 @@ class RefreshCommand extends Command
                 }
             }
 
+            // Recorded without its voice, it would be published silent.
+            if ($video->voice && ! Voices::available($video->voice)) {
+                $report[] = [...$row, 'status' => 'failed', 'voice' => $video->voice, 'error' => $this->voiceMissing($video->voice)];
+
+                continue;
+            }
+
             $report[] = [...$row, ...$this->refresh($video, $publisher)];
         }
 
@@ -100,6 +108,22 @@ class RefreshCommand extends Command
             : $this->print($summary);
 
         return $summary['ok'] ? self::SUCCESS : self::FAILURE;
+    }
+
+    /**
+     * Say why a video's voice isn't available here, and how to get it.
+     */
+    protected function voiceMissing(string $voice): string
+    {
+        [$provider] = Voices::parse($voice);
+        $how = match ($provider) {
+            'kokoro' => 'Run php artisan video-demo:install-voice first (in CI too).',
+            'system' => "It is a computer's own voice, and this computer doesn't have it. Choose another voice for the video.",
+            'openai', 'gemini', 'elevenlabs' => 'Set the '.strtoupper($provider).'_API_KEY here (in CI too).',
+            default => 'Choose another voice for the video.',
+        };
+
+        return 'Its voice, '.Voices::label($voice).", isn't available here, so it would be published without one. $how";
     }
 
     /**
@@ -182,7 +206,7 @@ class RefreshCommand extends Command
         $this->newLine();
         foreach ($summary['videos'] as $row) {
             if ($row['status'] === 'failed') {
-                $this->components->error("{$row['title']}: {$row['error']}".($this->option('fix') ? '' : ' Run again with --fix to ask the AI for a new plan, or open it in the studio.'));
+                $this->components->error("{$row['title']}: {$row['error']}".($this->option('fix') || isset($row['voice']) ? '' : ' Run again with --fix to ask the AI for a new plan, or open it in the studio.'));
             }
             if ($row['status'] === 'fixed') {
                 $this->components->info(sprintf('%s: its plan no longer worked, so it was made with a new one, for $%.4f.', $row['title'], $row['cost'] ?? 0));

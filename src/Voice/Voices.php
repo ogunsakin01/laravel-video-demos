@@ -61,16 +61,7 @@ class Voices
     {
         $groups = [];
 
-        if (static::localInstalled()) {
-            foreach ((array) config('video-demo.voice.kokoro_voices', []) as $id => $label) {
-                $groups['Local voices, free'][self::key('kokoro', $id)] = $label;
-            }
-        }
-
-        foreach (static::systemVoices() as $id => $label) {
-            $groups["This computer's voice: robotic, for drafts only"][self::key('system', $id)] = $label;
-        }
-
+        // The most natural first: the cloud voices sound most like a person.
         foreach (['openai' => 'OpenAI', 'gemini' => 'Gemini', 'elevenlabs' => 'ElevenLabs'] as $provider => $name) {
             if (! static::providerKey($provider)) {
                 continue;
@@ -79,6 +70,16 @@ class Voices
             foreach ($voices as $id => $label) {
                 $groups[sprintf('%s voices, about $%.2f a minute', $name, static::pricePerMinute($provider))][self::key($provider, (string) $id)] = $label;
             }
+        }
+
+        if (static::localInstalled()) {
+            foreach ((array) config('video-demo.voice.kokoro_voices', []) as $id => $label) {
+                $groups['Local voices, free'][self::key('kokoro', $id)] = $label;
+            }
+        }
+
+        foreach (static::systemVoices() as $id => $label) {
+            $groups["This computer's voice: robotic, for drafts only"][self::key('system', $id)] = $label;
         }
 
         return $groups;
