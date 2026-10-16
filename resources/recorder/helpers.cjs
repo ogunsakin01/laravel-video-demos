@@ -319,23 +319,45 @@ async function click(page, locator) {
 }
 
 // An outline around the element being used, dimming the rest of the page, for
-// styles with "highlight". Solid colours only.
+// styles with "highlight". It follows the element when the page scrolls or the
+// layout moves, and glides to the next one. Solid colours only.
 const HIGHLIGHT_JS = `
 (() => {
   if (window.__demoHighlight) return;
   const accent = (window.__demoStyle && window.__demoStyle.accent) || '#e5693d';
+  const pad = 8, glideMs = 450;
   const box = document.createElement('div');
-  box.style.cssText = 'position:fixed;z-index:2147483645;pointer-events:none;border-radius:10px;border:3px solid ' + accent + ';box-shadow:0 0 0 200vmax rgba(8,8,7,.5);opacity:0;transition:opacity .35s ease, left .45s ease, top .45s ease, width .45s ease, height .45s ease';
+  box.style.cssText = 'position:fixed;z-index:2147483645;pointer-events:none;border-radius:10px;border:3px solid ' + accent + ';box-shadow:0 0 0 200vmax rgba(8,8,7,.5);opacity:0;transition:opacity .35s ease';
   const attach = () => { if (!box.isConnected && document.body) document.body.appendChild(box); };
+  let el = null, from = null, since = 0, drawn = null, running = false;
+  const ease = t => t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+  const draw = () => {
+    if (el && !el.isConnected) { box.style.opacity = '0'; el = null; }
+    if (!el) { running = false; return; }
+    const r = el.getBoundingClientRect();
+    let x = r.left, y = r.top, w = r.width, h = r.height;
+    const k = from ? Math.min(1, (performance.now() - since) / glideMs) : 1;
+    if (k < 1) {
+      const e = ease(k);
+      x = from.x + (x - from.x) * e; y = from.y + (y - from.y) * e;
+      w = from.w + (w - from.w) * e; h = from.h + (h - from.h) * e;
+    }
+    drawn = { x, y, w, h };
+    box.style.left = (x - pad) + 'px'; box.style.top = (y - pad) + 'px';
+    box.style.width = (w + pad * 2) + 'px'; box.style.height = (h + pad * 2) + 'px';
+    requestAnimationFrame(draw);
+  };
   window.__demoHighlight = {
-    show(r) {
+    show(target) {
       attach();
-      const pad = 8;
-      box.style.left = (r.x - pad) + 'px'; box.style.top = (r.y - pad) + 'px';
-      box.style.width = (r.width + pad * 2) + 'px'; box.style.height = (r.height + pad * 2) + 'px';
+      const shown = el && box.style.opacity === '1';
+      from = shown ? drawn : null;
+      since = performance.now();
+      el = target;
       box.style.opacity = '1';
+      if (!running) { running = true; draw(); }
     },
-    hide() { box.style.opacity = '0'; },
+    hide() { box.style.opacity = '0'; el = null; },
   };
 })();`;
 

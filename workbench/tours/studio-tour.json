@@ -6,7 +6,8 @@
     "accent": "#c4532d",
     "captions": "bottom",
     "pace": "normal",
-    "art": "abstract"
+    "art": "abstract",
+    "highlight": true
   },
   "steps": [
     {
@@ -71,7 +72,7 @@
       "target": {
         "role": null,
         "name": null,
-        "label": "What should the video show?",
+        "label": "Description",
         "placeholder": null,
         "text": null,
         "selector": null
@@ -111,8 +112,8 @@
         "name": null,
         "label": null,
         "placeholder": null,
-        "text": "Edit anything before you generate",
-        "selector": null
+        "text": null,
+        "selector": "#vd-complete:not([aria-busy])"
       },
       "value": null,
       "title": null,
@@ -142,8 +143,8 @@
         "name": null,
         "label": null,
         "placeholder": null,
-        "text": "The AI writes one plan for all of them",
-        "selector": null
+        "text": null,
+        "selector": "#vd-devices-label"
       },
       "value": null,
       "title": null,
@@ -161,8 +162,8 @@
         "name": null,
         "label": null,
         "placeholder": null,
-        "text": "Tablet",
-        "selector": null
+        "text": null,
+        "selector": "label:has(input[value=tablet])"
       },
       "value": null,
       "title": null,
@@ -180,8 +181,8 @@
         "name": null,
         "label": null,
         "placeholder": null,
-        "text": "Mobile",
-        "selector": null
+        "text": null,
+        "selector": "label:has(input[value=mobile])"
       },
       "value": null,
       "title": null,
@@ -234,16 +235,16 @@
       "only_on": null
     },
     {
-      "action": "scroll",
-      "why": "",
+      "action": "click",
+      "why": "Open the spending limit",
       "url": null,
       "target": {
         "role": null,
         "name": null,
-        "label": "Spending limit",
+        "label": null,
         "placeholder": null,
         "text": null,
-        "selector": null
+        "selector": ".vd-more > summary"
       },
       "value": null,
       "title": null,
@@ -253,16 +254,35 @@
       "only_on": null
     },
     {
+      "action": "scroll",
+      "why": "",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": null,
+        "placeholder": null,
+        "text": null,
+        "selector": "#max_cost"
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": null,
+      "only_on": null
+    },
+    {
       "action": "type",
       "why": "",
       "url": null,
       "target": {
         "role": null,
         "name": null,
-        "label": "Spending limit",
+        "label": null,
         "placeholder": null,
         "text": null,
-        "selector": null
+        "selector": "#max_cost"
       },
       "value": "0.50",
       "title": null,
@@ -429,12 +449,12 @@
       "why": "Mobile version",
       "url": null,
       "target": {
-        "role": "button",
-        "name": "Mobile",
+        "role": null,
+        "name": null,
         "label": null,
         "placeholder": null,
         "text": null,
-        "selector": null
+        "selector": ".vd-segment:has-text(\"Mobile\")"
       },
       "value": null,
       "title": null,
@@ -452,7 +472,7 @@
         "name": null,
         "label": null,
         "placeholder": null,
-        "text": "Plan · 13 steps",
+        "text": "Plan · 12 steps",
         "selector": null
       },
       "value": null,

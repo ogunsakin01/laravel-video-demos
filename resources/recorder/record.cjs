@@ -49,7 +49,7 @@ async function focusOn(page, loc) {
   const box = await loc.boundingBox().catch(() => null);
   if (!box) return;
   focus.push({ t: Date.now() - started, x: box.x, y: box.y, w: box.width, h: box.height });
-  if (style.highlight) await page.evaluate(r => window.__demoHighlight && window.__demoHighlight.show(r), box).catch(() => {});
+  if (style.highlight) await loc.evaluate(el => window.__demoHighlight && window.__demoHighlight.show(el)).catch(() => {});
 }
 
 // Show the whole page again: the camera pulls back and the outline goes.

@@ -2,6 +2,12 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/). While the version is 0.x, minor releases may include breaking changes; they will be listed here.
 
+## Unreleased
+
+### Fixed
+
+- **Highlights stay on what they outline.** In styles with the highlight on, such as Spotlight, the outline now follows its element when the page scrolls or the layout moves (a panel opens, a player changes size), and glides from one element to the next. Before, it stayed where the element first was.
+
 ## v0.17.9 - 2026-10-16
 
 ### Changed
