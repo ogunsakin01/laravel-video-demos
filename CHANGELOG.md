@@ -2,6 +2,12 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/). While the version is 0.x, minor releases may include breaking changes; they will be listed here.
 
+## v0.17.4 - 2026-10-16
+
+### Fixed
+
+- The test of the progress bar on a video's page no longer fails on a slow machine: it stops the clock while it checks. Nothing changes in the package itself.
+
 ## v0.17.3 - 2026-10-16
 
 ### Fixed

@@ -136,6 +136,8 @@ class SpendingTest extends TestCase
 
     public function test_the_video_page_shows_the_progress_bar_while_it_is_made(): void
     {
+        // The bar moves with time, so the clock stands still for the checks.
+        $this->freezeTime();
         $video = $this->video(['status' => VideoStatus::Recording, 'status_at' => now()]);
 
         $this->get("/video-demo/studio/{$video->id}")->assertOk()->assertSee('id="vd-progress"', false)->assertSee('role="progressbar"', false);
