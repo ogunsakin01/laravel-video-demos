@@ -212,8 +212,7 @@
       </div>
       <div class="vd-small vd-error" id="vd-limit-warn" hidden></div>
       <button class="vd-btn vd-btn-primary vd-btn-block" type="submit" @disabled(! $hasKey)>Generate video</button>
-      <div class="vd-field vd-small vd-muted">Recording is free and runs here. Stop it any time.
-        <details class="vd-tip"><summary aria-label="About costs and the queue">?</summary><div class="vd-tip-body">Charged to your AI provider's key. Pages are checked for errors before any AI is used. Videos are made by a queue worker: <code>php artisan video-demo:work</code> makes several at once.</div></details>
+      <div class="vd-field vd-small vd-muted">Recording is free and runs here. Stop it <span class="vd-tip-with">any time.<details class="vd-tip"><summary aria-label="About costs and the queue">?</summary><div class="vd-tip-body">Charged to your AI provider's key. Pages are checked for errors before any AI is used. Videos are made by a queue worker: <code>php artisan video-demo:work</code> makes several at once.</div></details></span>
       </div>
     </aside>
   </form>

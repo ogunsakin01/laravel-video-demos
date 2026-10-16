@@ -524,6 +524,8 @@ return [
             'accent' => '#171717',
             'captions' => 'bottom',
             'pace' => 'normal',
+            // Outline what is being used, so viewers see where to click.
+            'highlight' => true,
         ],
         'quick' => [
             'name' => 'Quick tip',
@@ -532,6 +534,7 @@ return [
             'accent' => '#171717',
             'captions' => 'bottom',
             'pace' => 'brisk',
+            'highlight' => true,
         ],
         'detailed' => [
             'name' => 'Detailed tutorial',
@@ -540,15 +543,20 @@ return [
             'accent' => '#171717',
             'captions' => 'bottom',
             'pace' => 'relaxed',
+            'highlight' => true,
         ],
         'showcase' => [
             'name' => 'Product showcase',
-            'direction' => 'For a marketing page. Lead with the benefit to the user, keep captions upbeat but plain, linger on the finished result, and end on a card stating the outcome.',
+            'direction' => 'For a marketing page. Lead with the benefit to the user, linger on the finished result, and end on a card stating the outcome. Give each caption a title of under six words naming what the viewer gains, upbeat but plain, and a second line of a few words.',
             'theme' => 'dark',
             'accent' => '#171717',
             'captions' => 'top',
             'pace' => 'normal',
             'art' => 'abstract',
+            // The camera on each step, what is being used outlined, and music.
+            'zoom' => true,
+            'highlight' => true,
+            'music' => 'builtin:corporate',
         ],
         'ad' => [
             'name' => 'Promo ad',
@@ -558,10 +566,14 @@ return [
             'captions' => 'bottom',
             'pace' => 'brisk',
             'art' => 'abstract',
+            // The camera on each step, what is being used outlined, and upbeat music.
+            'zoom' => true,
+            'highlight' => true,
+            'music' => 'builtin:upbeat',
         ],
         'spotlight' => [
             'name' => 'Spotlight',
-            'direction' => 'A polished feature reel. Open on a card with one bold line about what the viewer gains. Show each key moment with a caption of under eight words that names the benefit, not the button. Keep the steps that show something worth seeing and skip routine ones. Close on a card naming the result.',
+            'direction' => 'A polished feature reel. Open on a card with one bold line about what the viewer gains. Show each key moment with a caption: a title of under six words that names the benefit, not the button, and a second line of a few words. Keep the steps that show something worth seeing and skip routine ones. Close on a card naming the result.',
             'theme' => 'dark',
             'accent' => '#e5693d',
             'captions' => 'bottom',

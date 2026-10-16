@@ -50,6 +50,52 @@ class StyleTest extends TestCase
         $this->assertSame('Promo ad', VideoStyle::where('key', 'ad')->value('name'));
     }
 
+    public function test_an_upgrade_adds_new_built_in_styles_to_apps_whose_config_predates_them(): void
+    {
+        // An app that published its config before Spotlight and Promo reel.
+        config(['video-demo.styles' => [
+            'clean' => ['name' => 'Clean walkthrough', 'direction' => 'Calm and clear.'],
+            'house' => ['name' => 'House style', 'direction' => 'Plain and short.'],
+        ]]);
+        $this->assertCount(2, VideoStyle::options());
+
+        (require __DIR__.'/../database/migrations/2026_10_26_000000_add_missing_video_demo_styles.php')->up();
+
+        // They come from the package, as it defines them.
+        $promo = VideoStyle::where('key', 'promo')->firstOrFail();
+        $this->assertSame(['Promo reel', 'headline', 'dark', true, 'builtin:upbeat'], [$promo->name, $promo->art, $promo->app_theme, (bool) $promo->zoom, $promo->music]);
+        $this->assertSame('Spotlight', VideoStyle::where('key', 'spotlight')->value('name'));
+        $this->assertSame(4, VideoStyle::count());
+
+        // Run again, or for an app that deleted one later: nothing is added twice.
+        (require __DIR__.'/../database/migrations/2026_10_26_000000_add_missing_video_demo_styles.php')->up();
+        $this->assertSame(4, VideoStyle::count());
+    }
+
+    public function test_an_upgrade_updates_built_in_styles_only_where_nobody_changed_them(): void
+    {
+        // Styles as an app copied them before this upgrade.
+        $migration = require __DIR__.'/../database/migrations/2026_10_27_000000_update_video_demo_built_in_styles.php';
+        $before = fn (string $key, string $name) => ['name' => $name, 'theme' => 'dark', 'accent' => '#171717', 'captions' => 'bottom', 'pace' => 'normal', ...(new \ReflectionClassConstant($migration, 'CHANGES'))->getValue()[$key]['from']];
+        config(['video-demo.styles' => ['clean' => $before('clean', 'Clean walkthrough'), 'showcase' => $before('showcase', 'Product showcase'), 'ad' => $before('ad', 'Promo ad')]]);
+        VideoStyle::options();
+        // The app made the showcase its own.
+        VideoStyle::where('key', 'showcase')->update(['direction' => 'Our own words.']);
+
+        $migration->up();
+
+        $this->assertTrue((bool) VideoStyle::where('key', 'clean')->value('highlight'));
+        $ad = VideoStyle::where('key', 'ad')->firstOrFail();
+        $this->assertSame([true, true, 'builtin:upbeat'], [(bool) $ad->zoom, (bool) $ad->highlight, $ad->music]);
+        $showcase = VideoStyle::where('key', 'showcase')->firstOrFail();
+        $this->assertSame(['Our own words.', false, null], [$showcase->direction, (bool) $showcase->zoom, $showcase->music]);
+
+        // And back again.
+        $migration->down();
+        $this->assertFalse((bool) VideoStyle::where('key', 'clean')->value('highlight'));
+        $this->assertNull(VideoStyle::where('key', 'ad')->value('music'));
+    }
+
     public function test_the_last_style_cannot_be_deleted(): void
     {
         config(['video-demo.styles' => ['only' => ['name' => 'Only', 'direction' => 'x']]]);

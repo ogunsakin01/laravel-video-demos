@@ -4,6 +4,8 @@ namespace Ogunsakin01\VideoDemo\Models;
 
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -95,6 +97,47 @@ class VideoStyle extends Model
         foreach (config('video-demo.styles', []) as $key => $style) {
             static::firstOrCreate(['key' => $key], [...static::defaults(), ...$style, 'position' => $position++]);
         }
+    }
+
+    /**
+     * Get a built-in style's settings: the app's own, when its config lists
+     * the style, otherwise the package's. An app that published its config
+     * before a style was added to the package has no entry for it.
+     */
+    public static function builtIn(string $key): ?array
+    {
+        $style = config("video-demo.styles.$key");
+        if (is_array($style)) {
+            return $style;
+        }
+
+        $package = (require __DIR__.'/../../config/video-demo.php')['styles'][$key] ?? null;
+
+        return is_array($package) ? $package : null;
+    }
+
+    /**
+     * Add a style the package added in an upgrade to an app that already has
+     * its styles, unless it has that one. Used by the upgrade's migration.
+     */
+    public static function addBuiltIn(string $key): void
+    {
+        $styles = DB::table('video_demo_styles');
+        if (! $styles->exists() || (clone $styles)->where('key', $key)->exists() || ! ($style = static::builtIn($key))) {
+            return;
+        }
+
+        $columns = array_flip(['name', 'direction', 'theme', 'accent', 'captions', 'pace', 'art', 'app_theme', 'zoom', 'highlight', 'voice', 'music']);
+        // Only the columns the table has at this point of the upgrade.
+        $columns = array_filter($columns, fn ($i, $column) => Schema::hasColumn('video_demo_styles', $column), ARRAY_FILTER_USE_BOTH);
+
+        DB::table('video_demo_styles')->insert([
+            'key' => $key,
+            ...array_intersect_key($style, $columns),
+            'position' => (int) DB::table('video_demo_styles')->max('position') + 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 
     /**

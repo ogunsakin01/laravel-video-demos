@@ -17,7 +17,7 @@ class ExamplesTest extends TestCase
         $this->get('/video-demo/studio/examples')
             ->assertOk()
             ->assertSee('Spotlight')
-            ->assertSee('https://cdn.jsdelivr.net/gh/ogunsakin01/laravel-video-demos@v0.15.0/docs/examples/example-spotlight.mp4', false)
+            ->assertSee('https://cdn.jsdelivr.net/gh/ogunsakin01/laravel-video-demos@v0.17.5/docs/examples/example-spotlight.mp4', false)
             ->assertSee('docs/examples/example-quick.mp4', false)
             ->assertSee('Make one like this');
 
@@ -32,7 +32,7 @@ class ExamplesTest extends TestCase
 
         $this->get('/video-demo/studio/create?style=ad')
             ->assertOk()
-            ->assertSee('<option value="'.$ad->id.'" data-direction="'.e($ad->direction).'" data-voice="" data-music="" data-accent="'.$ad->accent.'" data-theme="'.$ad->theme.'" selected', false);
+            ->assertSee('<option value="'.$ad->id.'" data-direction="'.e($ad->direction).'" data-voice="" data-music="'.$ad->music.'" data-accent="'.$ad->accent.'" data-theme="'.$ad->theme.'" selected', false);
     }
 
     public function test_the_page_can_be_turned_off_or_hosted_elsewhere(): void

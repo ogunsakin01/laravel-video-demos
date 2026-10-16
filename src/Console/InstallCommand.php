@@ -10,7 +10,7 @@ use Throwable;
 
 /**
  * Sets the package up in one go, and is safe to run again after each
- * upgrade: the config, the package's migrations, Playwright and Chromium for
+ * upgrade: the package's migrations, Playwright and Chromium for
  * the recorder, the sample database, and a restart of the queue workers. The
  * recorder's files are kept out of the app's git repository.
  */
@@ -31,12 +31,56 @@ class InstallCommand extends Command
      *
      * @var string
      */
-    protected $description = 'Set up or upgrade the package: config, migrations, the recorder\'s browser and the sample database';
+    protected $description = 'Set up or upgrade the package: migrations, the recorder\'s browser and the sample database';
 
     /**
      * The Playwright version the recorder is tested with.
      */
     protected const PLAYWRIGHT = '1.64.0';
+
+    /**
+     * Warn when the app has its own copy of the config that lacks settings
+     * the package has now. Laravel reads a section such as "styles" from the
+     * app's copy alone, so an older copy hides what was added since, like
+     * new styles and models.
+     */
+    protected function warnAboutStaleConfig(): void
+    {
+        $file = config_path('video-demo.php');
+        if (! is_file($file)) {
+            return;
+        }
+
+        $missing = $this->missingKeys(require __DIR__.'/../../config/video-demo.php', (array) require $file);
+        if ($missing === []) {
+            return;
+        }
+
+        $this->components->warn(sprintf(
+            'config/video-demo.php is a copy from an older version, without %s. Until it has them, this app gets none of them. If you never edited it, delete it: every setting can be made in .env. Otherwise copy the new parts from vendor/ogunsakin01/laravel-video-demos/config/video-demo.php.',
+            implode(', ', array_slice($missing, 0, 6)).(count($missing) > 6 ? ' and '.(count($missing) - 6).' more' : ''),
+        ));
+    }
+
+    /**
+     * Find the settings in the package's config that the app's copy lacks,
+     * as dotted names such as "styles.promo".
+     *
+     * @return list<string>
+     */
+    protected function missingKeys(array $package, array $app, string $prefix = ''): array
+    {
+        $missing = [];
+        foreach ($package as $key => $value) {
+            if (! array_key_exists($key, $app)) {
+                $missing[] = $prefix.$key;
+            } elseif (is_array($value) && ! array_is_list($value) && is_array($app[$key])) {
+                array_push($missing, ...$this->missingKeys($value, $app[$key], "$prefix$key."));
+            }
+        }
+
+        return $missing;
+    }
 
     /**
      * The GIF encoder the recorder uses for GIF copies of videos.
@@ -48,8 +92,10 @@ class InstallCommand extends Command
      */
     public function handle(): int
     {
-        // An existing config is left as it is.
-        $this->call('vendor:publish', ['--tag' => 'video-demo-config']);
+        // The config isn't copied into the app: everything is set from .env,
+        // and a copy would keep the app on this version's defaults after
+        // upgrades. Publish it with --tag=video-demo-config to change more.
+        $this->warnAboutStaleConfig();
 
         // Laravel ignores only the storage folders it makes itself, so keep
         // the package's tools out of the app's repository and its deploys.

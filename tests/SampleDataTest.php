@@ -380,7 +380,8 @@ class SampleDataTest extends TestCase
                 ->expectsOutputToContain("Recording on sample data won't work until this is fixed")
                 ->expectsOutputToContain('Run this command again after each upgrade')
                 ->assertSuccessful();
-            $this->assertFileExists(config_path('video-demo.php'));
+            // The config stays in the package: a copy would keep the app on these defaults.
+            $this->assertFileDoesNotExist(config_path('video-demo.php'));
 
             // The package's tools in storage are kept out of the app's git repository.
             $this->assertSame("*\n!.gitignore\n", File::get(storage_path('video-demo/.gitignore')));
@@ -391,6 +392,28 @@ class SampleDataTest extends TestCase
         } finally {
             File::delete([config_path('video-demo.php'), storage_path('video-demo/.gitignore')]);
         }
+    }
+
+    public function test_install_warns_about_an_old_copy_of_the_config(): void
+    {
+        // A copy published by an older version: no Promo reel, no stats settings.
+        $old = require __DIR__.'/../config/video-demo.php';
+        unset($old['styles']['promo'], $old['library']['stats']);
+        File::put(config_path('video-demo.php'), '<?php return '.var_export($old, true).';');
+
+        try {
+            $this->artisan('video-demo:install', ['--no-browser' => true, '--no-sample-data' => true])
+                ->expectsOutputToContain('config/video-demo.php is a copy from an older version, without library.stats, styles.promo.')
+                ->assertSuccessful();
+        } finally {
+            File::delete([config_path('video-demo.php'), storage_path('video-demo/.gitignore')]);
+        }
+
+        // An up-to-date copy, or none, says nothing.
+        $this->artisan('video-demo:install', ['--no-browser' => true, '--no-sample-data' => true])
+            ->doesntExpectOutputToContain('is a copy from an older version')
+            ->assertSuccessful();
+        File::delete(storage_path('video-demo/.gitignore'));
     }
 
     public function test_install_keeps_an_existing_gitignore(): void

@@ -239,15 +239,23 @@
   /* "?" beside a label: the longer explanation, only when asked for. */
   .vd-label-line { display: flex; align-items: center; gap: 2px; margin-bottom: 6px; }
   .vd .vd-label-line > :is(label, .vd-label) { margin: 0; }
-  .vd-tip { display: inline-block; vertical-align: 1px; margin-left: 4px; }
-  .vd .vd-tip > summary { list-style: none; display: inline-grid; place-items: center; width: 17px; height: 17px; border-radius: 50%; border: 1px solid var(--vd-border-strong);
-    font: 600 10.5px/1 var(--vd-font); color: var(--vd-muted-ink); cursor: pointer; transition: background-color .15s, color .15s; }
+  .vd-tip { display: inline-block; vertical-align: middle; margin-left: 4px; }
+  .vd .vd-tip > summary { list-style: none; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; width: 18px; height: 18px; padding: 0; border-radius: 50%; border: 1px solid var(--vd-border-strong);
+    font: 600 11px/1 var(--vd-font); color: var(--vd-muted-ink); cursor: pointer; transition: background-color .15s, color .15s; }
   .vd .vd-tip > summary::-webkit-details-marker { display: none; }
-  .vd .vd-tip > summary::after { content: none; }
+  /* No open/closed mark: the circle is the whole button, open or not. */
+  .vd details.vd-tip > summary::after, .vd details.vd-tip[open] > summary::after { content: none; }
+  /* A tip that would open past the bottom of what's visible opens upwards. */
+  .vd-tip-body.vd-tip-up { bottom: 100%; margin: 0 0 8px; }
+  /* Keeps a "?" on the line of the words it explains. */
+  .vd-tip-with { white-space: nowrap; }
   .vd .vd-tip[open] > summary, .vd .vd-tip > summary:hover { background: var(--vd-strong); border-color: var(--vd-strong); color: var(--vd-card); }
   .vd-tip-body { position: absolute; left: 0; right: 0; z-index: 6; margin-top: 8px; padding: 12px 14px; border-radius: var(--vd-radius); background: var(--vd-strong); color: var(--vd-card);
-    font: 400 12.5px/1.55 var(--vd-font); box-shadow: var(--vd-shadow-lg); animation: vd-rise .2s ease-out both; max-width: 520px; }
-  .vd-tip-body code { color: inherit; background: rgb(255 255 255 / .12); }
+    font: 400 12.5px/1.55 var(--vd-font); box-shadow: var(--vd-shadow-lg); animation: vd-rise .2s ease-out both; max-width: 520px; white-space: normal; text-align: left; }
+  .vd .vd-tip-body code { color: inherit; background: color-mix(in srgb, currentColor 16%, transparent); border-color: transparent; }
+  /* The field with an open tip sits above the fields after it, which can be
+     layers of their own while they fade in. */
+  .vd-more[open] > :has(.vd-tip[open]), .vd .vd-field:has(.vd-tip[open]) { position: relative; z-index: 7; }
   .vd-toggle.vd-toggle-wide { padding: 12px 14px; }
   .vd-more { border: 1px dashed var(--vd-border-strong); border-radius: var(--vd-radius-lg); padding: 0 16px; }
   .vd .vd-more > summary { list-style: none; display: flex; align-items: center; gap: 8px; padding: 13px 0; cursor: pointer; font-weight: 500; color: var(--vd-strong); }

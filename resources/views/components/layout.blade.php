@@ -34,6 +34,22 @@
     </div>
   </main>
   <script>
+    // A "?" tip opens downwards, or upwards when there's no room below in what
+    // can be seen (the page, or a sidebar that scrolls on its own).
+    document.addEventListener('toggle', e => {
+      const tip = e.target;
+      if (!tip.matches?.('details.vd-tip') || !tip.open) return;
+      const body = tip.querySelector('.vd-tip-body');
+      if (!body) return;
+      body.classList.remove('vd-tip-up');
+      let bottom = innerHeight;
+      for (let el = tip.parentElement; el; el = el.parentElement) {
+        if (/(auto|scroll|hidden)/.test(getComputedStyle(el).overflowY)) { bottom = Math.min(bottom, el.getBoundingClientRect().bottom); break; }
+      }
+      const box = body.getBoundingClientRect();
+      if (box.bottom > bottom && tip.getBoundingClientRect().top - box.height - 16 > 0) body.classList.add('vd-tip-up');
+      else if (box.bottom > bottom) body.scrollIntoView({ block: 'nearest' });
+    }, true);
     // Forms marked data-busy-form show their button as busy once sent, so it
     // isn't pressed twice. The pressed button's value is kept as it's disabled.
     document.addEventListener('submit', e => {

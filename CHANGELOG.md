@@ -2,6 +2,25 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/). While the version is 0.x, minor releases may include breaking changes; they will be listed here.
 
+## v0.17.5 - 2026-10-16
+
+Run `php artisan video-demo:install` after updating.
+
+### Changed
+
+- **The built-in styles take the best of Promo reel.**
+  - Every built-in style now outlines what is being used. Clean walkthrough, Quick tip and Detailed tutorial gain it, which shows learners exactly where to click.
+  - Product showcase and Promo ad gain the camera moving in on each step, and music: the Corporate track for Product showcase, the Upbeat track for Promo ad.
+  - Product showcase and Spotlight now write two-line captions: a short title naming what the viewer gains, and a few words under it.
+  - `video-demo:install` updates a built-in style in apps that already have it, only when it is still as the package shipped it. A style you changed, in the studio or in your own config, stays as it is.
+  - The examples on the Examples page were recorded again to match, and the page now plays them from this release.
+
+### Fixed
+
+- **Promo reel (and Spotlight) were missing in apps that published their config before those styles were added.** The upgrade that adds a new style read it from the app's own `config/video-demo.php`, which didn't list it, and quietly added nothing. New styles now come from the package's own settings when the app's config doesn't have them, and `video-demo:install` adds the ones that were missed. A style the app's config defines still uses the app's settings.
+- **`video-demo:install` no longer copies the config into the app.** A copy kept the app on that version's defaults after every upgrade, so new styles and models never reached it. Everything can be set in `.env`; publish the config with `php artisan vendor:publish --tag=video-demo-config` only to change more. When the app already has an older copy, install says which new settings it's missing; delete the copy if you never edited it.
+- **The "?" tips on the new video form** are centred, keep to the line of the words they explain, and open upwards when there's no room below, so the one under **Generate video** is no longer cut off by the sidebar. A tip in **More options** is no longer drawn under the field after it, and the command in the cost tip is readable in light and dark mode.
+
 ## v0.17.4 - 2026-10-16
 
 ### Fixed

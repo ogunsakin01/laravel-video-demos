@@ -12,7 +12,7 @@ class Examples
     /**
      * The jsDelivr address of the sample videos, pinned to a release.
      */
-    public const DEFAULT_URL = 'https://cdn.jsdelivr.net/gh/ogunsakin01/laravel-video-demos@v0.15.0';
+    public const DEFAULT_URL = 'https://cdn.jsdelivr.net/gh/ogunsakin01/laravel-video-demos@v0.17.5';
 
     /**
      * Determine if the Examples page should be shown.
