@@ -9,7 +9,7 @@
 
 **Use it when a Laravel app needs how-to videos, a help center, onboarding or product demo videos, kept up to date as the app changes.**
 
-Describe a flow in your Laravel app and get a recorded how-to video of it. An AI model (Claude by default, or OpenAI, Gemini, a local model and others) reads your app's code and plans the walkthrough. Playwright then records it in a real browser against your local copy of the app, with a cursor, captions and title cards, and plays it back at twice the speed so it feels snappy. You choose the length, the style (from step-by-step tutorials to short ads with animated line art) and the screens (desktop, TV, tablet, mobile), and you see the cost before anything is spent.
+Describe a flow in your Laravel app and get a recorded how-to video of it. An AI model (Claude by default, or OpenAI, Gemini, a local model and others) reads your app's code and plans the walkthrough. Playwright then records it in a real browser against your local copy of the app, with a cursor, captions and title cards, and cuts out the waits on your app. It plays at real time, or up to 3× faster if you choose. You choose the length, the style (from step-by-step tutorials to short ads with animated line art) and the screens (desktop, TV, tablet, mobile), and you see the cost before anything is spent.
 
 Videos are made on your machine and published to any Laravel disk. Your production app shows them in a ready-made help library, or inside your own pages with a Blade component.
 
@@ -30,6 +30,12 @@ GitHub doesn't play videos stored in a repository, so the previews below are GIF
 
 [Full video (MP4, about three minutes)](https://raw.githubusercontent.com/ogunsakin01/laravel-video-demos/main/docs/social/laravel-video-demos-promo.mp4)
 
+### The studio, where you make them
+
+[![The studio: describe a video, choose its screens, style and spending limit, then review and publish it](docs/studio-tour.gif)](https://raw.githubusercontent.com/ogunsakin01/laravel-video-demos/main/docs/studio-tour.mp4)
+
+[Full studio tour (MP4)](https://raw.githubusercontent.com/ogunsakin01/laravel-video-demos/main/docs/studio-tour.mp4)
+
 ### The library, where your users watch them
 
 | Desktop | Mobile |
@@ -38,7 +44,7 @@ GitHub doesn't play videos stored in a repository, so the previews below are GIF
 
 [Full library tour (MP4)](https://raw.githubusercontent.com/ogunsakin01/laravel-video-demos/main/docs/library-tour.mp4) · [Mobile version (MP4)](https://raw.githubusercontent.com/ogunsakin01/laravel-video-demos/main/docs/library-tour-mobile.mp4)
 
-The library tours were recorded by the package itself, from the demo app in [`workbench/`](workbench), in the "Promo ad" style. The videos in the demo library all play one sample clip, recorded from the demo app's "Post a job" page. The demo app answers "Complete with AI" with a fixed reply, so the tours could be recorded without an API key.
+The studio and library tours were recorded by the package itself, from the demo app in [`workbench/`](workbench), with the highlight on. The videos in the demo library all play one sample clip, recorded from the demo app's "Post a job" page. The demo app answers "Complete with AI" with a fixed reply, so the tours could be recorded without an API key.
 
 ## Quick start
 
