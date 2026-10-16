@@ -110,7 +110,8 @@
   .vd-btn-danger-solid:hover { background: color-mix(in srgb, var(--vd-bad) 88%, #000); border-color: transparent; }
   .vd-btn[disabled] { opacity: .5; cursor: not-allowed; }
   .vd-btn svg { width: 16px; height: 16px; flex: none; }
-  .vd-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .vd-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .vd-actions > form { margin: 0; }
 
   /* Forms */
   .vd label, .vd-label { display: block; font-size: 13px; font-weight: 500; color: var(--vd-strong); margin-bottom: 6px; }

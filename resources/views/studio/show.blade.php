@@ -28,6 +28,8 @@
     @if (in_array($video->status, [VideoStatus::Failed, VideoStatus::Stopped], true))
         @php($hasPlan = $video->hasPlan())
         <div class="vd-actions">
+          {{-- Opens a page that first says where the video is used: the library, and pages that show it. --}}
+          <a class="vd-btn vd-btn-ghost vd-btn-danger" href="{{ route('video-demo.studio.delete', ['videos' => [$video->id]]) }}">Delete…</a>
           <form method="post" action="{{ route('video-demo.studio.retry', $video) }}">@csrf
             <input type="hidden" name="mode" value="plan">
             <button class="vd-btn vd-btn-primary">{{ $hasPlan ? 'Try again with a new plan' : 'Try again' }}</button>
@@ -47,6 +49,8 @@
     @endif
     @if ($video->isReady())
       <div class="vd-actions">
+        {{-- Opens a page that first says where the video is used: the library, and pages that show it. --}}
+        <a class="vd-btn vd-btn-ghost vd-btn-danger" href="{{ route('video-demo.studio.delete', ['videos' => [$video->id]]) }}">Delete…</a>
         @if ($video->isPublished())
           <form method="post" action="{{ route('video-demo.studio.unpublish', $video) }}">@csrf
             <button class="vd-btn">Unpublish</button>
@@ -416,10 +420,6 @@
         </div>
       </details>
 
-      @unless ($video->status->isWorking())
-        {{-- A page first says where the video is used: the library, and pages that embed it. --}}
-        <a class="vd-btn vd-btn-ghost vd-btn-danger vd-btn-block" href="{{ route('video-demo.studio.delete', ['videos' => [$video->id]]) }}">Delete video…</a>
-      @endunless
     </aside>
   </div>
 
