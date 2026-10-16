@@ -176,9 +176,15 @@
         @include('video-demo::studio.partials.plan-editor')
       @endif
 
-      <form method="post" action="{{ route('video-demo.studio.update', $video) }}" class="vd-card vd-stack">
+      <details class="vd-card vd-fold" id="vd-details" data-fold="details" @if ($errors->has('title') || $errors->has('visibility')) open data-fold-keep @endif>
+        <summary>
+          <span class="vd-fold-title">
+            <h2>Details</h2>
+            <span class="vd-fold-hint" data-closed-only>{{ $video->title }} · {{ $video->visibility === 'public' ? 'Public' : 'Private (staff)' }} library</span>
+          </span>
+        </summary>
+      <form method="post" action="{{ route('video-demo.studio.update', $video) }}" class="vd-fold-body vd-stack">
         @csrf @method('patch')
-        <h2 style="margin:0">Details</h2>
         <div class="vd-row">
           <div>
             <label for="title">Title</label>
@@ -194,16 +200,19 @@
         </div>
         <div><button class="vd-btn">Save details</button></div>
       </form>
+      </details>
 
       @unless ($video->status->isWorking())
         @php($hasPlan = ! empty($video->plan['steps']))
         @php($currentStyle = $styles->first(fn ($s) => $s->key === ($video->style['key'] ?? null)) ?? $styles->first(fn ($s) => $s->name === ($video->style['name'] ?? null)))
-        <form method="post" action="{{ route('video-demo.studio.again', $video) }}" class="vd-card" id="vd-again">@csrf
-          <div class="vd-section-head" style="margin-bottom:6px">
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>
-            <h2 class="vd-section-title">Make it again</h2>
-          </div>
-          <p class="vd-small vd-muted" style="margin:0 0 18px">Same plan: free. New plan: the AI makes one.</p>
+        <details class="vd-card vd-fold" id="vd-again-fold" data-fold="again" @if ($errors->any() && old('prompt') !== null) open data-fold-keep @endif>
+          <summary>
+            <span class="vd-fold-title">
+              <h2>Make it again</h2>
+              <span class="vd-fold-hint">Change the length, versions, style or voice. Same plan: free. New plan: the AI makes one.</span>
+            </span>
+          </summary>
+        <form method="post" action="{{ route('video-demo.studio.again', $video) }}" class="vd-fold-body" id="vd-again">@csrf
 
           <section class="vd-section">
             <div class="vd-field">
@@ -340,6 +349,7 @@
             <button class="vd-btn vd-btn-primary vd-btn-block" id="a-submit">{{ $hasPlan ? 'Record it again (free)' : 'Make it again with a new plan' }}</button>
           </section>
         </form>
+        </details>
       @endunless
     </div>
 
@@ -356,6 +366,11 @@
           @if ($video->estimate_low !== null)
             <div class="vd-stat"><dt>Estimate</dt><dd class="vd-num">${{ number_format($video->estimate_low, 2) }} – ${{ number_format($video->estimate_high, 2) }}</dd></div>
           @endif
+          <div class="vd-stat"><dt>Length</dt><dd class="vd-num">{{ $video->duration_seconds ? round($video->duration_seconds).'s of '.$video->target_seconds.'s target' : $video->target_seconds.'s target' }}</dd></div>
+        </dl>
+        <details class="vd-settings" data-fold="settings">
+          <summary>How it was made</summary>
+        <dl style="margin:4px 0 0">
           @if (! empty($video->style['name']))
             <div class="vd-stat"><dt>Style</dt><dd>{{ $video->style['name'] }}</dd></div>
           @endif
@@ -371,8 +386,8 @@
           <div class="vd-stat"><dt>Voice-over</dt><dd>{{ \Ogunsakin01\VideoDemo\Voice\Voices::label($video->voice) }}</dd></div>
           <div class="vd-stat"><dt>Music</dt><dd>{{ \Ogunsakin01\VideoDemo\Voice\Music::label($video->music) }}</dd></div>
           <div class="vd-stat"><dt>Model</dt><dd>{{ \Ogunsakin01\VideoDemo\Ai\Pricing::model($video->model)['label'] ?? $video->model }}, {{ $video->effort }}</dd></div>
-          <div class="vd-stat"><dt>Length</dt><dd class="vd-num">{{ $video->duration_seconds ? round($video->duration_seconds).'s of '.$video->target_seconds.'s target' : $video->target_seconds.'s target' }}</dd></div>
         </dl>
+        </details>
       </div>
 
       @if ($video->isPublished() && ($entry = app(\Ogunsakin01\VideoDemo\Library\Manifest::class)->find($video->slug, 'private')))
@@ -384,14 +399,21 @@
         </div>
       @endif
 
-      <div class="vd-card">
-        <h2>Progress</h2>
+      <details class="vd-card vd-fold" id="vd-log-fold" data-fold="progress" @if ($video->status->isWorking()) open data-fold-keep @endif>
+        <summary>
+          <span class="vd-fold-title">
+            <h2>Progress</h2>
+            <span class="vd-fold-hint" data-closed-only>{{ \Illuminate\Support\Arr::last($video->log ?? [])['message'] ?? 'Nothing yet.' }}</span>
+          </span>
+        </summary>
+        <div class="vd-fold-body">
         <ul class="vd-log" id="vd-log">
           @foreach (array_slice($video->log ?? [], -40) as $entry)
             <li><time datetime="{{ $entry['at'] }}">{{ \Illuminate\Support\Carbon::parse($entry['at'])->format('H:i:s') }}</time><span>{{ $entry['message'] }}</span></li>
           @endforeach
         </ul>
-      </div>
+        </div>
+      </details>
 
       @unless ($video->status->isWorking())
         {{-- A page first says where the video is used: the library, and pages that embed it. --}}
@@ -401,6 +423,30 @@
   </div>
 
   <script>
+    // Folded sections: each viewer's last choice is remembered, but a section
+    // that needs attention (working, failed, a form error) stays open, as does
+    // one the address points to or one whose form was just sent.
+    (() => {
+      const store = (key, open) => { try { localStorage.setItem('vd-fold:' + key, open ? '1' : '0'); } catch {} };
+      const folds = [...document.querySelectorAll('details[data-fold]')];
+      folds.forEach(fold => {
+        if (!fold.hasAttribute('data-fold-keep')) {
+          try {
+            const saved = localStorage.getItem('vd-fold:' + fold.dataset.fold);
+            if (saved !== null) fold.open = saved === '1';
+          } catch {}
+        }
+        fold.querySelector(':scope > summary').addEventListener('click', () => setTimeout(() => store(fold.dataset.fold, fold.open)));
+        fold.addEventListener('submit', () => store(fold.dataset.fold, true));
+      });
+      const reveal = () => {
+        const target = location.hash.length > 1 && document.getElementById(decodeURIComponent(location.hash.slice(1)));
+        const fold = target && target.closest('details[data-fold]');
+        if (fold && !fold.open) { fold.open = true; target.scrollIntoView(); }
+      };
+      reveal();
+      addEventListener('hashchange', reveal);
+    })();
     // Log times in the viewer's own time zone, as the live updates show them.
     document.querySelectorAll('#vd-log time[datetime]').forEach(t => { t.textContent = new Date(t.dateTime).toTimeString().slice(0, 8); });
     document.querySelectorAll('[data-src]').forEach(b => b.addEventListener('click', () => {

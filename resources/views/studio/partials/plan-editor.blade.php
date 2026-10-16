@@ -8,10 +8,16 @@
   $editable = ! $video->status->isWorking();
   $blank = fn (string $action) => ['action' => $action, 'title' => $action === 'card' ? 'New title card' : ($action === 'caption' ? 'New caption' : null)];
 @endphp
-<details class="vd-card" id="vd-plan" @if ($errors->has('plan') || old('steps') || session('status') === 'Plan saved. Record it again to see the change.') open @endif>
-  <summary>Plan · {{ count($video->plan['steps'] ?? []) }} steps</summary>
+<details class="vd-card vd-fold" id="vd-plan" data-fold="plan" @if ($errors->has('plan') || old('steps') || session('status') === 'Plan saved. Record it again to see the change.') open data-fold-keep @endif>
+  <summary>
+    <span class="vd-fold-title">
+      <h2>Plan · {{ count($video->plan['steps'] ?? []) }} steps</h2>
+      <span class="vd-fold-hint" data-closed-only>{{ \Illuminate\Support\Str::limit($video->plan['summary'] ?? '', 140) ?: ($editable ? 'Reword captions and voice-over lines, or change the steps, without the AI.' : 'The steps the video plays.') }}</span>
+    </span>
+  </summary>
+  <div class="vd-fold-body">
   @if (! $editable)
-    @if (! empty($video->plan['summary']))<p class="vd-small vd-muted" style="margin:10px 0 0">{{ $video->plan['summary'] }}</p>@endif
+    @if (! empty($video->plan['summary']))<p class="vd-small vd-muted" style="margin:0">{{ $video->plan['summary'] }}</p>@endif
     <ol class="vd-steps">
       @foreach ($video->plan['steps'] as $step)
         <li>
@@ -31,7 +37,7 @@
       @endforeach
     </ol>
   @else
-    <form method="post" action="{{ route('video-demo.studio.plan', $video) }}" class="vd-stack-sm" id="vd-plan-form" style="margin-top:12px">
+    <form method="post" action="{{ route('video-demo.studio.plan', $video) }}" class="vd-stack-sm" id="vd-plan-form">
       @csrf @method('put')
       <p class="vd-small vd-muted" style="margin:0">Fix a word, a voice-over line or a button name without asking the AI. Recording the edited plan is free.</p>
       <div class="vd-row">
@@ -76,6 +82,7 @@
       </div>
     </form>
   @endif
+  </div>
 </details>
 
 @if ($editable)

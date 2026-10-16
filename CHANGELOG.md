@@ -2,6 +2,16 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/). While the version is 0.x, minor releases may include breaking changes; they will be listed here.
 
+## v0.17.1 - 2026-10-16
+
+### Changed
+
+- **A shorter video page.** Each section below the video (Where to put it, Does it still work?, Downloads, Watching, Other languages, Plan, Details, Make it again, Progress) now folds to its title and a one-line summary, such as "3 places suggested, all fit" or "Step 10 no longer works". They start folded and remember what each person opened. A section that needs attention stays open: while it's working, when it failed, or when its form has an error. **Where to put it** shows the tag and the publish step once instead of under every place, and each place folds too, with only the first open. The cost card keeps the cost, estimate and length in view, with the rest under **How it was made**, and the embed's HTML is behind **Show the code**.
+
+### Fixed
+
+- The picture of the page where **Does it still work?** found a broken step is framed and sized to the card again.
+
 ## v0.17.0 - 2026-10-16
 
 Run `php artisan video-demo:install` after updating, for the new columns and table, and the GIF encoder the recorder now uses.

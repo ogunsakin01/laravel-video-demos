@@ -25,7 +25,15 @@
         <span class="vd-label" style="margin:0">{{ $label }}</span>
         <button type="button" class="vd-btn vd-btn-sm" data-copy="{{ $code }}">Copy</button>
       </div>
-      <pre class="vd-code"><code>{{ $code }}</code></pre>
+      @if ($loop->first)
+        <pre class="vd-code"><code>{{ $code }}</code></pre>
+      @else
+        {{-- Long, and copied more than read: shown on request. --}}
+        <details class="vd-settings" style="margin:0;border:0">
+          <summary style="padding:0">Show the code</summary>
+          <pre class="vd-code" style="margin-top:8px"><code>{{ $code }}</code></pre>
+        </details>
+      @endif
     </div>
   @endforeach
   <span class="vd-hint">{{ $public ? 'The Blade component picks the version that suits each screen. The HTML plays the '.config('video-demo.devices.'.$first.'.label', $first).' version.' : 'Private videos can only be shown inside this app.' }}</span>

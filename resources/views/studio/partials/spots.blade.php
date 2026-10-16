@@ -18,19 +18,51 @@
   $shot = fn (string $file) => route('video-demo.studio.spot-shot', [$video, $file]).'?v='.urlencode($spots['at'] ?? '');
   $where = fn (string $position) => match ($position) { 'before' => 'just above the section', 'after' => 'just below the section', default => 'at the top of the section, inside it' };
   $screenName = fn (string $s) => $s === 'mobile' ? 'phone' : strtolower((string) config("video-demo.devices.$s.label", $s));
+  $fitting = collect($items)->filter(fn ($s) => $s['fits'] ?? false)->count();
+  $summary = match (true) {
+      $state === 'working' => 'Finding places in your app…',
+      $state === 'failed' && $items === [] => 'It did not finish. Open to try again.',
+      $items !== [] => count($items).' '.(count($items) === 1 ? 'place' : 'places').' suggested'.(collect($items)->contains(fn ($s) => array_key_exists('fits', $s)) ? ', '.($fitting === count($items) ? 'all fit' : $fitting.' fit') : ''),
+      default => 'Suggests places in your app for the video, checked to fit the page.',
+  };
 @endphp
-<section class="vd-card vd-stack" id="vd-spots" @if ($state === 'working') data-spots-working @endif>
+<details class="vd-card vd-fold" id="vd-spots" data-fold="spots" @if (in_array($state, ['working', 'failed'], true)) open data-fold-keep @endif @if ($state === 'working') data-spots-working @endif>
+  <summary>
+    <span class="vd-fold-title">
+      <h2>Where to put it</h2>
+      <span class="vd-fold-hint" @if ($state === 'failed') data-tone="bad" @endif>{{ $summary }}</span>
+    </span>
+  </summary>
+  <div class="vd-fold-body vd-stack">
   <div class="vd-spots-head">
-    <div>
-      <h2 style="margin:0">Where to put it</h2>
-      <p class="vd-small vd-muted" style="margin:4px 0 0">Places in your app where people doing this task would find the video, checked to fit without upsetting the page.</p>
-    </div>
+    <p class="vd-small vd-muted" style="margin:0">Places in your app where people doing this task would find the video, checked to fit without upsetting the page.</p>
     @if ($items !== [] && $state !== 'working')
       <form method="post" action="{{ route('video-demo.studio.spots', $video) }}" data-busy-form>@csrf
         <button class="vd-btn vd-btn-sm">Suggest again</button>
       </form>
     @endif
   </div>
+
+  {{-- What every spot shares: the tag, and publishing. --}}
+  @if ($items !== [] && $state !== 'working')
+    <div class="vd-spots-add">
+      <div class="vd-spots-add-row">
+        <pre class="vd-code"><code>{{ $tag }}</code></pre>
+        <button type="button" class="vd-btn vd-btn-sm" data-copy="{{ $tag }}">Copy tag</button>
+      </div>
+      <span class="vd-hint" style="margin:0">The tag for every place below. It shows as a slim “How-to video” bar people can open and minimise again; each viewer's choice is remembered.</span>
+      @if ($video->isPublished())
+        <span class="vd-small" style="color:var(--vd-ok)">Published, so the tag shows the video once it's pasted in.</span>
+      @else
+        <div class="vd-spots-add-row">
+          <span class="vd-small" style="flex:1 1 200px">Publish the video first, or the tag shows nothing.</span>
+          <form method="post" action="{{ route('video-demo.studio.publish', $video) }}">@csrf
+            <button class="vd-btn vd-btn-sm vd-btn-primary">Publish</button>
+          </form>
+        </div>
+      @endif
+    </div>
+  @endif
 
   {{-- Before the first suggestion: what it does, and what it costs. --}}
   @if ($items === [] && $state !== 'working')
@@ -73,8 +105,8 @@
       $code = $spot['code'] ?? null;
       $exact = is_array($code) && ! empty($code['exact']);
     @endphp
-    <article class="vd-spot" data-spot="{{ $i }}">
-      <header class="vd-spot-head">
+    <details class="vd-spot" data-spot="{{ $i }}" @if ($loop->first) open @endif>
+      <summary class="vd-spot-head">
         <span class="vd-spot-num">{{ $i + 1 }}</span>
         <div style="min-width:0;flex:1">
           <h3>{{ $spot['label'] }}</h3>
@@ -86,9 +118,10 @@
               <span class="vd-pill vd-pill-warn">May upset the layout</span>
             @endif
           </div>
-          @if ($spot['why'])<p class="vd-small vd-muted" style="margin:6px 0 0">{{ $spot['why'] }}</p>@endif
         </div>
-      </header>
+      </summary>
+      <div class="vd-spot-body">
+      @if ($spot['why'])<p class="vd-small vd-muted" style="margin:0">{{ $spot['why'] }}</p>@endif
 
       @if ($problems->isNotEmpty())
         <div class="vd-flash vd-flash-warn" style="margin:0">
@@ -155,23 +188,15 @@
               <span class="vd-hint">The section's opening tag couldn't be told apart in this file, so this is just above its heading. Move it {{ $where($spot['position']) }} if that reads better.</span>
             @endunless
           @else
-            <pre class="vd-code"><code>{{ $tag }}</code></pre>
             <span class="vd-hint">The heading isn't written in a view (it may come from the database or a translation), so find the section by eye.</span>
           @endif
-          <span class="vd-hint">It shows as a slim “How-to video” bar people can open and minimise again; each viewer's choice is remembered.</span>
         </li>
-        <li>
-          @if ($video->isPublished())
-            <div class="vd-howto-title">Published: reload <a href="{{ $appUrl.$spot['path'] }}" target="_blank" rel="noopener" class="vd-mono">{{ $spot['path'] }}</a> to see it</div>
-          @else
-            <div class="vd-howto-title">Publish the video, or the tag shows nothing</div>
-            <form method="post" action="{{ route('video-demo.studio.publish', $video) }}">@csrf
-              <button class="vd-btn vd-btn-sm vd-btn-primary">Publish</button>
-            </form>
-          @endif
-        </li>
+        @if ($video->isPublished())
+          <li><div class="vd-howto-title">Reload <a href="{{ $appUrl.$spot['path'] }}" target="_blank" rel="noopener" class="vd-mono">{{ $spot['path'] }}</a> to see it</div></li>
+        @endif
       </ol>
-    </article>
+      </div>
+    </details>
   @endforeach
 
   @if ($items !== [] && in_array($state, ['ready', 'failed'], true))
@@ -202,7 +227,8 @@
       </span>
     </form>
   @endif
-</section>
+  </div>
+</details>
 @include('video-demo::partials.copy-script')
 
 @once

@@ -10,12 +10,22 @@
   $taken = $translations->map(fn ($t) => Language::base($t->languageCode()))->push(Language::base($video->languageCode()))->all();
   $choices = collect(Language::options())->reject(fn ($name, $code) => in_array(Language::base($code), $taken, true));
   $canAdd = ! $video->source_video_id && ! $video->status->isWorking() && ! empty($video->plan['steps']);
+  $summary = $video->source_video_id
+      ? 'The '.Language::name($video->languageCode()).' version of '.($video->source ? ($video->source->title ?: $video->source->slug) : 'a deleted video')
+      : ($translations->isNotEmpty() ? $translations->map(fn ($t) => Language::name($t->languageCode()))->implode(', ') : 'None yet. The AI translates the words, for about a cent.');
+  $hasErrors = $errors->has('language') || $errors->has('voice');
 @endphp
-<section class="vd-card vd-stack-sm" id="vd-languages">
+<details class="vd-card vd-fold" id="vd-languages" data-fold="languages" @if ($hasErrors) open data-fold-keep @endif>
+  <summary>
+    <span class="vd-fold-title">
+      <h2>Other languages</h2>
+      <span class="vd-fold-hint">{{ $summary }}</span>
+    </span>
+  </summary>
+  <div class="vd-fold-body vd-stack-sm">
   <div>
-    <h2 style="margin:0">Other languages</h2>
     @if ($video->source_video_id)
-      <p class="vd-small vd-muted" style="margin:4px 0 0">
+      <p class="vd-small vd-muted" style="margin:0">
         The {{ Language::name($video->languageCode()) }} version of
         @if ($video->source)
           <a href="{{ route('video-demo.studio.show', $video->source) }}">{{ $video->source->title ?: $video->source->slug }}</a>,
@@ -25,7 +35,7 @@
         made from its plan. The player shows it to viewers in {{ Language::name($video->languageCode()) }}.
       </p>
     @else
-      <p class="vd-small vd-muted" style="margin:4px 0 0">The same video in another language, made from this plan: the AI translates the words, for about a cent, and it is recorded with your app in that language. The player shows each viewer their own.</p>
+      <p class="vd-small vd-muted" style="margin:0">The same video in another language, made from this plan: the AI translates the words, for about a cent, and it is recorded with your app in that language. The player shows each viewer their own.</p>
     @endif
   </div>
 
@@ -88,4 +98,5 @@
       })();
     </script>
   @endif
-</section>
+  </div>
+</details>

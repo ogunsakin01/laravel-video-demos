@@ -6,12 +6,23 @@
   $check = $video->verify_result ?? [];
   $state = $check['status'] ?? null;
   $devices = collect($check['checked'] ?? [])->map(fn ($d) => config("video-demo.devices.$d.label", ucfirst($d)))->implode(', ');
+  $broken = $state === 'done' && ! ($check['ok'] ?? false);
+  $summary = match (true) {
+      $state === 'working' => 'Checking…',
+      $broken => ! empty($check['step']) ? 'Step '.$check['step'].' no longer works' : 'The video no longer works',
+      $state === 'done' => 'Every step worked, '.$video->verified_at?->diffForHumans(),
+      default => 'Not checked yet. Free: no AI is used.',
+  };
 @endphp
-<section class="vd-card vd-stack-sm" id="vd-check" @if ($state === 'working') data-check-working @endif>
-  <div>
-    <h2 style="margin:0">Does it still work?</h2>
-    <p class="vd-small vd-muted" style="margin:4px 0 0">Plays the video’s steps in your app without recording them, to find what a change broke. Free: no AI is used.</p>
-  </div>
+<details class="vd-card vd-fold" id="vd-check" data-fold="check" @if ($state === 'working' || $broken) open data-fold-keep @endif @if ($state === 'working') data-check-working @endif>
+  <summary>
+    <span class="vd-fold-title">
+      <h2>Does it still work?</h2>
+      <span class="vd-fold-hint" @if ($broken) data-tone="bad" @elseif ($state === 'done') data-tone="ok" @endif>{{ $summary }}</span>
+    </span>
+  </summary>
+  <div class="vd-fold-body vd-stack-sm">
+    <p class="vd-small vd-muted" style="margin:0">Plays the video’s steps in your app without recording them, to find what a change broke. Free: no AI is used.</p>
 
   @if ($state === 'working')
     <p class="vd-small" style="margin:0;display:flex;gap:10px;align-items:center">
@@ -38,7 +49,7 @@
       <span class="vd-small">Checked {{ $video->verified_at?->diffForHumans() }}{{ ! empty($check['url']) ? ', on '.(parse_url($check['url'], PHP_URL_PATH) ?: $check['url']) : '' }}.</span>
     </div>
     @if (! empty($check['screenshot']))
-      <a href="{{ route('video-demo.studio.verify-screenshot', $video) }}?v={{ $video->verified_at?->timestamp }}" target="_blank" rel="noopener" class="vd-spot-shot">
+      <a href="{{ route('video-demo.studio.verify-screenshot', $video) }}?v={{ $video->verified_at?->timestamp }}" target="_blank" rel="noopener" class="vd-check-shot">
         <img src="{{ route('video-demo.studio.verify-screenshot', $video) }}?v={{ $video->verified_at?->timestamp }}" alt="The page when the step failed" loading="lazy">
       </a>
     @endif
@@ -58,7 +69,8 @@
     </div>
     <span class="vd-hint">In CI: <span class="vd-mono">php artisan video-demo:verify --changed=origin/main</span> checks the videos a change touches.</span>
   @endunless
-</section>
+  </div>
+</details>
 
 @once
   <script>

@@ -8,12 +8,19 @@
   $working = collect($exports)->contains(fn ($e) => ($e['status'] ?? null) === 'working');
   $size = fn (?int $bytes) => $bytes === null ? '' : ($bytes >= 1_048_576 ? number_format($bytes / 1_048_576, 1).' MB' : max(1, round($bytes / 1024)).' KB');
   $uses = ['gif' => 'For READMEs, changelogs, emails and chat, which don’t play videos.', 'square' => 'For social feeds, with the title above the app.', 'vertical' => 'For Stories, Reels and Shorts, with the title above the app.'];
+  $made = collect(Exporter::FORMATS)->filter(fn ($info, $format) => Exporter::isCurrent($video, $format))->map(fn ($info) => $info['label'])->values();
+  $summary = collect($video->recordedDevices())->filter(fn ($d) => $video->hasRecording($d))->map(fn ($d) => $devices[$d]['label'] ?? $d)->implode(', ').' MP4'
+      .($working ? ' · making a copy…' : ($made->isNotEmpty() ? ' · '.$made->implode(', ') : ' · GIF, square and vertical copies on request'));
 @endphp
-<section class="vd-card vd-stack-sm" id="vd-downloads" @if ($working) data-exports-working @endif>
-  <div>
-    <h2 style="margin:0">Downloads</h2>
-    <p class="vd-small vd-muted" style="margin:4px 0 0">The video's files, and copies for places that don’t play them as they are. Made on this machine: no AI is used.</p>
-  </div>
+<details class="vd-card vd-fold" id="vd-downloads" data-fold="downloads" @if ($working) open data-fold-keep data-exports-working @endif>
+  <summary>
+    <span class="vd-fold-title">
+      <h2>Downloads</h2>
+      <span class="vd-fold-hint">{{ $summary }}</span>
+    </span>
+  </summary>
+  <div class="vd-fold-body vd-stack-sm">
+    <p class="vd-small vd-muted" style="margin:0">The video's files, and copies for places that don’t play them as they are. Made on this machine: no AI is used.</p>
 
   <ul class="vd-files">
     @foreach ($video->recordedDevices() as $device)
@@ -52,7 +59,8 @@
       </li>
     @endforeach
   </ul>
-</section>
+  </div>
+</details>
 
 @once
   <script>

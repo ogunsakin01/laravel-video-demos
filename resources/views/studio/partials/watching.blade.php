@@ -3,11 +3,15 @@
   is set up: plays, how far viewers get, and where most of them stop.
   Expects $video. Filled in by the script below, so the page never waits.
 --}}
-<section class="vd-card vd-stack-sm" id="vd-watching" data-url="{{ route('video-demo.studio.video-stats', $video) }}">
-  <div>
-    <h2 style="margin:0">Watching</h2>
-    <p class="vd-small vd-muted" style="margin:4px 0 0" data-note>Loading…</p>
-  </div>
+<details class="vd-card vd-fold" id="vd-watching" data-fold="watching" data-url="{{ route('video-demo.studio.video-stats', $video) }}">
+  <summary>
+    <span class="vd-fold-title">
+      <h2>Watching</h2>
+      <span class="vd-fold-hint" data-note>Loading…</span>
+    </span>
+  </summary>
+  <div class="vd-fold-body vd-stack-sm">
+    <p class="vd-small vd-muted" style="margin:0">How many people start the video and how far they get, counted by the player in your app.</p>
   <div class="vd-watch" data-bars hidden>
     @foreach (['play' => 'Started', '25' => 'A quarter', '50' => 'Half', '75' => 'Three quarters', '100' => 'To the end'] as $event => $label)
       <div class="vd-watch-row" data-event="{{ $event }}">
@@ -18,7 +22,8 @@
     @endforeach
   </div>
   <p class="vd-small" style="margin:0" data-drop hidden></p>
-</section>
+  </div>
+</details>
 
 @once
   <script>

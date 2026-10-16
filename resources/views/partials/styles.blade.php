@@ -304,6 +304,8 @@
   .vd-log-kind { font: 500 11px/1.6 var(--vd-mono); text-transform: uppercase; color: var(--vd-muted-ink); }
   .vd-log-error, .vd-log-exception, .vd-log-failed { color: var(--vd-bad); }
   .vd-log-warning { color: var(--vd-warn); }
+  .vd-check-shot { display: block; max-width: 520px; border: 1px solid var(--vd-border); border-radius: var(--vd-radius); overflow: hidden; }
+  .vd-check-shot img { display: block; width: 100%; height: auto; }
   .vd-spots-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
   .vd-spots-intro { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .vd-spots-intro li { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border: 1px solid var(--vd-border); border-radius: var(--vd-radius); background: var(--vd-muted); font-size: 13px; line-height: 1.5; color: var(--vd-ink); }
@@ -448,6 +450,30 @@
   .vd details > summary::-webkit-details-marker { display: none; }
   .vd details > summary::after { content: "+"; font: 18px/1 var(--vd-mono); color: var(--vd-muted-ink); }
   .vd details[open] > summary::after { content: "−"; }
+  /* A video page's sections fold to their title and a one-line summary. */
+  .vd .vd-fold { padding: 0; }
+  .vd .vd-fold > summary { gap: 16px; padding: 16px 20px; border-radius: var(--vd-radius-lg); }
+  .vd .vd-fold > summary:hover h2 { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+  .vd .vd-fold > summary:focus-visible { outline: 2px solid var(--vd-strong); outline-offset: -2px; }
+  .vd .vd-fold > summary h2 { margin: 0; }
+  .vd-fold-title { min-width: 0; }
+  .vd-fold-hint { display: block; margin-top: 3px; font-size: 13px; font-weight: 400; color: var(--vd-muted-ink); overflow-wrap: anywhere; }
+  .vd-fold-hint[data-tone="ok"] { color: var(--vd-ok); }
+  .vd-fold-hint[data-tone="bad"] { color: var(--vd-bad); }
+  .vd-fold-body { padding: 0 20px 20px; min-width: 0; }
+  .vd-fold[open] > summary .vd-fold-hint[data-closed-only] { display: none; }
+  .vd-fold[open] > .vd-fold-body { animation: vd-rise .25s ease-out both; }
+  /* A spot folds the same way, inside its section. */
+  .vd .vd-spot { display: block; padding: 0; }
+  .vd .vd-spot > summary { padding: 14px 16px; gap: 12px; align-items: flex-start; border-radius: var(--vd-radius-lg); font-weight: 400; }
+  .vd .vd-spot > summary::after { margin-top: 4px; }
+  .vd-spot-body { display: grid; gap: 14px; padding: 0 16px 16px; min-width: 0; }
+  .vd-spots-add { display: grid; gap: 8px; padding: 14px 16px; border-radius: var(--vd-radius-lg); background: var(--vd-paper); border: 1px solid var(--vd-border); min-width: 0; }
+  .vd-spots-add-row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; min-width: 0; }
+  .vd-spots-add-row pre { flex: 1 1 260px; min-width: 0; margin: 0; }
+  /* The sidebar's settings, under the cost. */
+  .vd .vd-settings { margin-top: 12px; border-top: 1px solid var(--vd-border); }
+  .vd .vd-settings > summary { padding: 10px 0 0; font-size: 13px; font-weight: 500; color: var(--vd-muted-ink); }
 
   /* Media */
   .vd-video { width: 100%; aspect-ratio: 16 / 10; border-radius: var(--vd-radius-lg); background: #0e0e0d; display: block; border: 1px solid var(--vd-border); }
