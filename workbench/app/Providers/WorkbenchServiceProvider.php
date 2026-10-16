@@ -24,6 +24,8 @@ class WorkbenchServiceProvider extends ServiceProvider
             'video-demo.studio.enabled' => true,
             // No sign-in in the demo, so the private library is open.
             'video-demo.library.private.middleware' => ['web'],
+            // Count plays, so the studio shows how the videos are watched.
+            'video-demo.library.stats' => true,
             'video-demo.ai.api_key' => env('ANTHROPIC_API_KEY', 'demo-key'),
             'video-demo.ui.name' => 'Acme HR videos',
             'filesystems.disks.demo-videos' => [

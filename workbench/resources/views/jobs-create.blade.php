@@ -3,6 +3,8 @@
     <p class="eyebrow">Jobs</p>
     <h1>Post a job</h1>
     <p class="lead">Tell people what the role is about. It goes live on your careers page as soon as you publish it.</p>
+    {{-- The package's help button: the videos that show this page --}}
+    <x-video-demo::help style="margin-top:18px" />
   </section>
 
   <div class="grid">

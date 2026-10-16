@@ -69,6 +69,61 @@
       "only_on": null
     },
     {
+      "action": "goto",
+      "why": "A page with its own videos",
+      "url": "/jobs/create",
+      "target": null,
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": "Help on each page",
+      "only_on": null
+    },
+    {
+      "action": "click",
+      "why": "Open the page's videos",
+      "url": null,
+      "target": {
+        "role": null,
+        "name": null,
+        "label": null,
+        "placeholder": null,
+        "text": null,
+        "selector": ".vd-help-button"
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": 1600,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "caption",
+      "why": "Explain the help button",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "Videos for this page",
+      "text": "<x-video-demo::help /> lists the ones that show it.",
+      "ms": 3800,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "goto",
+      "why": "Back to the jobs page",
+      "url": "/",
+      "target": null,
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": null,
+      "chapter": null,
+      "only_on": null
+    },
+    {
       "action": "type",
       "why": "Search from the app",
       "url": null,
@@ -201,6 +256,37 @@
       "title": "Made for every screen",
       "text": "The right version plays automatically.",
       "ms": 3600,
+      "chapter": null,
+      "only_on": null
+    },
+    {
+      "action": "click",
+      "why": "Switch language",
+      "url": null,
+      "target": {
+        "role": "link",
+        "name": "Français",
+        "label": null,
+        "placeholder": null,
+        "text": null,
+        "selector": null
+      },
+      "value": null,
+      "title": null,
+      "text": null,
+      "ms": 1800,
+      "chapter": "Every language",
+      "only_on": null
+    },
+    {
+      "action": "caption",
+      "why": "Explain languages",
+      "url": null,
+      "target": null,
+      "value": null,
+      "title": "In your users' language",
+      "text": "Made from the same plan. Each viewer gets theirs.",
+      "ms": 3800,
       "chapter": null,
       "only_on": null
     },

@@ -4,6 +4,27 @@ import {TransitionSeries, linearTiming} from '@remotion/transitions';
 import {fade} from '@remotion/transitions/fade';
 import {loadFont} from '@remotion/google-fonts/Geist';
 import {loadFont as loadMono} from '@remotion/google-fonts/GeistMono';
+import describeM from '../../footage/describe.json';
+import screensM from '../../footage/screens.json';
+import speedM from '../../footage/speed.json';
+import costM from '../../footage/cost.json';
+import sampledataM from '../../footage/sampledata.json';
+import checksM from '../../footage/checks.json';
+import reviewM from '../../footage/review.json';
+import againM from '../../footage/again.json';
+import verifyM from '../../footage/verify.json';
+import planeditM from '../../footage/planedit.json';
+import bulkM from '../../footage/bulk.json';
+import embedM from '../../footage/embed.json';
+import helpM from '../../footage/help.json';
+import libraryM from '../../footage/library.json';
+import languagesM from '../../footage/languages.json';
+import frenchM from '../../footage/french.json';
+import downloadsM from '../../footage/downloads.json';
+import brandM from '../../footage/brand.json';
+import watchingM from '../../footage/watching.json';
+import removeM from '../../footage/remove.json';
+import ideasM from '../../footage/ideas.json';
 
 const {fontFamily: sans} = loadFont('normal', {weights: ['400', '500', '600', '700'], subsets: ['latin']});
 const {fontFamily: mono} = loadMono('normal', {weights: ['400', '500'], subsets: ['latin']});
@@ -368,7 +389,7 @@ const Done: React.FC<{label: string; value?: string}> = ({label, value = 'DONE'}
 	<div style={{display: 'flex', gap: 12, alignItems: 'baseline'}}>
 		<span style={{whiteSpace: 'nowrap'}}>{label}</span>
 		<span style={{flex: 1, borderBottom: `2px dotted ${C.faint}`, transform: 'translateY(-7px)'}} />
-		<span style={{color: value === 'DONE' ? '#7fd49a' : C.muted, whiteSpace: 'nowrap'}}>{value}</span>
+		<span style={{color: value === 'DONE' ? '#7fd49a' : value === 'FAIL' ? '#f08a7a' : C.muted, whiteSpace: 'nowrap'}}>{value}</span>
 	</div>
 );
 
@@ -483,69 +504,166 @@ const Outro: React.FC = () => {
 
 // ---------------------------------------------------------------- Timeline
 
+// Where things were on screen and when, written by capture.cjs next to each clip.
+type Mark = {id: string; t: number; x?: number; y?: number; w?: number; h?: number};
+type Marks = {markers: Mark[]};
+const footage: Record<string, Marks> = {describe: describeM, screens: screensM, speed: speedM, cost: costM, sampledata: sampledataM, checks: checksM, review: reviewM, again: againM, verify: verifyM, planedit: planeditM, bulk: bulkM, embed: embedM, help: helpM, library: libraryM, languages: languagesM, french: frenchM, downloads: downloadsM, brand: brandM, watching: watchingM, remove: removeM, ideas: ideasM};
+const mark = (scene: string, id: string): Mark => {
+	const m = footage[scene].markers.filter(k => k.id === id);
+	const found = m.find(k => k.w !== undefined) ?? m[0];
+	if (!found) throw new Error(`No marker ${id} in ${scene}`);
+	return found;
+};
+// The time of a marker, and a box around it (or around several), with room on each side.
+const at = (scene: string, id: string, shift = 0) => Math.max(0, mark(scene, id).t + shift);
+const around = (scene: string, ids: string | string[], padX = 28, padY = 28): Rect => {
+	const boxes = (Array.isArray(ids) ? ids : [ids]).map(id => mark(scene, id));
+	const x = Math.min(...boxes.map(b => b.x!)), y = Math.min(...boxes.map(b => b.y!));
+	const r = Math.max(...boxes.map(b => b.x! + b.w!)), bottom = Math.max(...boxes.map(b => b.y! + b.h!));
+	return [x - padX, y - padY, r - x + padX * 2, bottom - y + padY * 2];
+};
+const spot = (scene: string, id: string, pad = 6): Rect => around(scene, id, pad, pad);
+
 const seg = (src: string, from: number, to: number, frames: number, focus: Focus[]): Segment => ({src, from, rate: (to - from) / (frames / FPS), frames, focus});
+
+const CI: React.FC<{n: number}> = ({n}) => {
+	const frame = useCurrentFrame();
+	const cmd = 'php artisan video-demo:verify --changed=origin/main';
+	const typed = cmd.slice(0, Math.floor(clamp((frame - 18) * 1.8, 0, cmd.length)));
+	const caret = Math.floor(frame / 8) % 2 === 0 && typed.length < cmd.length;
+	const start = 18 + Math.ceil(cmd.length / 1.8) + 6;
+	return (
+		<AbsoluteFill>
+			<div style={{position: 'absolute', left: PAD, top: 66, right: PAD}}>
+				<Kicker n={n} label="In CI" />
+				<div style={{marginTop: 22, display: 'flex', flexDirection: 'column', gap: 2}}>
+					<Words text="Check every pull request." delay={4} />
+					<Words text="Only the videos it touches." delay={10} color={C.muted} />
+				</div>
+			</div>
+			<LogWindow title="terminal" start={start} every={10} size={24} lines={[
+				<Done label="Post a job" />,
+				<Done label="Invite a teammate" />,
+				<Done label="Review applicants" value="FAIL" />,
+				<div style={{marginTop: 14, color: '#f08a7a'}}>Step 10 (click): Could not find a visible element with role "button", name "Post job".</div>,
+				<div style={{marginTop: 14, color: C.muted}}>3 checked, 1 broken. Free: no AI is used.</div>,
+			]}>
+				<div style={{marginBottom: 16}}><span style={{color: C.accent}}>$ </span>{typed}{caret ? <span style={{background: C.text}}>{' '}</span> : null}</div>
+			</LogWindow>
+		</AbsoluteFill>
+	);
+};
+
+const chip = (tag: string, attrs: React.ReactNode = null) => <><span style={{color: C.muted}}>&lt;</span><span style={{color: C.accent}}>{tag}</span>{attrs} <span style={{color: C.muted}}>/&gt;</span></>;
+
+// Each scene: its length in frames, and what it shows. Numbers count up in order.
+const list: {frames: number; render: (n: number) => React.ReactNode}[] = [
+	{frames: 231, render: n => <AppScene n={n} label="Describe it" lines={['Type a few words.', 'AI plans the walkthrough.']} accent={['AI']}
+		segments={[seg('describe.mp4', 1.0, 10.3, 231, [
+			{at: 0, rect: around('describe', ['prompt', 'complete'], 24, 40)},
+			{at: at('describe', 'click', -1), rect: around('describe', ['prompt', 'complete'], 24, 40), spot: spot('describe', 'complete')},
+			{at: at('describe', 'done', -0.2), rect: around('describe', ['prompt', 'complete'], 24, 40), spot: spot('describe', 'prompt-filled')},
+		])]} />},
+	{frames: 176, render: n => <AppScene n={n} label="Every screen" lines={['One plan.', 'Desktop, tablet, mobile, TV.']}
+		segments={[seg('screens.mp4', 0.8, 8.0, 176, [{at: 0, rect: around('screens', 'devices', 24, 60), spot: spot('screens', 'devices')}])]} />},
+	{frames: 160, render: n => <AppScene n={n} label="Speed" lines={['Real time, or brisk.', 'You set the speed.']}
+		segments={[seg('speed.mp4', 0.8, 7.6, 160, [{at: 0, rect: around('speed', 'speed', 24, 70), spot: around('speed', 'speed', 8, 30)}])]} />},
+	{frames: 276, render: n => <AppScene n={n} label="Cost control" lines={['See the cost first.', 'Every video has a limit.']}
+		segments={[seg('cost.mp4', 0.5, 11.5, 276, [
+			{at: 0, rect: around('cost', 'estimate', 16, 16), spot: spot('cost', 'estimate')},
+			{at: 2.4, rect: null},
+			{at: at('cost', 'limit', -0.6), rect: around('cost', 'limit', 200, 70), spot: spot('cost', 'limit')},
+		])]} />},
+	{frames: 180, render: n => <SampleData n={n} />},
+	{frames: 200, render: n => <AppScene n={n} label="Record as anyone" lines={['Admin, member, guest.', 'On a fresh sample database.']}
+		segments={[seg('sampledata.mp4', 0.6, 8.6, 200, [
+			{at: 0, rect: null},
+			{at: at('sampledata', 'recordas', -0.4), rect: around('sampledata', 'recordas', 200, 80), spot: spot('sampledata', 'recordas')},
+			{at: at('sampledata', 'sample', -0.4), rect: around('sampledata', 'sample', 24, 90), spot: spot('sampledata', 'sample')},
+		])]} />},
+	{frames: 150, render: n => <AppScene n={n} label="Checked first" lines={['Broken pages caught', 'before AI spends a cent.']} accent={['Broken']}
+		segments={[seg('checks.mp4', 4.0, 10.0, 150, [{at: 0, rect: null}, {at: at('checks', 'issues', -0.1), rect: around('checks', 'issues', 8, 120), spot: spot('checks', 'issues')}])]} />},
+	{frames: 251, render: n => <AppScene n={n} label="Review" lines={['Watch every version', 'before anyone else.']}
+		segments={[seg('review.mp4', 1.0, 11.0, 251, [{at: 0, rect: around('review', 'player', 8, 20)}])]}>
+		<Phone src="phone.mp4" delay={40} />
+	</AppScene>},
+	{frames: 300, render: n => <AppScene n={n} label="Make it again" lines={['Change anything.', 'Same plan? Free.']} accent={['Free.']}
+		segments={[seg('again.mp4', 0.5, 14.0, 300, [
+			{at: 0, rect: null},
+			{at: at('again', 'style', -0.4), rect: around('again', 'style', 24, 60), spot: spot('again', 'style')},
+			{at: at('again', 'toggle', -0.4), rect: around('again', 'toggle', 24, 80), spot: spot('again', 'toggle')},
+			{at: at('again', 'button', -0.2), rect: around('again', 'button', 24, 90), spot: spot('again', 'button')},
+		])]} />},
+	{frames: 245, render: n => <AppScene n={n} label="Still working?" lines={['Your app changed.', 'Find the videos it broke.']} accent={['broke.']}
+		segments={[
+			seg('verify.mp4', 1.0, 4.8, 95, [{at: 0, rect: null}, {at: at('verify', 'row', -0.5), rect: around('verify', 'row', 20, 120), spot: spot('verify', 'row')}]),
+			seg('verify.mp4', 12.3, 18.4, 150, [
+				{at: 12.3, rect: around('verify', 'check', 8, 8), spot: spot('verify', 'error')},
+				{at: at('verify', 'fix', -0.3), rect: around('verify', 'check', 8, 8), spot: spot('verify', 'fix')},
+			]),
+		]} />},
+	{frames: 260, render: n => <AppScene n={n} label="Edit the plan" lines={['Fix a step by hand.', 'Record it again, free.']} accent={['free.']}
+		segments={[seg('planedit.mp4', 0.4, 13.0, 260, [
+			{at: 0, rect: around('planedit', 'step', 24, 60)},
+			{at: at('planedit', 'edit', -0.6), rect: around('planedit', 'name', 240, 110), spot: spot('planedit', 'name')},
+			{at: at('planedit', 'save', 0.2), rect: around('planedit', 'save', 24, 120), spot: spot('planedit', 'save')},
+		])]} />},
+	{frames: 150, render: n => <CI n={n} />},
+	{frames: 276, render: n => <AppScene n={n} label="Publish" lines={['Publish one,', 'or publish them all.']}
+		segments={[seg('bulk.mp4', 1.5, 12.5, 276, [{at: 0, rect: around('bulk', 'table', 8, 8)}, {at: at('bulk', 'bar', -0.3), rect: around('bulk', 'bar', 8, 120), spot: spot('bulk', 'bar')}])]} />},
+	{frames: 200, render: n => <AppScene n={n} label="Embed" lines={['One Blade tag.', 'Any page.']}
+		segments={[seg('embed.mp4', 0.6, 8.0, 200, [{at: 0, rect: around('embed', 'embed', 10, 60), spot: spot('embed', 'embed')}])]}>
+		<CodeChip delay={63} code={chip('x-video-demo::player', <> <span style={{color: C.muted}}>slug=</span>"post-a-job"</>)} />
+	</AppScene>},
+	{frames: 200, render: n => <AppScene n={n} label="Help on each page" lines={['Every page lists', 'the videos that show it.']}
+		segments={[seg('help.mp4', 0.6, 8.2, 200, [
+			{at: 0, rect: around('help', 'button', 60, 120), spot: spot('help', 'button')},
+			{at: at('help', 'open', -0.2), rect: around('help', 'panel', 24, 24)},
+		])]}>
+		<CodeChip delay={30} code={chip('x-video-demo::help')} />
+	</AppScene>},
+	{frames: 202, render: n => <AppScene n={n} label="Help library" lines={['A searchable help', 'library, built in.']}
+		segments={[
+			seg('library.mp4', 0.6, 5.0, 111, [{at: 0, rect: around('library', 'search', 120, 90), spot: spot('library', 'search')}]),
+			seg('library.mp4', 23.6, 27.2, 91, [{at: 23.6, rect: null}]),
+		]} />},
+	{frames: 240, render: n => <AppScene n={n} label="Every language" lines={['The same video,', 'in your users\' language.']}
+		segments={[
+			seg('languages.mp4', 0.8, 9.6, 160, [{at: 0, rect: around('languages', 'card', 8, 8)}]),
+			seg('french.mp4', 19.6, 22.4, 80, [{at: 19.6, rect: null}]),
+		]} />},
+	{frames: 190, render: n => <AppScene n={n} label="Downloads" lines={['GIFs for READMEs.', 'Square and vertical for social.']} accent={['GIFs']}
+		segments={[seg('downloads.mp4', 0.8, 10.0, 190, [{at: 0, rect: around('downloads', 'card', 8, 8)}])]} />},
+	{frames: 220, render: n => <AppScene n={n} label="Your brand" lines={['Your logo on every frame.', 'Your card at the end.']}
+		segments={[seg('brand.mp4', 0.8, 12.8, 220, [
+			{at: 0, rect: null},
+			{at: at('brand', 'fields', -0.4), rect: around('brand', 'fields', 40, 50)},
+			{at: at('brand', 'end', -0.4), rect: around('brand', 'end', 40, 50), spot: spot('brand', 'end')},
+		])]} />},
+	{frames: 210, render: n => <AppScene n={n} label="Watching" lines={['See how far people watch,', 'and what they looked for.']}
+		segments={[seg('watching.mp4', 0.4, 8.8, 210, [
+			{at: 0, rect: around('watching', 'card', 8, 8)},
+			{at: at('watching', 'searches', 0.2), rect: around('watching', 'searches', 60, 40), spot: spot('watching', 'searches')},
+		])]} />},
+	{frames: 230, render: n => <AppScene n={n} label="Delete with care" lines={['See which videos', 'are in use first.']}
+		segments={[
+			seg('remove.mp4', 1.0, 5.0, 100, [{at: 0, rect: null}]),
+			seg('remove.mp4', 10.2, 13.6, 130, [{at: 10.2, rect: around('remove', ['warning', 'card'], 8, 40)}, {at: 10.9, rect: around('remove', ['warning', 'card'], 8, 40), spot: spot('remove', 'card')}]),
+		]} />},
+	{frames: 215, render: n => <AppScene n={n} label="Ideas" lines={['Not sure what to film?', 'AI suggests it.']} accent={['AI']}
+		segments={[seg('ideas.mp4', 1.0, 9.9, 215, [{at: 0, rect: around('ideas', 'button', 300, 60), spot: spot('ideas', 'button')}, {at: at('ideas', 'ideas', -0.1), rect: around('ideas', 'grid', 8, 8)}])]} />},
+	{frames: 225, render: n => <AppScene n={n} label="Spotlight style" lines={['A polished reel', 'in one click.']}
+		segments={[seg('spotlight-example.mp4', 10.0, 19.0, 225, [{at: 0, rect: null}])]} />},
+	{frames: 190, render: n => <Install n={n} />},
+	{frames: 165, render: n => <Terminal n={n} />},
+	{frames: 190, render: n => <CodeScene n={n} />},
+	{frames: 110, render: n => <Providers n={n} />},
+];
 
 const scenes: {frames: number; render: () => React.ReactNode}[] = [
 	{frames: 105, render: () => <Intro />},
 	{frames: 96, render: () => <Hook />},
-	{frames: 231, render: () => <AppScene n={1} label="Describe it" lines={['Type a few words.', 'AI plans the walkthrough.']} accent={['AI']}
-		segments={[seg('describe.mp4', 1.0, 10.3, 231, [
-			{at: 0, rect: [96, 262, 730, 200]},
-			{at: 4.95, rect: [96, 262, 730, 200], spot: [660, 276, 160, 40]},
-			{at: 8.15, rect: [96, 262, 730, 200], spot: [105, 316, 710, 116]},
-		])]} />},
-	{frames: 176, render: () => <AppScene n={2} label="Every screen" lines={['One plan.', 'Desktop, tablet, mobile, TV.']}
-		segments={[seg('screens.mp4', 0.8, 7.8, 176, [{at: 0, rect: [96, 416, 730, 174], spot: [105, 476, 710, 54]}])]} />},
-	{frames: 176, render: () => <AppScene n={3} label="Speed" lines={['Real time, or brisk.', 'You set the speed.']}
-		segments={[seg('speed.mp4', 0.8, 7.8, 176, [{at: 0, rect: [96, 413, 730, 200], spot: [100, 463, 720, 112]}])]} />},
-	{frames: 276, render: () => <AppScene n={4} label="Cost control" lines={['See the cost first.', 'Every video has a limit.']}
-		segments={[seg('cost.mp4', 0.5, 11.5, 276, [
-			{at: 0, rect: [846, 240, 360, 340], spot: [856, 259, 340, 302]},
-			{at: 1.9, rect: null},
-			{at: 7.0, rect: [96, 560, 740, 200], spot: [105, 615, 347, 92]},
-		])]} />},
-	{frames: 180, render: () => <SampleData n={5} />},
-	{frames: 200, render: () => <AppScene n={6} label="Record as anyone" lines={['Admin, member, guest.', 'On a fresh sample database.']}
-		segments={[seg('sampledata.mp4', 0.6, 8.6, 200, [
-			{at: 0, rect: [96, 330, 730, 250], spot: [100, 372, 720, 50]},
-			{at: 3.3, rect: [96, 250, 730, 250], spot: [100, 385, 720, 92]},
-		])]} />},
-	{frames: 150, render: () => <AppScene n={7} label="Checked first" lines={['Broken pages caught', 'before AI spends a cent.']} accent={['Broken']}
-		segments={[seg('checks.mp4', 4.0, 10.0, 150, [{at: 0, rect: null}, {at: 5.6, rect: [76, 40, 1128, 420], spot: [84, 240, 1112, 181]}])]} />},
-	{frames: 251, render: () => <AppScene n={8} label="Review" lines={['Watch every version', 'before anyone else.']}
-		segments={[seg('review.mp4', 1.0, 11.0, 251, [{at: 0, rect: [76, 220, 780, 510]}])]}>
-		<Phone src="phone.mp4" delay={40} />
-	</AppScene>},
-	{frames: 260, render: () => <AppScene n={9} label="Make it again" lines={['Change anything.', 'Same plan? Free.']} accent={['Free.']}
-		segments={[seg('again.mp4', 0.5, 10.9, 260, [
-			{at: 0, rect: [96, 300, 730, 220], spot: [100, 352, 720, 112]},
-			{at: 4.3, rect: [96, 520, 730, 220], spot: [100, 582, 720, 70]},
-			{at: 8.9, rect: [96, 520, 730, 220], spot: [100, 665, 720, 48]},
-		])]} />},
-	{frames: 276, render: () => <AppScene n={10} label="Publish" lines={['Publish one,', 'or publish them all.']}
-		segments={[seg('bulk.mp4', 1.5, 12.5, 276, [{at: 0, rect: [76, 140, 780, 440]}, {at: 9.3, rect: [76, 230, 780, 330], spot: [85, 260, 750, 50]}])]} />},
-	{frames: 200, render: () => <AppScene n={11} label="Embed" lines={['One Blade tag.', 'Any page.']}
-		segments={[seg('embed.mp4', 0.6, 8.6, 200, [{at: 0, rect: [846, 320, 360, 480], spot: [856, 330, 340, 460]}, {at: 4.8, rect: [846, 216, 360, 480], spot: [856, 226, 340, 460]}])]}>
-		<CodeChip delay={63} code={<><span style={{color: C.muted}}>&lt;</span><span style={{color: C.accent}}>x-video-demo::player</span> <span style={{color: C.muted}}>slug=</span>"post-a-job" <span style={{color: C.muted}}>/&gt;</span></>} />
-	</AppScene>},
-	{frames: 202, render: () => <AppScene n={12} label="Help library" lines={['A searchable help', 'library, built in.']}
-		segments={[
-			seg('library.mp4', 0.6, 5.0, 111, [{at: 0, rect: [600, 100, 620, 280], spot: [731, 131, 356, 39]}]),
-			seg('library.mp4', 23.5, 27.1, 91, [{at: 23.5, rect: [60, 40, 1160, 700]}]),
-		]} />},
-	{frames: 230, render: () => <AppScene n={13} label="Delete with care" lines={['See every page', 'that shows it first.']}
-		segments={[
-			seg('remove.mp4', 1.0, 5.0, 100, [{at: 0, rect: null}]),
-			seg('remove.mp4', 9.5, 13.7, 130, [{at: 9.5, rect: [60, 230, 1160, 300]}, {at: 10.2, rect: [60, 230, 1160, 300], spot: [84, 346, 1112, 158]}]),
-		]} />},
-	{frames: 215, render: () => <AppScene n={14} label="Ideas" lines={['Not sure what to film?', 'AI suggests it.']} accent={['AI']}
-		segments={[seg('ideas.mp4', 1.0, 9.9, 215, [{at: 0, rect: [700, 110, 520, 120], spot: [1016, 155, 155, 36]}, {at: 5.9, rect: [76, 300, 1128, 490]}])]} />},
-	{frames: 225, render: () => <AppScene n={15} label="Spotlight style" lines={['A polished reel', 'in one click.']}
-		segments={[seg('spotlight-example.mp4', 10.0, 19.0, 225, [{at: 0, rect: null}])]} />},
-	{frames: 190, render: () => <Install n={16} />},
-	{frames: 165, render: () => <Terminal n={17} />},
-	{frames: 190, render: () => <CodeScene n={18} />},
-	{frames: 110, render: () => <Providers n={19} />},
+	...list.map((s, i) => ({frames: s.frames, render: () => s.render(i + 1)})),
 	{frames: 210, render: () => <Outro />},
 ];
 

@@ -3,12 +3,14 @@
 namespace Workbench\Database\Seeders;
 
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Ogunsakin01\VideoDemo\Enums\VideoStatus;
 use Ogunsakin01\VideoDemo\Library\Publisher;
 use Ogunsakin01\VideoDemo\Models\Video;
 use Ogunsakin01\VideoDemo\Models\VideoRequest;
 use Ogunsakin01\VideoDemo\Models\VideoStyle;
+use Ogunsakin01\VideoDemo\Recording\Exporter;
 
 /**
  * Sample videos for the demo app. They all play one clip, recorded from the
@@ -39,6 +41,7 @@ class DemoSeeder extends Seeder
             ['Change notification emails', 'How to choose which emails you get about new applicants.', 'public', 'done', 0.0825, ['desktop', 'tv'], false],
         ];
 
+        $videos = [];
         foreach ($samples as $i => [$title, $prompt, $visibility, $poster, $cost, $devices, $publish]) {
             $recordings = [];
             foreach ($devices as $device) {
@@ -59,7 +62,7 @@ class DemoSeeder extends Seeder
                 'plan' => [
                     'title' => $plan['title'],
                     'summary' => $prompt,
-                    'steps' => $plan['steps'],
+                    'steps' => $this->steps($plan['steps'], $title),
                     'chapters' => $recordings['desktop']['chapters'],
                 ],
                 'log' => $this->log($recordings, $cost),
@@ -86,7 +89,13 @@ class DemoSeeder extends Seeder
             if ($publish) {
                 $publisher->publish($video);
             }
+            $videos[$title] = $video;
         }
+
+        $this->french($videos['Post a job'], $publisher);
+        $this->broken($videos['Review applicants']);
+        $this->gif($videos['Post a job']);
+        $this->stats();
 
         Video::create([
             'title' => 'Export invoices to CSV',
@@ -133,6 +142,126 @@ class DemoSeeder extends Seeder
         foreach (['How do I add a second admin?', 'Where do I change the company logo?', 'Can I export applicants to a spreadsheet?'] as $i => $question) {
             VideoRequest::create(['question' => $question, 'created_at' => now()->subDays($i + 1)]);
         }
+    }
+
+    /**
+     * Get a sample's steps. "Post a job" opens the form itself, so the help
+     * button on that page lists it; "Review applicants" still clicks the
+     * button by its old name, so the check finds it broken.
+     */
+    protected function steps(array $steps, string $title): array
+    {
+        if ($title === 'Post a job') {
+            $steps[1]['url'] = '/jobs/create';
+            array_splice($steps, 2, 1);
+        }
+        if ($title === 'Review applicants') {
+            foreach ($steps as $i => $step) {
+                if (($step['target']['name'] ?? null) === 'Publish job') {
+                    $steps[$i]['target']['name'] = 'Post job';
+                }
+            }
+        }
+
+        return $steps;
+    }
+
+    /**
+     * A French version of a video, as "Make it in this language" makes it.
+     * It plays the same sample clip.
+     */
+    protected function french(Video $video, Publisher $publisher): void
+    {
+        $words = [
+            'Post a job in a minute' => ['Publier une offre en une minute', 'Du formulaire à l’annonce en ligne.'],
+            'Start with the basics' => ['Commencez par l’essentiel', 'Un titre, un contrat et un lieu.'],
+            'Live straight away' => ['En ligne tout de suite', 'Les candidats la voient dès maintenant.'],
+            'Your job is live' => ['Votre offre est en ligne', 'Il ne reste plus qu’à attendre les candidatures.'],
+        ];
+        $plan = $video->plan;
+        foreach ($plan['steps'] as $i => $step) {
+            if (isset($words[$step['title'] ?? ''])) {
+                [$plan['steps'][$i]['title'], $plan['steps'][$i]['text']] = $words[$step['title']];
+            }
+        }
+        $chapters = ['Open the form' => 'Ouvrir le formulaire', 'Fill in the details' => 'Remplir les détails', 'Publish' => 'Publier'];
+        $translate = fn (array $list) => array_map(fn ($c) => [...$c, 'title' => $chapters[$c['title']] ?? $c['title']], $list);
+        $plan['title'] = 'Publier une offre';
+        $plan['summary'] = 'Comment un recruteur publie une offre, de la page des offres à l’annonce en ligne.';
+        $plan['chapters'] = $translate($plan['chapters']);
+
+        $french = Video::create([
+            ...$video->only(['prompt', 'style', 'devices', 'target_seconds', 'model', 'effort', 'visibility', 'duration_seconds', 'version']),
+            'slug' => 'post-a-job-fr',
+            'title' => 'Publier une offre',
+            'language' => 'fr',
+            'source_video_id' => $video->id,
+            'status' => VideoStatus::Ready,
+            'plan' => $plan,
+            'recordings' => array_map(fn ($r) => [...$r, 'chapters' => $translate($r['chapters'] ?? [])], $video->recordings),
+            'log' => [['at' => now()->subHours(20)->toIso8601String(), 'message' => 'Queued: the French version of "Post a job"'],
+                ['at' => now()->subHours(20)->addSeconds(14)->toIso8601String(), 'message' => 'Translated the words. The AI cost $0.0081.'],
+                ['at' => now()->subHours(20)->addSeconds(19)->toIso8601String(), 'message' => 'Checked the steps with the app in French'],
+                ['at' => now()->subHours(20)->addSeconds(130)->toIso8601String(), 'message' => 'Ready.']],
+            'cost' => 0.0081,
+            'created_at' => now()->subHours(20), 'updated_at' => now()->subHours(20),
+        ]);
+        $work = Storage::disk(config('video-demo.storage.work_disk'));
+        foreach ($video->devices as $device) {
+            foreach (['video', 'poster'] as $kind) {
+                $work->put($french->workFile($device, $kind), $work->get($video->workFile($device, $kind)));
+            }
+        }
+        $publisher->publish($french);
+    }
+
+    /**
+     * Mark a video as broken by a change to the app, as the last check found.
+     */
+    protected function broken(Video $video): void
+    {
+        $step = collect($video->plan['steps'])->search(fn ($s) => ($s['target']['name'] ?? null) === 'Post job');
+        Storage::disk(config('video-demo.storage.work_disk'))->put($video->workPath('verify.jpg'), file_get_contents("$this->assets/poster-form.jpg"));
+        $video->forceFill([
+            'verified_at' => now()->subMinutes(12),
+            'verify_result' => [
+                'status' => 'done', 'ok' => false, 'checked' => ['desktop'], 'device' => 'desktop', 'step' => $step + 1, 'action' => 'click',
+                'error' => 'Could not find a visible element with role "button", name "Post job".',
+                'url' => url('/jobs/create'), 'issues' => [], 'screenshot' => true,
+            ],
+        ])->save();
+    }
+
+    /**
+     * A GIF of a video, as "Make it" under Downloads makes it.
+     */
+    protected function gif(Video $video): void
+    {
+        $gif = file_get_contents(__DIR__.'/../../../docs/library-tour-mobile.gif');
+        Storage::disk(config('video-demo.storage.work_disk'))->put(Exporter::file($video, 'gif'), $gif);
+        $video->forceFill(['exports' => ['gif' => ['status' => 'ready', 'version' => $video->version, 'bytes' => strlen($gif), 'at' => now()->subHours(3)->toIso8601String()]]])->save();
+    }
+
+    /**
+     * Thirty days of plays, and the searches that found nothing.
+     */
+    protected function stats(): void
+    {
+        $rows = [];
+        // Plays, and how many reached each quarter, out of 100.
+        $shapes = ['post-a-job' => [212, [94, 81, 74, 69]], 'post-a-job-fr' => [38, [92, 85, 80, 77]], 'invite-a-teammate' => [96, [88, 52, 47, 41]], 'review-applicants' => [61, [90, 79, 71, 66]]];
+        foreach ($shapes as $slug => [$plays, $quarters]) {
+            foreach (range(0, 29) as $day) {
+                $n = max(1, (int) round($plays / 30 * (0.6 + 0.8 * (($day * 7 + strlen($slug)) % 10) / 10)));
+                foreach (['play' => 100, '25' => $quarters[0], '50' => $quarters[1], '75' => $quarters[2], '100' => $quarters[3]] as $event => $share) {
+                    $rows[] = ['slug' => $slug, 'day' => now()->subDays($day)->toDateString(), 'event' => $event, 'term' => '', 'hits' => (int) round($n * $share / 100)];
+                }
+            }
+        }
+        foreach (['export invoices' => 14, 'company logo' => 9, 'two factor' => 6, 'delete account' => 3] as $term => $hits) {
+            $rows[] = ['slug' => '', 'day' => now()->subDays($hits)->toDateString(), 'event' => 'search', 'term' => $term, 'hits' => $hits];
+        }
+        DB::table('video_demo_stats')->insert(array_values(array_filter($rows, fn ($r) => $r['hits'] > 0)));
     }
 
     /**

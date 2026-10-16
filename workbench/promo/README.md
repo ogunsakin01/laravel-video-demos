@@ -2,11 +2,13 @@
 
 The dark-mode promo at the top of the README (`docs/social/laravel-video-demos-promo.mp4`), made from footage of the demo app.
 
-1. **Serve the demo app** with Playwright reachable and its own address set, so the start-page list can open pages:
+1. **Serve the demo app** with Playwright reachable and its own address set, so the start-page list can open pages. Set `APP_URL=http://127.0.0.1:8123` (and `VIDEO_DEMO_NODE_MODULES` if Playwright isn't installed in storage) in the Testbench app's `.env`, `vendor/orchestra/testbench-core/laravel/.env`. The page check opens the app's own pages while answering a request, so the server needs more than one worker:
 
    ```bash
-   composer serve     # http://127.0.0.1:8123
+   PHP_CLI_SERVER_WORKERS=4 composer serve     # http://127.0.0.1:8123
    ```
+
+   The scenes film the demo data as `composer build` seeds it (a broken video, a French version, watch counts), so rebuild first if you changed anything in the studio.
 
 2. **Film the footage** into `footage/` (dark mode, at 2× pixel density). Each clip comes with the positions of what it shows, which the edit uses to zoom and highlight:
 
@@ -15,9 +17,9 @@ The dark-mode promo at the top of the README (`docs/social/laravel-video-demos-p
    NODE_PATH=/path/to/node_modules node workbench/promo/capture.cjs again remove                    # some of them
    ```
 
-   `spotlight-example.mp4` is a recording made with the Spotlight style; copy one into `footage/`.
+   `spotlight-example.mp4` is a recording made with the Spotlight style: copy `docs/examples/example-spotlight.mp4` into `footage/`.
 
-3. **Edit** in `remotion/src/Promo.tsx`: each scene's headline, the footage it plays, and where the camera points. Check single frames with:
+3. **Edit** in `remotion/src/Promo.tsx`: each scene's headline, the footage it plays, and where the camera points. The camera and highlights use the markers `capture.cjs` writes, so they follow the page when its layout changes. Check single frames with:
 
    ```bash
    cd workbench/promo/remotion && npm install && node render.mjs --stills 300,1200
@@ -28,6 +30,8 @@ The dark-mode promo at the top of the README (`docs/social/laravel-video-demos-p
    ```bash
    FFMPEG=/path/to/ffmpeg bash workbench/promo/build.sh
    ```
+
+   It takes a while; `CONCURRENCY=6` renders more frames at once. `node render.mjs out.mp4` renders the MP4 directly and is quicker, but about one frame in a hundred comes out tiled or missing a layer, so it is only good for a first look.
 
 Make the README's preview from the first 40 seconds:
 
