@@ -51,7 +51,10 @@ const WIN_H = BAR + Math.round(WIN_W * 0.625);
 const WIN_Y = 288;
 
 type Rect = [number, number, number, number];
-type Focus = {at: number; rect?: Rect | null; spot?: Rect};
+// A highlight, with how far the page was scrolled when it was measured.
+type Spot = [number, number, number, number, number?];
+// follow: the camera moves with the page when it scrolls while this is shown.
+type Focus = {at: number; rect?: Rect | null; spot?: Spot; follow?: boolean};
 type Segment = {src: string; from: number; rate: number; frames: number; focus: Focus[]};
 
 const ease = Easing.bezier(0.65, 0, 0.35, 1);
@@ -122,10 +125,12 @@ const Footage: React.FC<{seg: Segment; width: number; height: number}> = ({seg, 
 	const frame = useCurrentFrame();
 	const ft = seg.from + (frame / FPS) * seg.rate;
 	const s0 = width / 1280;
+	const scene = footage[seg.src.replace(/\.mp4$/, '')];
 
 	const cam = (f?: Focus) => {
 		if (!f || !f.rect) return {z: 1, tx: 0, ty: (height - 800 * s0) / 2};
-		const [x, y, w, h] = f.rect;
+		const [x, y0, w, h] = f.rect;
+		const y = f.follow && scene ? y0 + scrollAt(scene, f.at) - scrollAt(scene, ft) : y0;
 		const z = clamp(Math.min(width / (w * s0), height / (h * s0)), 1, 2.4);
 		const sc = s0 * z;
 		const tx = clamp(width / 2 - (x + w / 2) * sc, width - 1280 * sc, 0);
@@ -142,8 +147,12 @@ const Footage: React.FC<{seg: Segment; width: number; height: number}> = ({seg, 
 	const z = a.z + (b.z - a.z) * t, tx = a.tx + (b.tx - a.tx) * t, ty = a.ty + (b.ty - a.ty) * t;
 	const sc = s0 * z;
 
-	const spot = cur.spot;
-	const spotOn = spot ? interpolate(ft - cur.at, [0.35 * seg.rate, 0.75 * seg.rate], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'}) : 0;
+	// The page may scroll after a marker is taken; the highlight moves with it.
+	const spot = cur.spot && (cur.spot[4] === undefined || !scene ? cur.spot
+		: [cur.spot[0], cur.spot[1] + cur.spot[4] - scrollAt(scene, ft), cur.spot[2], cur.spot[3]]);
+	// A keyframe that keeps the same highlight leaves it on; a new one fades in.
+	const same = !!prev.spot && prev !== cur && JSON.stringify(prev.spot) === JSON.stringify(cur.spot);
+	const spotOn = spot && same ? 1 : spot ? interpolate(ft - cur.at, [0.35 * seg.rate, 0.75 * seg.rate], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'}) : 0;
 	const pulse = 1 + Math.sin(frame / 6) * 0.004;
 
 	return (
@@ -505,8 +514,8 @@ const Outro: React.FC = () => {
 // ---------------------------------------------------------------- Timeline
 
 // Where things were on screen and when, written by capture.cjs next to each clip.
-type Mark = {id: string; t: number; x?: number; y?: number; w?: number; h?: number};
-type Marks = {markers: Mark[]};
+type Mark = {id: string; t: number; x?: number; y?: number; w?: number; h?: number; sy?: number};
+type Marks = {markers: Mark[]; scroll?: [number, number][]};
 const footage: Record<string, Marks> = {describe: describeM, screens: screensM, speed: speedM, cost: costM, sampledata: sampledataM, checks: checksM, review: reviewM, again: againM, verify: verifyM, planedit: planeditM, bulk: bulkM, embed: embedM, help: helpM, library: libraryM, languages: languagesM, french: frenchM, downloads: downloadsM, brand: brandM, watching: watchingM, remove: removeM, ideas: ideasM};
 const mark = (scene: string, id: string): Mark => {
 	const m = footage[scene].markers.filter(k => k.id === id);
@@ -522,7 +531,13 @@ const around = (scene: string, ids: string | string[], padX = 28, padY = 28): Re
 	const r = Math.max(...boxes.map(b => b.x! + b.w!)), bottom = Math.max(...boxes.map(b => b.y! + b.h!));
 	return [x - padX, y - padY, r - x + padX * 2, bottom - y + padY * 2];
 };
-const spot = (scene: string, id: string, pad = 6): Rect => around(scene, id, pad, pad);
+const spot = (scene: string, ids: string | string[], pad = 6, padY = pad): Spot => [...around(scene, ids, pad, padY), mark(scene, [ids].flat()[0]).sy];
+// How far the page was scrolled at a time in a clip.
+const scrollAt = (m: Marks, t: number) => {
+	let y = m.scroll?.[0]?.[1] ?? 0;
+	for (const [at, v] of m.scroll ?? []) { if (at > t) break; y = v; }
+	return y;
+};
 
 const seg = (src: string, from: number, to: number, frames: number, focus: Focus[]): Segment => ({src, from, rate: (to - from) / (frames / FPS), frames, focus});
 
@@ -567,7 +582,7 @@ const list: {frames: number; render: (n: number) => React.ReactNode}[] = [
 	{frames: 176, render: n => <AppScene n={n} label="Every screen" lines={['One plan.', 'Desktop, tablet, mobile, TV.']}
 		segments={[seg('screens.mp4', 0.8, 8.0, 176, [{at: 0, rect: around('screens', 'devices', 24, 60), spot: spot('screens', 'devices')}])]} />},
 	{frames: 160, render: n => <AppScene n={n} label="Speed" lines={['Real time, or brisk.', 'You set the speed.']}
-		segments={[seg('speed.mp4', 0.8, 7.6, 160, [{at: 0, rect: around('speed', 'speed', 24, 70), spot: around('speed', 'speed', 8, 30)}])]} />},
+		segments={[seg('speed.mp4', 0.8, 7.6, 160, [{at: 0, rect: around('speed', 'speed', 24, 70), spot: spot('speed', 'speed', 8)}])]} />},
 	{frames: 276, render: n => <AppScene n={n} label="Cost control" lines={['See the cost first.', 'Every video has a limit.']}
 		segments={[seg('cost.mp4', 0.5, 11.5, 276, [
 			{at: 0, rect: around('cost', 'estimate', 16, 16), spot: spot('cost', 'estimate')},
@@ -599,7 +614,7 @@ const list: {frames: number; render: (n: number) => React.ReactNode}[] = [
 			seg('verify.mp4', 1.0, 4.8, 95, [{at: 0, rect: null}, {at: at('verify', 'row', -0.5), rect: around('verify', 'row', 20, 120), spot: spot('verify', 'row')}]),
 			seg('verify.mp4', 12.3, 18.4, 150, [
 				{at: 12.3, rect: around('verify', 'check', 8, 8), spot: spot('verify', 'error')},
-				{at: at('verify', 'fix', -0.3), rect: around('verify', 'check', 8, 8), spot: spot('verify', 'fix')},
+				{at: at('verify', 'fix', -1.0), rect: around('verify', 'check', 8, 8), spot: spot('verify', 'fix')},
 			]),
 		]} />},
 	{frames: 260, render: n => <AppScene n={n} label="Edit the plan" lines={['Fix a step by hand.', 'Record it again, free.']} accent={['free.']}
@@ -610,7 +625,7 @@ const list: {frames: number; render: (n: number) => React.ReactNode}[] = [
 		])]} />},
 	{frames: 150, render: n => <CI n={n} />},
 	{frames: 276, render: n => <AppScene n={n} label="Publish" lines={['Publish one,', 'or publish them all.']}
-		segments={[seg('bulk.mp4', 1.5, 12.5, 276, [{at: 0, rect: around('bulk', 'table', 8, 8)}, {at: at('bulk', 'bar', -0.3), rect: around('bulk', 'bar', 8, 120), spot: spot('bulk', 'bar')}])]} />},
+		segments={[seg('bulk.mp4', 1.5, 13.2, 276, [{at: 0, rect: around('bulk', 'table', 8, 8)}, {at: at('bulk', 'bar', -0.4), rect: around('bulk', 'bar', 8, 120), spot: spot('bulk', 'bar')}])]} />},
 	{frames: 200, render: n => <AppScene n={n} label="Embed" lines={['One Blade tag.', 'Any page.']}
 		segments={[seg('embed.mp4', 0.6, 8.0, 200, [{at: 0, rect: around('embed', 'embed', 10, 60), spot: spot('embed', 'embed')}])]}>
 		<CodeChip delay={63} code={chip('x-video-demo::player', <> <span style={{color: C.muted}}>slug=</span>"post-a-job"</>)} />
@@ -624,13 +639,13 @@ const list: {frames: number; render: (n: number) => React.ReactNode}[] = [
 	</AppScene>},
 	{frames: 202, render: n => <AppScene n={n} label="Help library" lines={['A searchable help', 'library, built in.']}
 		segments={[
-			seg('library.mp4', 0.6, 5.0, 111, [{at: 0, rect: around('library', 'search', 120, 90), spot: spot('library', 'search')}]),
-			seg('library.mp4', 23.6, 27.2, 91, [{at: 23.6, rect: null}]),
+			seg('library.mp4', 0.6, at('library', 'enter', 0.2), 111, [{at: 0, rect: around('library', 'search', 120, 90), spot: spot('library', 'search')}]),
+			seg('library.mp4', at('library', 'player', -0.3), at('library', 'player', 3.3), 91, [{at: 0, rect: null}]),
 		]} />},
 	{frames: 240, render: n => <AppScene n={n} label="Every language" lines={['The same video,', 'in your users\' language.']}
 		segments={[
 			seg('languages.mp4', 0.8, 9.6, 160, [{at: 0, rect: around('languages', 'card', 8, 8)}]),
-			seg('french.mp4', 19.6, 22.4, 80, [{at: 19.6, rect: null}]),
+			seg('french.mp4', at('french', 'french', 0.1), at('french', 'french', 2.7), 80, [{at: 0, rect: null}]),
 		]} />},
 	{frames: 190, render: n => <AppScene n={n} label="Downloads" lines={['GIFs for READMEs.', 'Square and vertical for social.']} accent={['GIFs']}
 		segments={[seg('downloads.mp4', 0.8, 10.0, 190, [{at: 0, rect: around('downloads', 'card', 8, 8)}])]} />},
@@ -638,7 +653,7 @@ const list: {frames: number; render: (n: number) => React.ReactNode}[] = [
 		segments={[seg('brand.mp4', 0.8, 12.8, 220, [
 			{at: 0, rect: null},
 			{at: at('brand', 'fields', -0.4), rect: around('brand', 'fields', 40, 50)},
-			{at: at('brand', 'end', -0.4), rect: around('brand', 'end', 40, 50), spot: spot('brand', 'end')},
+			{at: at('brand', 'end', -0.4), rect: around('brand', ['end', 'end-hint'], 40, 40), spot: spot('brand', ['end', 'end-hint']), follow: true},
 		])]} />},
 	{frames: 210, render: n => <AppScene n={n} label="Watching" lines={['See how far people watch,', 'and what they looked for.']}
 		segments={[seg('watching.mp4', 0.4, 8.8, 210, [
@@ -648,7 +663,7 @@ const list: {frames: number; render: (n: number) => React.ReactNode}[] = [
 	{frames: 230, render: n => <AppScene n={n} label="Delete with care" lines={['See which videos', 'are in use first.']}
 		segments={[
 			seg('remove.mp4', 1.0, 5.0, 100, [{at: 0, rect: null}]),
-			seg('remove.mp4', 10.2, 13.6, 130, [{at: 10.2, rect: around('remove', ['warning', 'card'], 8, 40)}, {at: 10.9, rect: around('remove', ['warning', 'card'], 8, 40), spot: spot('remove', 'card')}]),
+			seg('remove.mp4', at('remove', 'confirm'), at('remove', 'confirm', 3.1), 130, [{at: 0, rect: around('remove', ['warning', 'card'], 40, 40)}, {at: at('remove', 'card', 0.6), rect: around('remove', ['warning', 'card'], 40, 40), spot: spot('remove', 'card')}]),
 		]} />},
 	{frames: 215, render: n => <AppScene n={n} label="Ideas" lines={['Not sure what to film?', 'AI suggests it.']} accent={['AI']}
 		segments={[seg('ideas.mp4', 1.0, 9.9, 215, [{at: 0, rect: around('ideas', 'button', 300, 60), spot: spot('ideas', 'button')}, {at: at('ideas', 'ideas', -0.1), rect: around('ideas', 'grid', 8, 8)}])]} />},

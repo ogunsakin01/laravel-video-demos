@@ -22,7 +22,7 @@ if (process.argv[2] === '--frames') {
 	let last = -1;
 	await renderFrames({
 		composition, serveUrl, outputDir: dir, imageFormat: 'jpeg', jpegQuality: 95, browserExecutable, chromiumOptions, logLevel: 'error',
-		concurrency: Number(process.env.CONCURRENCY) || 3, timeoutInMilliseconds: 120000, inputProps: {},
+		concurrency: Number(process.env.CONCURRENCY) || 3, timeoutInMilliseconds: 120000, inputProps: {}, frameRange,
 		onStart: () => {}, onFrameUpdate: n => { const p = Math.floor((n / composition.durationInFrames) * 10) * 10; if (p !== last) { last = p; console.log(`frames ${p}%`); } },
 	});
 	console.log('frames done');

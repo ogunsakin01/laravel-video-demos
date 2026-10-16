@@ -48,12 +48,27 @@ async function scene(browser, name, opts, run) {
   const markers = [];
   const mark = async (id, locator) => {
     const box = await locator.boundingBox();
-    markers.push({ id, t: (Date.now() - t0) / 1000, x: box.x, y: box.y, w: box.width, h: box.height });
+    const sy = await page.evaluate(() => scrollY);
+    markers.push({ id, t: (Date.now() - t0) / 1000, x: box.x, y: box.y, w: box.width, h: box.height, sy });
   };
   const at = id => markers.push({ id, t: (Date.now() - t0) / 1000 });
 
+  // How far the page is scrolled, all through the clip, so a highlight can
+  // follow what it marks when the page moves after the marker was taken.
+  const scroll = [];
+  let filming = true;
+  const watch = (async () => {
+    while (filming) {
+      const y = await page.evaluate(() => scrollY).catch(() => null);
+      if (y !== null && scroll.at(-1)?.[1] !== y) scroll.push([(Date.now() - t0) / 1000, y]);
+      await new Promise(r => setTimeout(r, 40));
+    }
+  })();
+
   await run(page, { mark, at });
   await page.waitForTimeout(600);
+  filming = false;
+  await watch;
   await cdp.send('Page.stopScreencast');
   const total = (Date.now() - t0) / 1000;
   await ctx.close();
@@ -63,7 +78,7 @@ async function scene(browser, name, opts, run) {
   fs.writeFileSync(path.join(dir, 'frames.txt'), list);
   execFileSync(FFMPEG, ['-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', path.join(dir, 'frames.txt'),
     '-vf', `scale=${w}:${h}:flags=lanczos,format=yuv420p`, '-r', '30', '-fps_mode', 'cfr', '-c:v', 'libx264', '-crf', '14', '-preset', 'medium', path.join(OUT, `${name}.mp4`)]);
-  fs.writeFileSync(path.join(OUT, `${name}.json`), JSON.stringify({ width: opts.viewport.width, height: opts.viewport.height, seconds: total, markers }, null, 2));
+  fs.writeFileSync(path.join(OUT, `${name}.json`), JSON.stringify({ width: opts.viewport.width, height: opts.viewport.height, seconds: total, markers, scroll }, null, 2));
   fs.rmSync(dir, { recursive: true, force: true });
   console.log(`${name}: ${total.toFixed(1)}s, ${frames.length} frames, ${markers.length} markers`);
 }
@@ -201,8 +216,11 @@ const scenes = {
         await page.waitForTimeout(250);
       }
       await page.waitForTimeout(400);
-      await mark('bar', page.locator('#vd-bulk'));
+      // The bar sticks to the top while the list is scrolled; gliding to its
+      // button scrolls back up, so it is measured once it has settled.
       await H.glide(page, page.locator('#vd-bulk button[value=publish]'));
+      await page.waitForTimeout(500);
+      await mark('bar', page.locator('#vd-bulk'));
       at('publish');
       await page.waitForTimeout(1400);
     });
@@ -215,6 +233,8 @@ const scenes = {
       await mark('search', q);
       await H.click(page, q);
       await q.pressSequentially('applicants', { delay: 90 });
+      await page.waitForTimeout(300);
+      at('enter');
       await page.keyboard.press('Enter');
       await page.waitForLoadState('networkidle');
       await page.waitForTimeout(800);
@@ -241,7 +261,7 @@ const scenes = {
   async speed(b) {
     await scene(b, 'speed', { ...desktop, before: async p => { await go(p, '/video-demo/studio/create'); await open(p, '.vd-more'); await scrollTo(p, 'vd-speed-label', 300); } }, async (page, { mark }) => {
       await page.waitForTimeout(500);
-      await mark('speed', page.locator('#vd-speed-label').locator('xpath=..'));
+      await mark('speed', page.locator('#vd-speed-label').locator('xpath=../..'));
       for (const speed of ['1', '1.5', '1.25']) {
         await H.click(page, page.locator(`[data-speed="${speed}"]`));
         await page.waitForTimeout(700);
@@ -477,7 +497,9 @@ const scenes = {
       await page.waitForTimeout(600);
       const end = page.locator('#end_title');
       await H.glide(page, end);
-      await mark('end', end.locator('xpath=ancestor::div[contains(@class,"vd-row")][1]'));
+      const row = end.locator('xpath=ancestor::div[contains(@class,"vd-row")][1]');
+      await mark('end', row);
+      await mark('end-hint', row.locator('xpath=following-sibling::span[1]'));
       at('end');
       await H.click(page, end);
       await end.pressSequentially('Try it at acme.test', { delay: 70 });

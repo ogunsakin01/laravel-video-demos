@@ -26,12 +26,12 @@ fs = sorted(os.listdir(d)); frames = [read(os.path.join(d, f)) for f in fs]
 N = len(frames[0])
 diff = lambda a, b: sum(abs(x - y) for x, y in zip(a, b)) / N
 bad = []
-# A glitch is a run of 1-3 frames that differs from the frames on both sides,
+# A glitch is a run of 1-8 frames that differs from the frames on both sides,
 # while those two are close to each other.
 i = 1
 while i < len(frames) - 1:
     found = False
-    for k in (1, 2, 3):
+    for k in range(1, 9):
         if i + k >= len(frames): break
         before, after = frames[i - 1], frames[i + k]
         inside = [diff(before, frames[j]) for j in range(i, i + k)]
