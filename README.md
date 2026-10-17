@@ -72,9 +72,9 @@ The [setup checklist](https://github.com/ogunsakin01/laravel-video-demos/wiki/Se
 
 1. **You describe the video** in the studio. A few words are enough: **Complete with AI** fills in the rest.
 2. **A sample database is prepared**, so your own data is never used. The AI reads your routes' middleware, policies and gates, and adds what each page needs, such as a permission or a profile photo.
-3. **The AI reads your code** (only the folders you allow, with secrets hidden) and writes a step-by-step plan.
-4. **Pages are checked** in a browser before anything is recorded, at no AI cost.
-5. **Playwright records the plan** on each screen you chose. If a step fails, the AI fixes the plan and it tries again.
+3. **The AI reads your code** (only the folders you allow, with secrets hidden) and writes a step-by-step plan. When the code doesn't settle a label, such as one from a translation or a component, it looks at the page.
+4. **Pages are checked** and, on sample data, **the plan is rehearsed** in a browser, without recording, at no AI cost. A step that doesn't work goes back to the AI before anything is recorded.
+5. **Playwright records the plan** on each screen you chose. If a step still fails, the AI fixes the plan and it tries again.
 6. **You watch it and publish it** to your storage disk, where your production app's help library reads it.
 
 The plan is stored with the video, so after a redesign you can record it again at no AI cost.
@@ -90,6 +90,7 @@ The plan is stored with the video, so after a redesign you can record it again a
 - **Downloads**: a GIF for READMEs and emails, and square and vertical copies for social posts.
 - **[Styles and screens](https://github.com/ogunsakin01/laravel-video-demos/wiki/Styles-and-Screens)**: from step-by-step tutorials to the Spotlight feature reel and a Promo reel with bold headlines, on desktop, TV, tablet and mobile, at the speed you choose, with your logo and an end card if you like.
 - **[A help library](https://github.com/ogunsakin01/laravel-video-demos/wiki/The-Library)** for your users, a Blade tag to put any video on any page, and `<x-video-demo::help />` to show each page's own videos. Optional counts show how far viewers get and what they searched for in vain.
+- **[A separate frontend](https://github.com/ogunsakin01/laravel-video-demos/wiki/Separate-Frontend)**: a Vue, React or other app on its own address that uses your Laravel app as its API, signed in with a session, Sanctum token, JWT or your own way (SSO included), on sample data.
 - **[Cost control](https://github.com/ogunsakin01/laravel-video-demos/wiki/AI-Providers-and-Costs)**: an estimate first, a spending limit on every video ($0.50 unless you change it), and the real cost afterwards.
 - **[Any model](https://github.com/ogunsakin01/laravel-video-demos/wiki/AI-Providers-and-Costs#providers)**: Claude by default, or OpenAI, Gemini, Mistral, a local model with Ollama, and others through Prism.
 - **[Commands](https://github.com/ogunsakin01/laravel-video-demos/wiki/Command-Line)** with JSON output for scripts and AI agents, and **[a facade](https://github.com/ogunsakin01/laravel-video-demos/wiki/Using-It-From-Code)** to build your own screens.

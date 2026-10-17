@@ -7,7 +7,7 @@ Use it when someone wants: how-to or tutorial videos of their Laravel app, onboa
 ## Install
 
 ```bash
-composer require ogunsakin01/laravel-video-demos:^0.17
+composer require ogunsakin01/laravel-video-demos:^0.18
 php artisan video-demo:install   # the package's migrations, Playwright and Chromium, the sample database; run it again after upgrading
 ```
 
@@ -51,6 +51,7 @@ VideoDemo::updatePlan($video, ['steps' => [...]]); VideoDemo::rerecord($video); 
 VideoDemo::translate($video, 'fr');           // a linked video in French, made from the plan
 VideoDemo::export($video, 'vertical');        // path of a gif, square or vertical copy
 VideoDemo::forPage('jobs.create');            // published videos that show a page (route name or path)
+VideoDemo::signInUsing(fn ($user) => \Ogunsakin01\VideoDemo\Recording\SignIn::header('Authorization', 'Bearer '.$user->createToken('video-demo')->accessToken));  // a separate frontend's own sign-in (VIDEO_DEMO_SIGN_IN=custom), here Passport
 ```
 
 `Ogunsakin01\VideoDemo\Events\VideoStatusChanged` fires when a video's status changes. `php artisan video-demo:clean` frees disk space.
@@ -82,10 +83,14 @@ Library pages: `/help/videos` (public) and `/admin/videos` (private videos too).
 - Plan steps can reach into iframes (embedded payment fields). CAPTCHAs, SMS codes and social logins can't be automated.
 - Each video records its actual AI cost and has a spending limit (default `limits.max_cost_per_video`, $0.50, or `VIDEO_DEMO_MAX_COST`): the AI is told its budget and stops before going over. A video can be stopped from the studio at any time.
 - The default model is the cheapest one marked `reliable` whose provider has a key (Claude Sonnet 5.5); `VIDEO_DEMO_MODEL` overrides it.
-- Pages are checked for errors (HTTP errors, sign-in redirects, JavaScript errors) before planning and recording, so no AI is spent on broken pages.
+- Pages are checked for errors (HTTP errors, sign-in redirects, JavaScript errors) before planning and recording, so no AI is spent on broken pages. On sample data each new plan is then rehearsed on every screen without recording, on a copy of the database, so a step that doesn't work goes back to the AI before the voice-over or recording (`VIDEO_DEMO_REHEARSE`, no AI cost; a failed rehearsal counts as one of `limits.max_repairs`).
+- While planning, the AI reads the code, and looks at a page as the video's user when the code doesn't settle a label (a translation key, a component, text from the database): up to `limits.page_looks` (3) per video, redacted like code.
+- A separate frontend (Vue, React… on its own address, using the Laravel app as its API): set `VIDEO_DEMO_FRONTEND_URL`. Videos are recorded on the frontend; `VIDEO_DEMO_SIGN_IN` is `session` (also Sanctum cookie sign-in), `sanctum-token` or `jwt` (put in localStorage under `VIDEO_DEMO_TOKEN_KEY`), or `custom` with `VideoDemo::signInUsing(fn ($user) => SignIn::header(...)->withCookie(...)->withLocalStorage(...))`. Sample data reaches the API through a signed header the recorder adds to requests to the app's address (`VIDEO_DEMO_BASE_URL`, else `APP_URL`) and to the frontend's own address (dev-server proxies); the frontend must call one of those. A change a step sends (POST, PUT, PATCH, DELETE) that the app refuses with a 4xx fails that step with Laravel's message; GETs, Laravel Precognition, broadcasting sign-in and a guest's 401 are left alone.
+- Published videos go to `VIDEO_DEMO_DISK`: a disk production also reads (S3, R2), or `video-demo-repo` (`public/video-demo`, committed and deployed with the code). Each published video's studio record is saved next to it, and `video-demo:install` brings back published videos the studio's database lost.
 - Videos are recorded as a type of user (found from spatie/laravel-permission, Laratrust, Bouncer, a role column or an is_admin flag, or `recorder.user_types`), or as a guest.
 - Suggested ideas are saved in the database and can be added to or replaced.
-- Voice-over and music are optional and off by default. The AI writes a line per step and a voice speaks it: free local voices (Kokoro) after `php artisan video-demo:install-voice`, the computer's own voice, or OpenAI, Gemini and ElevenLabs voices when their key is set (their cost is added to the video's). Music: four built-in CC0 tracks (`builtin:calm`, `builtin:upbeat`, `builtin:corporate`, `builtin:cinematic`) or your own. Each step waits for its line; music loops, fades and drops under the voice; spoken lines become subtitles. Anthropic has no speech output, so this works with any AI provider. `VideoDemo::voices()` and `VideoDemo::music()` list the choices.
+- Voice-over and music are optional and off by default. The AI writes a line per step and a voice speaks it: free local voices (Kokoro) after `php artisan video-demo:install-voice`, the computer's own voice, or OpenAI, Gemini and ElevenLabs voices when their key is set (their cost is added to the video's). Music: four built-in CC0 tracks (`builtin:calm`, `builtin:upbeat`, `builtin:corporate`, `builtin:cinematic`) or your own. Each step waits for its line; music loops, fades and drops under the voice; spoken lines become subtitles. Anthropic has no speech output, so this works with any AI provider. `VideoDemo::voices()` and `VideoDemo::music()` list the choices. `video-demo:install` installs the local voice by itself when a video or style uses it, and `video-demo:refresh` fails a video whose voice isn't available rather than publishing it silent.
+- Laravel Boost: the package ships a guideline and a `laravel-video-demos` agent skill; run `php artisan boost:install` and tick the package.
 - Language: titles, captions, cards, chapters and the voice-over are written in the language of the app's pages (their `<html lang>`, else `app.locale`), or the video's `language` option. Local Kokoro voices speak English only; the computer's voices speak their own language; cloud voices nearly any. A voice that can't speak the language is refused by the forms and `make()`, and left out (with a log line) when the language is only found while making the video.
 - By default a video is recorded on sample data (`--own-data` or `'sample_data' => false` to opt out; `VIDEO_DEMO_SAMPLE_DATA=false` for the whole app): it is recorded against a copy of a base SQLite database built once from the app's migrations, seeders and a user of each type (`php artisan video-demo:sample-database`). The AI reads the routes' middleware, policies and gates and adds or updates the records the flow needs; the app's own database is never used. Only the recorder's browser, with a signed cookie, reaches it.
 

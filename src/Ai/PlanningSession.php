@@ -48,4 +48,9 @@ class PlanningSession
      * The tools for the video's sample database, when it is recorded on sample data.
      */
     public ?SampleDataTools $sampleData = null;
+
+    /**
+     * Looking at the app's pages, when the model may.
+     */
+    public ?PageTools $pages = null;
 }

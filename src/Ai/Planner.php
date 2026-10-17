@@ -43,6 +43,7 @@ class Planner
     {
         $session = new PlanningSession;
         $session->sampleData = $sandbox ? new SampleDataTools($sandbox) : null;
+        $session->pages = PageTools::enabled() ? PageTools::for($video, $sandbox) : null;
         // A new plan is made from the code it reads now.
         $this->code->takeReadFiles();
         $video->update(['source_files' => null]);
@@ -116,7 +117,7 @@ class Planner
         $maxTurns = (int) config('video-demo.limits.max_turns', 30);
         $maxCost = $video->spendLimit();
         $driver = $this->drivers->for($video->model);
-        $tools = [...$this->code->definitions(), ...($session->sampleData?->definitions() ?? []), $this->submitTool()];
+        $tools = [...$this->code->definitions(), ...($session->sampleData?->definitions() ?? []), ...($session->pages?->definitions() ?? []), $this->submitTool()];
 
         while ($session->turns < $maxTurns) {
             if ($video->stopRequested()) {
@@ -164,6 +165,17 @@ class Planner
                     } else {
                         $results[] = new ToolOutput($call['id'], $call['name'], $call['input'], $problems ? "The plan was not accepted:\n- ".implode("\n- ", $problems) : 'Submit one plan at a time.', isError: true);
                     }
+
+                    continue;
+                }
+
+                if ($session->pages?->handles($call['name'])) {
+                    try {
+                        $results[] = new ToolOutput($call['id'], $call['name'], $call['input'], $session->pages->run($call['input']));
+                    } catch (RuntimeException $e) {
+                        $results[] = new ToolOutput($call['id'], $call['name'], $call['input'], $e->getMessage(), isError: true);
+                    }
+                    $video->addLog($session->pages->describe($call['input']));
 
                     continue;
                 }
@@ -424,6 +436,39 @@ class Planner
      * Get the system prompt for planning.
      */
     protected function systemPrompt(): string
+    {
+        return $this->basePrompt().$this->pagesPrompt().$this->frontendPrompt();
+    }
+
+    /**
+     * Tell the model when to look at a page instead of guessing a label.
+     */
+    protected function pagesPrompt(): string
+    {
+        if (! PageTools::enabled()) {
+            return '';
+        }
+
+        return "\n\nWhen the code doesn't settle what a page shows, such as a label from a translation key, a component or the database, look at the page with look_at_page instead of guessing: a wrong label fails the recording. Don't look at pages whose labels the code already makes clear. Pages reached only by submitting a form can't be opened by their path.";
+    }
+
+    /**
+     * Tell the model the pages are a separate frontend, when they are: its
+     * paths come from its own router, not Laravel's routes.
+     */
+    protected function frontendPrompt(): string
+    {
+        if (! config('video-demo.frontend.url')) {
+            return '';
+        }
+
+        return "\n\nThis app's pages are a separate frontend (a single-page app), and the Laravel code you can read is its API. goto paths are the frontend's own page paths, from its router, not Laravel's routes, which are API endpoints. Read the API's controllers and validation to learn what the pages send and get back. The frontend's source isn't readable here, so take page paths from the developer's description, and labels from looking at the pages (look_at_page) or from the page contents the recorder returns when a step fails.";
+    }
+
+    /**
+     * Get the system prompt for planning any app.
+     */
+    protected function basePrompt(): string
     {
         return <<<'PROMPT'
         You plan short screen-recorded videos that show people how to use a web app. You have read access to the app's source code, and a recorder that plays your plan in a real browser against the developer's local copy of the app, which has sample data.

@@ -2,6 +2,7 @@
 
 namespace Ogunsakin01\VideoDemo\Jobs;
 
+use Closure;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -53,6 +54,11 @@ class GenerateVideo implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     /**
+     * Logged once when a video is recorded on the app's own data.
+     */
+    protected const NO_REHEARSAL = 'Recording without a rehearsal first: on your own data it would make every change twice';
+
+    /**
      * The number of times the job may be attempted.
      */
     public int $tries = 1;
@@ -83,6 +89,12 @@ class GenerateVideo implements ShouldQueue
      * @var list<array<string, mixed>>
      */
     protected array $appErrors = [];
+
+    /**
+     * The errors the app reported during the last rehearsal that failed, kept
+     * from its copy of the sample database for the video's full error view.
+     */
+    protected array $rehearsalErrors = [];
 
     /**
      * Execute the job.
@@ -180,18 +192,23 @@ class GenerateVideo implements ShouldQueue
                     continue;
                 }
 
-                // A voice that can't speak the video's language would read it out wrongly.
-                if ($clips !== null && ! $video->hasVoiceOver()) {
-                    $video->addLog(sprintf("%s doesn't speak %s, so the video is made without a voice-over. Choose a voice that does.", Voices::label($video->voice), Language::name($video->languageCode())));
-                    $clips = null;
+                // A step that doesn't work is found by a quick rehearsal, before the
+                // voice-over is paid for or anything is recorded, while the AI can still fix it.
+                $failure = $this->rehearse($recorder, $video, $plan, $devices, $sandbox, $shouldStop, canRepair: $session !== null && $session->repairs < $maxRepairs);
+
+                if (! $failure) {
+                    // A voice that can't speak the video's language would read it out wrongly.
+                    if ($clips !== null && ! $video->hasVoiceOver()) {
+                        $video->addLog(sprintf("%s doesn't speak %s, so the video is made without a voice-over. Choose a voice that does.", Voices::label($video->voice), Language::name($video->languageCode())));
+                        $clips = null;
+                    }
+                    [$plan, $clips] = $clips !== null ? $this->voiceOver($video, $plan, $narrator, $speaker) : [$plan->withoutVoice(), null];
+                    $plan = $plan->fitTo(min($video->target_seconds, (int) config('video-demo.limits.max_seconds', 300)), $video->playbackSpeed());
+                    $video->update(['plan' => $plan->toArray()]);
                 }
-                [$plan, $clips] = $clips !== null ? $this->voiceOver($video, $plan, $narrator, $speaker) : [$plan->withoutVoice(), null];
-                $plan = $plan->fitTo(min($video->target_seconds, (int) config('video-demo.limits.max_seconds', 300)), $video->playbackSpeed());
-                $video->update(['plan' => $plan->toArray()]);
 
                 $results = [];
-                $failure = null;
-                foreach ($devices as $device) {
+                foreach ($failure ? [] : $devices as $device) {
                     $this->stopIfAsked($video);
                     $video->moveTo(VideoStatus::Recording, 'Recording the '.Devices::get($device)['label'].' version');
                     // The style's end card goes after the last step; the plan itself keeps without it.
@@ -233,7 +250,7 @@ class GenerateVideo implements ShouldQueue
 
             return;
         } finally {
-            $this->appErrors = $sandbox?->appErrors() ?? [];
+            $this->appErrors = [...$this->rehearsalErrors, ...($sandbox?->appErrors() ?? [])];
             $sandbox?->delete();
             $recorder->sandbox = null;
             $recorder->locale = null;
@@ -426,6 +443,57 @@ class GenerateVideo implements ShouldQueue
         $video->addLog(Language::same($found, $made)
             ? sprintf('The pages are in %s, so the video is made in %s', Language::name($found), Language::name($made))
             : sprintf('The pages are in %s; the video is made in %s, as chosen', Language::name($found), Language::name($made)));
+    }
+
+    /**
+     * Play the plan on every version without recording, as fast as it goes,
+     * so a step that doesn't work (a label the AI guessed wrong, a button
+     * that isn't there) goes back to the AI before anything is recorded. It
+     * runs on a copy of the sample database, so the recording starts from the
+     * same data. On the app's own data it is skipped: it would make every
+     * change twice. So is a plan the AI can't fix any more, such as one
+     * recorded again as it was, which is recorded as before. It costs no AI.
+     *
+     * @param  list<string>  $devices
+     */
+    protected function rehearse(Recorder $recorder, Video $video, Plan $plan, array $devices, ?Sandbox $sandbox, Closure $shouldStop, bool $canRepair): ?RecordingResult
+    {
+        $this->rehearsalErrors = [];
+        if (! $canRepair || ! config('video-demo.recorder.rehearse', true) || ! $plan->hasActions()) {
+            return null;
+        }
+        if (! $sandbox) {
+            if (! collect($video->log ?? [])->contains('message', self::NO_REHEARSAL)) {
+                $video->addLog(self::NO_REHEARSAL);
+            }
+
+            return null;
+        }
+
+        $video->moveTo(VideoStatus::Recording, 'Rehearsing the plan');
+        // The last failed rehearsal's screenshot is kept until now, for the video's full error view.
+        File::deleteDirectory(Recorder::workDir($video->workPath('rehearsal')));
+        foreach ($devices as $device) {
+            $this->stopIfAsked($video);
+            $copy = $sandbox->copy();
+            $recorder->sandbox = $copy;
+            $dir = Recorder::workDir($video->workPath("rehearsal/$device"));
+            try {
+                $run = $recorder->verify($plan, $dir, $video->style ?? [], $device, $video->record_as, $shouldStop);
+                if (! $run->ok) {
+                    $this->rehearsalErrors = $copy->appErrors();
+                    $video->addLog('Rehearsal: '.$run->summary());
+
+                    return $run;
+                }
+                File::deleteDirectory($dir);
+            } finally {
+                $recorder->sandbox = $sandbox;
+                $copy->delete();
+            }
+        }
+
+        return null;
     }
 
     /**

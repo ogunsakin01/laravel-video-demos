@@ -2,6 +2,23 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/). While the version is 0.x, minor releases may include breaking changes; they will be listed here.
 
+## v0.18.0 - 2026-10-18
+
+### Added
+
+- **Plans are rehearsed before they are recorded.** Once the pages pass their check, the plan is played on every screen as fast as it goes, without recording, on a copy of the sample database. A step that doesn't work, such as a field the AI named "Title" when the page says "Job title", goes back to the AI before the voice-over is made or anything is recorded. A failed rehearsal counts as one of the video's repairs (`limits.max_repairs`). It costs no AI and takes a few seconds. Videos on your own data aren't rehearsed, as it would make every change twice, and neither are plans recorded again as they were. `VIDEO_DEMO_REHEARSE=false` turns it off.
+- **The AI can look at a page while it plans**, when the code doesn't settle a label: a translation key, a component, text from the database, or a separate frontend's page. It opens the page as the video's user and sees its headings, links, buttons and field labels, with secrets hidden. Each look costs about a cent, so it looks only when needed, at most three times per video (`VIDEO_DEMO_PAGE_LOOKS`, 0 turns it off).
+- **Apps with a separate frontend.** For a Vue, React or other frontend on its own address that uses the Laravel app as its API, set `VIDEO_DEMO_FRONTEND_URL`. Videos are then recorded on the frontend's pages, while signing in and sample data still go through the Laravel app.
+  - **Signing in with any kind of auth:** `VIDEO_DEMO_SIGN_IN` is `session` (the default, also right for Sanctum's cookie-based SPA sign-in), `sanctum-token` or `jwt` (a token made by the app and put in the frontend's `localStorage` under `VIDEO_DEMO_TOKEN_KEY`), or `custom`, with `VideoDemo::signInUsing(fn ($user) => SignIn::header(...)->withCookie(...)->withLocalStorage(...))` for anything else, including Passport and the app's own session after SSO. Sign-in comes from a signed link that only exists while the studio is enabled. On sample data, tokens are made in the video's own database; Sanctum tokens expire after an hour, and the recorder's expired ones are removed.
+  - **Sample data across addresses:** the frontend's requests to the app, and through its own address (a dev-server proxy such as Vite's `/api`), carry a signed header the recorder adds, so they reach the video's sample database without any CORS changes.
+  - **Page checks for single-page apps:** before any AI is spent, a page is reported when a request it makes to the app fails with a server error, or is refused (401, 403) for the signed-in user, with Laravel's message, or when the frontend sends the browser to its own sign-in page.
+  - **A change the app refuses fails the step that sent it:** a POST, PUT, PATCH or DELETE the app answers with a 4xx (a 422 for a field left empty, a 403, a 419) fails that step with Laravel's message, so the AI fixes the plan instead of the video being made showing the error. Reading data (GET), Laravel Precognition's live validation, broadcasting sign-in, and a guest's 401 are left alone. A step that fails for another reason says what the app refused just before, such as "Meanwhile, the app refused a request: POST /api/jobs returned HTTP 419: CSRF token mismatch."
+  - Without `VIDEO_DEMO_FRONTEND_URL`, nothing changes.
+
+### Fixed
+
+- **Text boxes found by their label.** A step aimed at an element by its role and label (or placeholder), with no name, such as a text box labelled "Location", used the first element of that role on the page, so typing could go into the wrong field. It now uses the element of that role the label belongs to, and only falls back to the first one when the page has no such label.
+
 ## v0.17.12 - 2026-10-17
 
 ### Added

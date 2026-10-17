@@ -9,6 +9,7 @@ use Ogunsakin01\VideoDemo\Ai\PlanningFailed;
 use Ogunsakin01\VideoDemo\Ai\VideoStopped;
 use Ogunsakin01\VideoDemo\Enums\VideoStatus;
 use Ogunsakin01\VideoDemo\Models\Video;
+use Ogunsakin01\VideoDemo\Recording\Recorder;
 use Ogunsakin01\VideoDemo\Recording\RecordingResult;
 use Ogunsakin01\VideoDemo\Tests\Concerns\FakesAnthropic;
 
@@ -97,7 +98,7 @@ class PlannerTest extends TestCase
         $this->assertSame(['type' => 'adaptive'], $first['body']['thinking']);
         $this->assertSame('high', $first['body']['output_config']['effort']);
         $this->assertSame(['type' => 'ephemeral'], $first['body']['cache_control']);
-        $this->assertSame(['list_files', 'read_file', 'search_code', 'submit_plan'], array_column($first['body']['tools'], 'name'));
+        $this->assertSame(['list_files', 'read_file', 'search_code', 'look_at_page', 'submit_plan'], array_column($first['body']['tools'], 'name'));
         $this->assertTrue($first['body']['tools'][3]['strict']);
         $this->assertArrayHasKey('input_schema', $first['body']['tools'][3]);
         $this->assertStringContainsString('How a recruiter posts a job', $first['body']['messages'][0]['content']);
@@ -139,6 +140,54 @@ class PlannerTest extends TestCase
 
         // The code it read is noted, so video-demo:verify --changed knows the video depends on it.
         $this->assertSame(['resources/views/jobs/create.blade.php'], $video->fresh()->source_files);
+    }
+
+    public function test_looks_at_a_page_when_the_code_doesnt_settle_a_label(): void
+    {
+        $recorder = new class extends Recorder
+        {
+            public array $looked = [];
+
+            public function __construct() {}
+
+            public function lookAtPage(string $path, ?string $recordAs = null, string $device = 'desktop', int $limit = 6000, ?\Closure $shouldStop = null): array
+            {
+                $this->looked[] = [$path, $recordAs, $device];
+
+                return ['ok' => true, 'url' => "http://localhost$path", 'title' => 'Post a job', 'status' => 200, 'error' => null,
+                    'snapshot' => "- heading \"Post a job\"\n- textbox \"Job title\"\n- text: Staging key sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123"];
+            }
+        };
+        $this->app->instance(Recorder::class, $recorder);
+        config(['video-demo.limits.page_looks' => 1]);
+        $look = fn ($id, $path) => ['type' => 'tool_use', 'id' => $id, 'name' => 'look_at_page', 'input' => ['path' => $path]];
+        $this->respond(1, [$look('tu_look', '/jobs/create')]);
+        $this->respond(2, [$look('tu_again', '/jobs')]);
+        $this->respond(3, [$this->submit('tu_plan', [$this->step('goto', ['url' => '/jobs/create'])])]);
+        $video = $this->video();
+        $video->update(['record_as' => 'guest', 'devices' => ['mobile']]);
+
+        app(Planner::class)->plan($video);
+
+        // Told when to look, rather than guess.
+        $this->assertStringContainsString('look at the page with look_at_page instead of guessing', json_encode($this->request(1)['body']['system']));
+        // It sees the page as the video's user on its screen, with secrets hidden.
+        $this->assertSame([['/jobs/create', 'guest', 'mobile']], $recorder->looked);
+        $seen = end($this->request(2)['body']['messages'])['content'][0];
+        $this->assertStringContainsString('textbox "Job title"', $seen['content']);
+        $this->assertStringContainsString('[redacted: Anthropic API key]', $seen['content']);
+        $this->assertStringNotContainsString('sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123', $seen['content']);
+        // Only as often as allowed.
+        $refused = end($this->request(3)['body']['messages'])['content'][0];
+        $this->assertTrue($refused['is_error']);
+        $this->assertStringContainsString('You have looked at 1 pages, the most for one video.', $refused['content']);
+        $this->assertContains('Looked at /jobs/create', collect($video->fresh()->log)->pluck('message'));
+
+        // Turned off, the tool isn't offered.
+        config(['video-demo.limits.page_looks' => 0]);
+        $this->respond(4, [$this->submit('tu_plan2', [$this->step('goto', ['url' => '/jobs/create'])])]);
+        app(Planner::class)->plan($this->video());
+        $this->assertNotContains('look_at_page', array_column($this->request(4)['body']['tools'], 'name'));
     }
 
     public function test_sends_plain_requests_for_models_without_fallbacks(): void

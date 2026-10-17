@@ -35,7 +35,8 @@ php artisan video-demo:publish post-a-job            # --unpublish takes it out 
 - Styles: `clean`, `quick`, `detailed`, `showcase`, `ad`, `spotlight`, `promo`, or any added on the studio's Styles page. Versions: `desktop`, `tv`, `tablet`, `mobile`.
 - `--as` records as a type of user (from the app's roles, or `video-demo.recorder.user_types`), `guest` for signed out, or a user id or email. The default is `VIDEO_DEMO_LOGIN_AS`.
 - Videos are recorded on a temporary sample database by default (`--sample-data`), a copy built from the app's migrations and seeders where the AI adds the records a page needs. The app's own data isn't touched.
-- Pages are opened and checked before any AI is spent. Broken ones (an HTTP error, a redirect to sign-in, a JavaScript error) come back under `issues` with Laravel's error. Fix the cause in the app (seed data, a missing user, a bug) and run it again.
+- The AI reads the code, and looks at a page when the code doesn't settle a label (up to 3 times, `VIDEO_DEMO_PAGE_LOOKS`). On sample data the plan is then rehearsed without recording, so a step that doesn't work is fixed before anything is recorded (`VIDEO_DEMO_REHEARSE`).
+- Pages are opened and checked before any AI is spent. Broken ones (an HTTP error, a redirect to sign-in, a JavaScript error, or for a separate frontend a request to the API that fails) come back under `issues` with Laravel's error. Fix the cause in the app (seed data, a missing user, a bug) and run it again.
 - When `generate` fails, the JSON `error` names the step, usually an element it couldn't find. Fix the app or the plan, then run it again.
 
 From PHP, use the facade:
@@ -75,6 +76,27 @@ Production reads `manifest.json` and the files from `VIDEO_DEMO_DISK`. The machi
 - `VIDEO_DEMO_DISK=s3` (S3, R2…) with the same bucket settings in both `.env` files. Public videos need a bucket browsers can read.
 - `VIDEO_DEMO_DISK=video-demo-repo` keeps them in `public/video-demo`: commit that folder and they deploy with the code.
 - The default, `public`, stays on the machine that published, so production's library would be empty.
+
+## A separate frontend
+
+For a Vue, React or other frontend on its own address that uses this app as its API:
+
+```dotenv
+VIDEO_DEMO_FRONTEND_URL=http://localhost:5173   # where videos are recorded
+VIDEO_DEMO_SIGN_IN=sanctum-token                # session (default, also Sanctum cookie sign-in), sanctum-token, jwt or custom
+VIDEO_DEMO_TOKEN_KEY=token                      # the localStorage key the frontend reads its token from
+```
+
+For any other sign-in (Passport, headers, sessionStorage, the app's own session after SSO), set `custom` and register it:
+
+```php
+use Ogunsakin01\VideoDemo\Facades\VideoDemo;
+use Ogunsakin01\VideoDemo\Recording\SignIn;
+
+VideoDemo::signInUsing(fn ($user) => SignIn::header('Authorization', 'Bearer '.$user->createToken('video-demo')->accessToken));
+```
+
+`APP_URL` stays this app's address. The AI can't read the frontend's source yet: describe flows with its page paths, and it looks at the pages for their labels. The frontend must call the API at `APP_URL` (or through its own address, such as Vite's `/api` proxy): only those requests reach the sample database. A change a step sends (POST, PUT, PATCH, DELETE) that the app refuses with a 4xx fails that step with Laravel's message.
 
 ## After UI changes
 

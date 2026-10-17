@@ -12,6 +12,7 @@ use Ogunsakin01\VideoDemo\Recording\Encoder;
 use Ogunsakin01\VideoDemo\Recording\Exporter;
 use Ogunsakin01\VideoDemo\Recording\Plan;
 use Ogunsakin01\VideoDemo\Recording\Recorder;
+use Ogunsakin01\VideoDemo\SampleData\Sandbox;
 
 /**
  * Records a real video of tests/fixtures/app. Needs Playwright and ffmpeg, so it
@@ -56,6 +57,11 @@ class RecorderTest extends TestCase
     public function test_finds_sections_and_shows_the_video_in_one_that_fits(): void
     {
         $recorder = new Recorder;
+        // What the AI sees when it looks at a page of an ordinary, server-rendered app.
+        $page = $recorder->lookAtPage('/index.html');
+        $this->assertTrue($page['ok'], (string) $page['error']);
+        $this->assertStringContainsString('heading "Post a job"', $page['snapshot']);
+
         $map = $recorder->mapPages(['/index.html', '/spots.html']);
 
         $sections = collect($map['pages'][0]['sections'])->keyBy('kind');
@@ -301,6 +307,94 @@ class RecorderTest extends TestCase
             $this->assertSame(500, collect($result->browserLog)->firstWhere('kind', 'response')['status']);
         } finally {
             $server->stop();
+        }
+    }
+
+    public function test_records_a_separate_frontend_signed_in_with_a_token_on_sample_data(): void
+    {
+        $apiPort = $this->freePort();
+        $api = Process::path(__DIR__.'/fixtures')->start(['php', '-S', "127.0.0.1:$apiPort", 'api-router.php']);
+        $spaPort = $this->freePort();
+        $spa = Process::path(__DIR__.'/fixtures')->env(['API_URL' => "http://127.0.0.1:$apiPort"])->start(['php', '-S', "127.0.0.1:$spaPort", 'spa-router.php']);
+
+        try {
+            $this->waitForServer($apiPort);
+            $this->waitForServer($spaPort);
+            config([
+                'video-demo.recorder.base_url' => "http://127.0.0.1:$apiPort",
+                'video-demo.frontend.url' => "http://127.0.0.1:$spaPort",
+                'video-demo.frontend.sign_in' => 'custom',
+            ]);
+            // Signed in through the package's link, on a sample database.
+            $recorder = fn (?string $link) => tap(new class($link) extends Recorder
+            {
+                public function __construct(protected ?string $link) {}
+
+                protected function loginPath(?string $recordAs, string $route = 'video-demo.studio.recorder-login'): ?string
+                {
+                    return $this->link;
+                }
+            }, fn ($r) => $r->sandbox = new Sandbox(sys_get_temp_dir().'/5-abcdefghijkl.sqlite'));
+
+            // The token reaches the frontend's storage, and the headers its requests to the app,
+            // so the dashboard works; a request that fails on the server is found before any AI is spent.
+            $problems = collect($recorder('/video-demo/studio/_recorder/sign-in/1')->checkPages(['/', '/reports']))->keyBy('path');
+            $this->assertSame(['/reports'], $problems->keys()->all());
+            $this->assertSame('A request to the app failed', $problems['/reports']['problem']);
+            $this->assertSame('GET /api/reports returned HTTP 500: Undefined variable $total', $problems['/reports']['detail']);
+
+            // Signed out, the frontend sends the browser to its sign-in page itself.
+            $problems = $recorder(null)->checkPages(['/'], 'guest');
+            $this->assertSame('It needs signing in, but the video is recorded as a guest', $problems[0]['problem']);
+
+            $result = $recorder('/video-demo/studio/_recorder/sign-in/1')->record(new Plan('x', 'x', [
+                $this->step('goto', ['url' => '/']),
+                $this->step('click', ['target' => ['role' => 'button', 'name' => 'Signed in as Sample Ada']]),
+                // A label the page doesn't have leaves the first of the role, as before.
+                $this->step('click', ['target' => ['role' => 'button', 'label' => 'Account']]),
+            ]), $this->out, [], 'desktop', 'admin');
+            $this->assertTrue($result->ok, (string) $result->error);
+
+            // The AI can look at a page while it plans, signed in, and sees its labels.
+            $page = $recorder('/video-demo/studio/_recorder/sign-in/1')->lookAtPage('/', 'admin');
+            $this->assertTrue($page['ok'], (string) $page['error']);
+            $this->assertStringContainsString('button "Signed in as Sample Ada"', $page['snapshot']);
+            $this->assertStringContainsString('textbox "Job title"', $recorder('/video-demo/studio/_recorder/sign-in/1')->lookAtPage('/jobs/new', 'admin')['snapshot']);
+
+            // A text box named by its label, among several, is the right one.
+            $publish = fn (array $fields) => $recorder('/video-demo/studio/_recorder/sign-in/1')->record(new Plan('x', 'x', [
+                $this->step('goto', ['url' => '/jobs/new']),
+                ...$fields,
+                $this->step('click', ['target' => ['role' => 'button', 'name' => 'Publish job']]),
+                $this->step('wait', ['target' => ['text' => 'Published']]),
+            ]), $this->out, [], 'desktop', 'admin');
+            $result = $publish([
+                $this->step('type', ['target' => ['role' => 'textbox', 'label' => 'Job title'], 'value' => 'Head of Support']),
+                $this->step('type', ['target' => ['role' => 'textbox', 'label' => 'Location'], 'value' => 'Accra']),
+            ]);
+            $this->assertTrue($result->ok, (string) $result->error);
+
+            // An optional endpoint's 404 and live validation's 422 while typing don't fail anything.
+            $this->assertSame([], $recorder('/video-demo/studio/_recorder/sign-in/1')->checkPages(['/jobs/new'], 'admin'));
+
+            // The app refusing what a step sent fails that step, so the video isn't made showing it.
+            $result = $publish([$this->step('type', ['target' => ['role' => 'textbox', 'label' => 'Job title'], 'value' => 'Head of Support'])]);
+            $this->assertSame(3, $result->failedStep);
+            $this->assertStringContainsString('The app refused a request: POST /api/jobs returned HTTP 422: The location field is required.', (string) $result->error);
+            $this->assertStringNotContainsString('..', (string) $result->error);
+
+            // A step that waits in vain says what the app refused just before.
+            $result = $recorder('/video-demo/studio/_recorder/sign-in/1')->record(new Plan('x', 'x', [
+                $this->step('goto', ['url' => '/save']),
+                $this->step('click', ['target' => ['role' => 'button', 'name' => 'Save']]),
+                $this->step('wait', ['target' => ['text' => 'Saved'], 'ms' => 1000]),
+            ]), $this->out, [], 'desktop', 'admin');
+            $this->assertFalse($result->ok);
+            $this->assertSame(2, $result->failedStep);
+            $this->assertStringContainsString('The app refused a request: POST /api/save returned HTTP 419: CSRF token mismatch.', (string) $result->error);
+        } finally {
+            $api->stop();
+            $spa->stop();
         }
     }
 

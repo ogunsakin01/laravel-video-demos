@@ -258,6 +258,15 @@ final class Plan
     }
 
     /**
+     * Determine if the plan does anything in the app, beyond captions, cards
+     * and pauses, so there is something to rehearse.
+     */
+    public function hasActions(): bool
+    {
+        return collect($this->steps)->contains(fn ($step) => ! $this->isFlexible($step));
+    }
+
+    /**
      * Determine if a step's length can change to fit the target length.
      */
     protected function isFlexible(array $step): bool

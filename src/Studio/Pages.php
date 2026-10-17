@@ -38,6 +38,11 @@ class Pages
      */
     public function candidates(): array
     {
+        // A separate frontend's pages aren't Laravel routes, which are its API.
+        if (config('video-demo.frontend.url')) {
+            return [];
+        }
+
         $paths = [];
         foreach (Router::getRoutes()->getRoutes() as $route) {
             /** @var Route $route */

@@ -57,9 +57,11 @@ async function wide(page) {
   focus.push({ t: Date.now() - started, wide: true });
   if (style.highlight) await page.evaluate(() => window.__demoHighlight && window.__demoHighlight.hide()).catch(() => {});
 }
-const SNAPSHOT_LIMIT = 12000;
 
 const url = p => browserKit.url(job, p);
+
+// End text with a full stop unless it already ends a sentence.
+const sentence = text => (/[.!?]$/.test(text) ? text : text + '.');
 
 // Build a locator for a plan target, inside an iframe when target.frame is set.
 function locate(page, t) {
@@ -81,12 +83,29 @@ function describe(t) {
   return Object.entries(t).filter(([, v]) => v).map(([k, v]) => `${k} "${v}"`).join(', ');
 }
 
+// For a role without a name but with a label or placeholder, the element of
+// that role the label or placeholder belongs to, then one named by it; when the
+// page has neither, the first of that role, as before.
+function narrowed(page, t) {
+  if (!t.role || t.name || !(t.label || t.placeholder)) return [];
+  const scope = t.frame ? page.frameLocator(t.frame).first() : page;
+  const byRole = scope.getByRole(t.role);
+  return [
+    byRole.and(t.label ? scope.getByLabel(t.label) : scope.getByPlaceholder(t.placeholder)),
+    scope.getByRole(t.role, { name: t.label || t.placeholder }),
+  ].map(loc => loc.filter({ visible: true }).first());
+}
+
 async function find(page, t) {
   const loc = locate(page, t);
   try {
     await waiting(() => loc.waitFor({ state: 'visible', timeout: FIND_TIMEOUT }));
   } catch {
     throw new Error(`Could not find a visible element with ${describe(t)}.`);
+  }
+  // Otherwise "the first text box" may be the wrong field of a form.
+  for (const better of narrowed(page, t)) {
+    if (await better.count().catch(() => 0)) return better;
   }
   return loc;
 }
@@ -108,7 +127,7 @@ async function run(page, step, isLast) {
       await waiting(() => page.goto(url(step.url), { waitUntil: 'domcontentloaded', timeout: 60000 }));
       await settle(page);
       if (browserKit.isSignIn(page.url()) && !browserKit.isSignIn(url(step.url))) {
-        throw new Error(`Opening ${step.url} went to the sign-in page instead. ${job.loginPath ? "The recorder's user may not have access." : 'The recorder is signed out; set video-demo.recorder.login_as.'}`);
+        throw new Error(`Opening ${step.url} went to the sign-in page instead. ${job.loginPath || job.signInPath ? "The recorder's user may not have access." : 'The recorder is signed out; set video-demo.recorder.login_as.'}`);
       }
       // Time to take in the new page before anything moves.
       await pause(page, 1100 + extra);
@@ -212,33 +231,6 @@ async function run(page, step, isLast) {
   }
 }
 
-// Describe what was on the page when a step failed, so the AI model can fix the plan.
-async function snapshot(page) {
-  let tree = '';
-  try {
-    tree = await page.locator('body').ariaSnapshot({ timeout: 3000 });
-  } catch {}
-
-  // Add the page's iframes and what's inside them, so the AI model can target
-  // fields in embedded forms (payment card fields, sign-in widgets) with target.frame.
-  try {
-    const frames = await page.locator('iframe').evaluateAll(els => els.map(f => ({
-      title: f.getAttribute('title'), name: f.getAttribute('name'), id: f.id,
-      src: (f.getAttribute('src') || '').slice(0, 120), visible: f.getBoundingClientRect().height > 0,
-    })));
-    const shown = frames.map((f, i) => ({ ...f, i })).filter(f => f.visible).slice(0, 5);
-    for (const f of shown) {
-      const selector = f.title ? `iframe[title="${f.title}"]` : f.name ? `iframe[name="${f.name}"]` : f.id ? `iframe#${f.id}` : `iframe >> nth=${f.i}`;
-      let inside = '';
-      try {
-        inside = await page.frameLocator(`iframe >> nth=${f.i}`).locator('body').ariaSnapshot({ timeout: 3000 });
-      } catch {}
-      tree += `\n\n- iframe (target.frame: ${selector})${f.src ? ` src=${f.src}` : ''}:\n` + inside.split('\n').map(l => '  ' + l).join('\n');
-    }
-  } catch {}
-
-  return tree.length > SNAPSHOT_LIMIT ? tree.slice(0, SNAPSHOT_LIMIT) + '\n… cut' : tree;
-}
 
 (async () => {
   // starts: when each step began, in ms since recording started, so voice-over lines can be placed.
@@ -259,7 +251,7 @@ async function snapshot(page) {
 
     // Sign in first, outside the recording.
     let storageState;
-    if (job.loginPath) {
+    if (job.loginPath || job.signInPath) {
       const ctx = await browserKit.newContext(browser, job, job, theme);
       await browserKit.signIn(ctx, job);
       storageState = await ctx.storageState();
@@ -294,8 +286,40 @@ async function snapshot(page) {
     // Errors from the app itself: a step that fails after one of these is a
     // bug in the app, not something a better plan can fix.
     const appErrors = [];
-    page.on('response', r => {
-      if (r.status() >= 500 && r.request().isNavigationRequest()) appErrors.push({ kind: 'server', status: r.status(), url: r.url(), at: Date.now() });
+    // A separate frontend's requests the app refused (a 419 CSRF mismatch, a
+    // 403, a 422 for a field left empty): changes it sent that didn't happen,
+    // which the video would show failing. Reading data (GET) is left alone, as
+    // an optional endpoint may answer 404.
+    const appRefusals = [];
+    const sentAt = new WeakMap();
+    page.on('request', r => sentAt.set(r, Date.now()));
+    const guest = !job.signInPath && !job.loginPath;
+    // Fail on the app's refusals, blaming the step that sent the request. The
+    // responses are given a moment to arrive, longer after the last step.
+    async function checkRefusals(wait) {
+      await waiting(() => page.waitForTimeout(wait));
+      const refused = appRefusals.filter(a => !a.reported);
+      if (!refused.length) return;
+      await Promise.all(refused.map(a => a.done));
+      refused.forEach(a => { a.reported = true; });
+      const sent = Math.min(...refused.map(a => a.sent)) - started;
+      const error = new Error(`The app refused ${refused.length === 1 ? 'a request' : refused.length + ' requests'}: ${sentence(refused.slice(-3).map(a => a.text).join(' · '))}`);
+      error.step = Math.max(0, result.starts.filter(s => s <= sent).length - 1);
+      throw error;
+    }
+    page.on('response', async r => {
+      // A separate frontend's pages load their data from the app, so its errors count too.
+      const fromApp = browserKit.toApp(job, r.url()) || browserKit.isAppCall(job, r.request());
+      if (fromApp && r.status() >= 400 && r.status() < 500 && r.request().method() !== 'GET' && browserKit.isAppCall(job, r.request()) && !(r.status() === 401 && guest)) {
+        const refusal = { sent: sentAt.get(r.request()) ?? Date.now(), status: r.status(), text: '' };
+        refusal.done = browserKit.describeAppError(r).then(text => { refusal.text = text; });
+        appRefusals.push(refusal);
+      }
+      if (r.status() >= 500 && (r.request().isNavigationRequest() || fromApp)) {
+        const error = { kind: 'server', status: r.status(), url: r.url(), at: Date.now() };
+        appErrors.push(error);
+        if (fromApp) error.message = await browserKit.describeAppError(r);
+      }
     });
     page.on('pageerror', e => appErrors.push({ kind: 'javascript', message: String(e.message || e).split('\n')[0], url: page.url(), at: Date.now() }));
     page.on('pageerror', e => log('exception', e.stack || e.message || e, { url: page.url() }));
@@ -315,14 +339,25 @@ async function snapshot(page) {
         // A step with a spoken line lasts until the line is finished.
         const left = (step.hold_ms || 0) - (Date.now() - stepStarted);
         if (left > 0) await pause(page, left);
+        // On a separate frontend, the app refusing a change a step sent means the
+        // video would show it failing. Captions, cards and pauses send nothing,
+        // but the last step waits for any late answers.
+        const last = i === plan.steps.length - 1;
+        if (job.frontendUrl && (last || !['caption', 'card', 'pause'].includes(step.action))) await checkRefusals(last ? 1500 : 300);
       } catch (e) {
-        result.failedStep = i + 1;
+        result.failedStep = (e.step ?? i) + 1;
         result.error = String(e.message || e).split('\n')[0];
+        // Since the step before this one, which may have sent what this one waits for.
+        const since = started + (result.starts[Math.max(0, i - 1)] ?? 0);
+        const pending = appRefusals.filter(a => a.sent >= since && !a.reported);
+        await Promise.all(pending.map(a => a.done));
+        const refused = pending.map(a => a.text).filter(Boolean);
+        if (refused.length) result.error += ` Meanwhile, the app refused ${refused.length === 1 ? 'a request' : refused.length + ' requests'}: ${sentence(refused.slice(-3).join(' · '))}`;
         result.errorFull = String(e.message || e).slice(0, 4000);
         result.url = page.url();
         result.screenshot = await page.screenshot({ path: path.join(job.outDir, 'failure.jpg'), type: 'jpeg', quality: 75 }).then(() => path.join(job.outDir, 'failure.jpg')).catch(() => null);
         result.title = await page.title().catch(() => '');
-        result.snapshot = await snapshot(page);
+        result.snapshot = await browserKit.snapshot(page, 12000);
         // A server error or JavaScript error during this step means the app is broken here.
         const appError = appErrors.filter(a => a.at >= stepStarted - 2000).pop();
         if (appError) {

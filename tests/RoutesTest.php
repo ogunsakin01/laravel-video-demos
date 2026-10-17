@@ -24,6 +24,7 @@ class RoutesTest extends TestCase
     {
         $this->assertFalse(Route::has('video-demo.studio.index'));
         $this->assertFalse(Route::has('video-demo.studio.recorder-login'));
+        $this->assertFalse(Route::has('video-demo.studio.recorder-sign-in'));
         $this->assertTrue(Route::has('video-demo.public.index'));
         $this->get('/video-demo/studio')->assertNotFound();
     }

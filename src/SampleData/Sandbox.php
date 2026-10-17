@@ -4,6 +4,7 @@ namespace Ogunsakin01\VideoDemo\SampleData;
 
 use Closure;
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Http\Request;
 use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
@@ -32,6 +33,12 @@ class Sandbox
      * The cookie the recorder's browser sends.
      */
     public const COOKIE = 'video_demo_sandbox';
+
+    /**
+     * The header that does the same as the cookie, which the recorder adds
+     * to requests to this app from a frontend on another address.
+     */
+    public const HEADER = 'X-Video-Demo-Sandbox';
 
     /**
      * The environment variable that points a PHP process at a sandbox.
@@ -251,6 +258,20 @@ class Sandbox
     }
 
     /**
+     * Copy this database as it is now, with the same user, such as for a
+     * rehearsal whose changes the recording mustn't see.
+     */
+    public function copy(): self
+    {
+        $path = static::dir().'/'.Str::before(basename($this->path), '-').'-'.Str::lower(Str::random(12)).'.sqlite';
+        File::copy($this->path, $path);
+        $copy = new self($path);
+        $copy->info = $this->info;
+
+        return $copy;
+    }
+
+    /**
      * Get the id of the user the recorder signs in as, or null for a guest.
      */
     public function userId(): int|string|null
@@ -315,7 +336,8 @@ class Sandbox
      *
      * Called while the app registers its services, before anything reads
      * the database: from the environment in the sample-data command, and
-     * from the recorder's cookie on web requests while the studio is enabled.
+     * from the recorder's cookie (or header, from a separate frontend) on web
+     * requests while the studio is enabled.
      */
     public static function activateFor(Application $app): void
     {
@@ -333,8 +355,7 @@ class Sandbox
             return;
         }
 
-        $value = $app['request']->cookies->get(self::COOKIE);
-        if (is_string($value) && ($path = static::fromCookie($value))) {
+        if ($path = static::fromRequest($app['request'])) {
             static::activate($path);
             static::keepErrors($app, $path);
         }
@@ -376,6 +397,18 @@ class Sandbox
         $errors = array_values(array_filter(array_map(fn ($line) => json_decode($line, true), file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [])));
 
         return array_slice($errors, -$limit);
+    }
+
+    /**
+     * Get the database a request asks for, by the recorder's cookie or, from
+     * a separate frontend, its header. Null when it asks for none, or for one
+     * the package didn't sign.
+     */
+    public static function fromRequest(Request $request): ?string
+    {
+        $value = $request->cookies->get(self::COOKIE) ?? $request->headers->get(self::HEADER);
+
+        return is_string($value) ? static::fromCookie($value) : null;
     }
 
     /**

@@ -66,3 +66,9 @@ Route::middleware(AuthorizeStudio::class)->group(function () {
 Route::get('/_recorder/login/{user}', RecorderLoginController::class)
     ->middleware('signed:relative')
     ->name('recorder-login');
+
+// For a separate frontend, the recorder fetches what its browser needs to be
+// signed in (a token, cookies or headers) from this signed link instead.
+Route::get('/_recorder/sign-in/{user}', [RecorderLoginController::class, 'signIn'])
+    ->middleware('signed:relative')
+    ->name('recorder-sign-in');

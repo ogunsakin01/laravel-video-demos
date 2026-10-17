@@ -9,4 +9,5 @@ This app makes recorded how-to videos of itself. An AI model reads the app's cod
 - After changing views, routes or labels, run `php artisan video-demo:verify --changed=origin/main --json` to find published videos the change broke.
 - Embed with `<x-video-demo::player slug="…" />` and, in a layout, `<x-video-demo::help />`. Both render nothing until the video is published.
 - Production reads videos from `VIDEO_DEMO_DISK`, so the machine that publishes must use the same disk: S3 or R2, or `video-demo-repo` (`public/video-demo`, committed with the code).
+- For a frontend on its own address (Vue, React…) that uses this app as its API, set `VIDEO_DEMO_FRONTEND_URL` and `VIDEO_DEMO_SIGN_IN`; see the skill.
 - `APP_URL` must be the address the app opens at. Outside local, the studio needs a `viewVideoDemoStudio` gate.

@@ -2,6 +2,8 @@
 
 namespace Ogunsakin01\VideoDemo;
 
+use Closure;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Storage;
 use InvalidArgumentException;
@@ -22,6 +24,7 @@ use Ogunsakin01\VideoDemo\Recording\Exporter;
 use Ogunsakin01\VideoDemo\Recording\Plan;
 use Ogunsakin01\VideoDemo\Recording\RecordAs;
 use Ogunsakin01\VideoDemo\Recording\Recorder;
+use Ogunsakin01\VideoDemo\Recording\SignIn;
 use Ogunsakin01\VideoDemo\Recording\Verifier;
 use Ogunsakin01\VideoDemo\Studio\Embeds;
 use Ogunsakin01\VideoDemo\Studio\Pages;
@@ -51,6 +54,24 @@ class VideoDemo
         protected Publisher $publisher,
         protected Manifest $manifest,
     ) {}
+
+    /**
+     * Sign the recorder in to a separate frontend the app's own way, when
+     * video-demo.frontend.sign_in is "custom". The callback gets the user a
+     * video is recorded as and returns what the browser needs:
+     *
+     *     VideoDemo::signInUsing(fn ($user) => SignIn::header('Authorization', 'Bearer '.$user->createToken('video-demo')->accessToken));
+     *
+     * It only runs while the studio is enabled, inside a video's sample
+     * database when it is recorded on one. Each recording signs in again, so
+     * give tokens a short life.
+     *
+     * @param  Closure(Authenticatable): SignIn  $callback
+     */
+    public function signInUsing(Closure $callback): void
+    {
+        SignIn::using($callback);
+    }
 
     /**
      * Create a video and queue it to be made.

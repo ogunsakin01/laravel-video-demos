@@ -136,6 +136,38 @@ class Recorder
     }
 
     /**
+     * Open one page as the given user and describe what is on it (headings,
+     * links, buttons, fields with their labels, text), for the AI model while
+     * it plans. Nothing is recorded, and it costs no AI by itself.
+     *
+     * @return array{ok: bool, url: ?string, title: ?string, status: ?int, snapshot: ?string, error: ?string}
+     */
+    public function lookAtPage(string $path, ?string $recordAs = null, string $device = 'desktop', int $limit = 6000, ?Closure $shouldStop = null): array
+    {
+        $dir = static::workDir(trim(config('video-demo.storage.work_path'), '/').'/checks/'.uniqid('look-'));
+        File::ensureDirectoryExists($dir);
+        File::put("$dir/job.json", json_encode([
+            ...$this->browserSettings(Devices::get($device), $recordAs),
+            'path' => $path,
+            'limit' => $limit,
+            'outDir' => $dir,
+        ], JSON_UNESCAPED_SLASHES));
+
+        try {
+            $output = $this->run(static::script('look.cjs'), "$dir/job.json", 90, $shouldStop);
+            $result = File::exists("$dir/result.json") ? json_decode(File::get("$dir/result.json"), true) : null;
+        } finally {
+            File::deleteDirectory($dir);
+        }
+
+        if (! is_array($result)) {
+            throw static::noResult('Looking at the page', $output);
+        }
+
+        return $result;
+    }
+
+    /**
      * Open each path as the given user and report the ones that don't work.
      *
      * A page fails on an error status, a redirect to sign-in, a JavaScript
@@ -398,8 +430,14 @@ class Recorder
     protected function browserSettings(array $screen, ?string $recordAs): array
     {
         return [
+            // This app: where the recorder signs in, and the API of a separate frontend.
             'baseUrl' => config('video-demo.recorder.base_url'),
-            'loginPath' => $this->loginPath($recordAs),
+            // Where pages open: a separate frontend's address, or this app's.
+            'frontendUrl' => config('video-demo.frontend.url') ?: null,
+            'loginPath' => SignIn::usesTokens() ? null : $this->loginPath($recordAs),
+            'signInPath' => SignIn::usesTokens() ? $this->loginPath($recordAs, 'video-demo.studio.recorder-sign-in') : null,
+            // A frontend's requests to this app reach the sample database through a header.
+            'sandboxHeader' => $this->sandbox && config('video-demo.frontend.url') ? ['name' => Sandbox::HEADER, 'value' => $this->sandbox->cookie()['value']] : null,
             'viewport' => ['width' => $screen['width'], 'height' => $screen['height']],
             'touch' => $screen['touch'],
             'channel' => config('video-demo.recorder.channel'),
@@ -476,9 +514,10 @@ class Recorder
 
     /**
      * Get a signed, short-lived link that signs the recorder in, or null to stay
-     * signed out.
+     * signed out: the login link, or for a separate frontend's tokens the
+     * link the recorder fetches its sign-in from.
      */
-    protected function loginPath(?string $recordAs): ?string
+    protected function loginPath(?string $recordAs, string $route = 'video-demo.studio.recorder-login'): ?string
     {
         // On sample data, the user is the one made in the sample database.
         $id = $this->sandbox ? $this->sandbox->userId() : RecordAs::resolve($recordAs)?->getAuthIdentifier();
@@ -488,7 +527,7 @@ class Recorder
         }
 
         return URL::temporarySignedRoute(
-            'video-demo.studio.recorder-login',
+            $route,
             now()->addMinutes(10),
             ['user' => $id],
             absolute: false,

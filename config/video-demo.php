@@ -210,6 +210,12 @@ return [
         // the browser.
         'max_repairs' => 2,
 
+        // The most pages the AI model may look at while it plans, when the
+        // code doesn't settle a label (a translation, a component, text from
+        // the database, or a separate frontend's pages). Each look costs
+        // about as much as reading a long file. 0 turns looking off.
+        'page_looks' => (int) env('VIDEO_DEMO_PAGE_LOOKS', 3),
+
         // The longest video that can be asked for, in seconds.
         'max_seconds' => 300,
     ],
@@ -279,6 +285,44 @@ return [
         // title cards and pauses keep a readable length at any speed. This is
         // the default for new videos; each video can set its own.
         'speed' => (float) env('VIDEO_DEMO_SPEED', 1),
+
+        // Play each plan once, as fast as it goes and without recording, on
+        // a copy of the sample database before recording it, so a step that
+        // doesn't work goes back to the AI first. It costs no AI and takes a
+        // few seconds. Videos recorded on your own data aren't rehearsed.
+        'rehearse' => (bool) env('VIDEO_DEMO_REHEARSE', true),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Separate Frontend
+    |--------------------------------------------------------------------------
+    |
+    | For a frontend served apart from this Laravel app, such as a Vue or
+    | React app on its own address that uses this app as its API. Videos are
+    | recorded on the frontend's pages; signing in and sample data still go
+    | through this app (recorder.base_url).
+    |
+    | "sign_in" is how the recorder signs in:
+    |   session        this app's login session, also right for Sanctum's
+    |                  cookie-based SPA sign-in (the default)
+    |   sanctum-token  a Sanctum API token, kept in localStorage under token_key
+    |   jwt            a JWT from php-open-source-saver or tymon jwt-auth,
+    |                  kept in localStorage under token_key
+    |   custom         whatever VideoDemo::signInUsing() returns, for anything
+    |                  else (Passport, other storage, headers, cookies)
+    |
+    */
+
+    'frontend' => [
+        // Where the frontend runs, such as http://localhost:5173. Empty when
+        // the pages are this app's own.
+        'url' => env('VIDEO_DEMO_FRONTEND_URL'),
+
+        'sign_in' => env('VIDEO_DEMO_SIGN_IN', 'session'),
+
+        // The localStorage key the frontend reads its token from.
+        'token_key' => env('VIDEO_DEMO_TOKEN_KEY', 'token'),
     ],
 
     /*
