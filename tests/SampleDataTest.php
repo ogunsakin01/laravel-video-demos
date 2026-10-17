@@ -379,6 +379,7 @@ class SampleDataTest extends TestCase
                 ->expectsOutputToContain('Running the package\'s migrations')
                 ->expectsOutputToContain("Recording on sample data won't work until this is fixed")
                 ->expectsOutputToContain('Run this command again after each upgrade')
+                ->expectsOutputToContain('a star on GitHub helps others find it: https://github.com/ogunsakin01/laravel-video-demos')
                 ->assertSuccessful();
             // The config stays in the package: a copy would keep the app on these defaults.
             $this->assertFileDoesNotExist(config_path('video-demo.php'));

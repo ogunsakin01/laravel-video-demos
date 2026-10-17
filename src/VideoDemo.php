@@ -38,6 +38,11 @@ use RuntimeException;
 class VideoDemo
 {
     /**
+     * The package's GitHub repository, where people can star it.
+     */
+    public const GITHUB_URL = 'https://github.com/ogunsakin01/laravel-video-demos';
+
+    /**
      * Create a new VideoDemo instance.
      */
     public function __construct(

@@ -2,6 +2,13 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/). While the version is 0.x, minor releases may include breaking changes; they will be listed here.
 
+## v0.17.12 - 2026-10-17
+
+### Added
+
+- **A Laravel Boost skill.** Apps using Laravel Boost now get a `laravel-video-demos` agent skill when they run `php artisan boost:install` and tick the package. It covers making, fixing, embedding, translating and exporting videos, plan steps, and where published videos are stored. The always-loaded guideline is shorter and points to it. A test keeps both from naming commands, options, methods or styles the package doesn't have.
+- **A one-time note asking for a star.** Once a video has been published, the studio shows a small note: if the package saved you time, a star on GitHub helps other Laravel developers find it. **Star on GitHub** or **Not now** hides it for good in that browser, and nothing is tracked. `video-demo:install` ends with the same line.
+
 ## v0.17.11 - 2026-10-17
 
 ### Added

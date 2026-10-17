@@ -11,6 +11,7 @@ use Ogunsakin01\VideoDemo\Models\Video;
 use Ogunsakin01\VideoDemo\Models\VideoStyle;
 use Ogunsakin01\VideoDemo\SampleData\Sandbox;
 use Ogunsakin01\VideoDemo\Support\PackageConfig;
+use Ogunsakin01\VideoDemo\VideoDemo;
 use Ogunsakin01\VideoDemo\VideoDemoServiceProvider;
 use Ogunsakin01\VideoDemo\Voice\Voices;
 use Throwable;
@@ -161,6 +162,7 @@ class InstallCommand extends Command
 
         $this->newLine();
         $this->components->info('Next: set ANTHROPIC_API_KEY (or another provider\'s key) and VIDEO_DEMO_LOGIN_AS in .env, start a worker with php artisan queue:work video-demo, and open /'.trim(config('video-demo.studio.prefix'), '/').'. Run this command again after each upgrade.');
+        $this->line('  If it saves you time, a star on GitHub helps others find it: '.VideoDemo::GITHUB_URL);
 
         return self::SUCCESS;
     }

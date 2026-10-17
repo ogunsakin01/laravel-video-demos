@@ -415,6 +415,10 @@
   .vd-flash { padding: 12px 16px; border-radius: var(--vd-radius); margin-bottom: 16px; background: var(--vd-card); border: 1px solid var(--vd-border); box-shadow: var(--vd-shadow); }
   .vd-flash-error { background: var(--vd-bad-bg); border-color: transparent; color: var(--vd-bad); }
   .vd-flash-warn { background: var(--vd-warn-bg); border-color: transparent; color: var(--vd-warn); }
+  .vd-star { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .vd-star[hidden] { display: none; }
+  .vd-star > span:first-child { flex: 1 1 280px; }
+  .vd-star-actions { display: flex; gap: 8px; }
   .vd-lost { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
   .vd-lost span { flex: 1 1 280px; }
 

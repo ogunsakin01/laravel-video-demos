@@ -64,6 +64,9 @@
   @if ($queueWarning)
     <div class="vd-flash vd-flash-warn" role="status">{{ $queueWarning }}</div>
   @endif
+  @if ($video->isPublished())
+    @include('video-demo::studio.partials.star')
+  @endif
 
   @if (! empty($video->issues))
     <div class="vd-flash vd-flash-error vd-stack-sm" role="alert" id="vd-issues">

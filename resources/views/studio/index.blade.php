@@ -21,6 +21,7 @@
   @if ($queueWarning)
     <div class="vd-flash vd-flash-warn" role="status">{{ $queueWarning }}</div>
   @endif
+  @include('video-demo::studio.partials.star')
   @if ($lost !== [])
     <div class="vd-flash vd-flash-warn vd-lost" role="status">
       <span>

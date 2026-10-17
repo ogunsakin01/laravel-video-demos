@@ -83,6 +83,20 @@ class MakeAgainTest extends TestCase
         $this->assertSame([60, 'Queued to record the same plan again'], [$video->fresh()->target_seconds, collect($video->fresh()->log)->last()['message']]);
     }
 
+    public function test_a_star_on_github_is_asked_for_once_a_video_is_published(): void
+    {
+        $video = $this->video();
+
+        // Not before anything is published.
+        $this->get('/video-demo/studio')->assertOk()->assertDontSee('data-star-note', false);
+        $this->get("/video-demo/studio/{$video->id}")->assertDontSee('data-star-note', false);
+
+        $video->update(['published_at' => now()]);
+        $this->get('/video-demo/studio')->assertSee('a star on GitHub helps other Laravel developers find it')
+            ->assertSee('href="'.VideoDemo::GITHUB_URL.'"', false);
+        $this->get("/video-demo/studio/{$video->id}")->assertSee('data-star-note', false);
+    }
+
     public function test_a_new_user_or_data_or_no_plan_always_means_a_new_plan(): void
     {
         Queue::fake();
