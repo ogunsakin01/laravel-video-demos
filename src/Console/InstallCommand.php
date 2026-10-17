@@ -6,10 +6,12 @@ use Illuminate\Console\Command;
 use Illuminate\Contracts\Foundation\CachesConfiguration;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
+use Ogunsakin01\VideoDemo\Library\Restorer;
 use Ogunsakin01\VideoDemo\Models\Video;
 use Ogunsakin01\VideoDemo\Models\VideoStyle;
 use Ogunsakin01\VideoDemo\SampleData\Sandbox;
 use Ogunsakin01\VideoDemo\Support\PackageConfig;
+use Ogunsakin01\VideoDemo\VideoDemoServiceProvider;
 use Ogunsakin01\VideoDemo\Voice\Voices;
 use Throwable;
 
@@ -68,6 +70,32 @@ class InstallCommand extends Command
     }
 
     /**
+     * Bring back into the studio the published videos its database no longer
+     * has, such as after the database was reset, so they can be managed again.
+     */
+    protected function restorePublishedVideos(): void
+    {
+        if (! VideoDemoServiceProvider::studioEnabled()) {
+            return;
+        }
+
+        try {
+            $restored = app(Restorer::class)->restore();
+        } catch (Throwable $e) {
+            $this->components->warn('Could not check the library for videos the studio lost: '.$e->getMessage());
+
+            return;
+        }
+
+        if ($restored !== []) {
+            $this->components->info(sprintf(
+                'Brought back %d published %s the studio\'s database no longer had: %s.',
+                count($restored), count($restored) === 1 ? 'video' : 'videos', collect($restored)->pluck('title')->implode(', '),
+            ));
+        }
+    }
+
+    /**
      * Whether the app's default voice, a video or a style uses a local voice.
      */
     protected function localVoiceUsed(): bool
@@ -109,6 +137,8 @@ class InstallCommand extends Command
             '--realpath' => true,
             '--force' => true,
         ]) === 0);
+
+        $this->restorePublishedVideos();
 
         if (! $this->option('no-browser')) {
             $this->installBrowser();

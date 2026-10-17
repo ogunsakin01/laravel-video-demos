@@ -27,6 +27,7 @@ use Ogunsakin01\VideoDemo\Jobs\GenerateVideo;
 use Ogunsakin01\VideoDemo\Jobs\VerifyVideo;
 use Ogunsakin01\VideoDemo\Library\Manifest;
 use Ogunsakin01\VideoDemo\Library\Publisher;
+use Ogunsakin01\VideoDemo\Library\Restorer;
 use Ogunsakin01\VideoDemo\Library\Stats;
 use Ogunsakin01\VideoDemo\Models\Spend;
 use Ogunsakin01\VideoDemo\Models\Video;
@@ -58,13 +59,28 @@ class VideoController extends Controller
     /**
      * Display the studio's list of videos.
      */
-    public function index(): View
+    public function index(Restorer $restorer): View
     {
         return view('video-demo::studio.index', [
             'videos' => Video::latest()->get(),
             'totalCost' => Spend::total(),
             'queueWarning' => VideoDemoServiceProvider::queueWarning(),
+            'lost' => rescue(fn () => $restorer->missing(), [], false),
         ]);
+    }
+
+    /**
+     * Bring back the published videos the studio's database no longer has.
+     */
+    public function restore(Restorer $restorer): RedirectResponse
+    {
+        $restored = collect($restorer->restore());
+        $unplanned = $restored->reject(fn (Video $video) => $video->hasPlan())->count();
+
+        return redirect()->route('video-demo.studio.index')->with('status', $restored->isEmpty()
+            ? 'Nothing to bring back: the studio has every published video.'
+            : sprintf('Brought back %d published %s.', $restored->count(), Str::plural('video', $restored->count()))
+                .($unplanned ? sprintf(' %d %s published before plans were saved with videos, so to record %s again, ask for a new plan.', $unplanned, $unplanned === 1 ? 'was' : 'were', $unplanned === 1 ? 'it' : 'them') : ''));
     }
 
     /**
@@ -520,7 +536,14 @@ class VideoController extends Controller
         // A plan's words are in its language, so another language needs a new plan.
         $language = Language::normalize($data['language'] ?? null) ?? Language::normalize($video->page_language) ?? Language::app();
         $forced = $recordAs !== $video->record_as || $sampleData !== $video->sample_data || ! Language::same($language, $video->languageCode());
-        $replan = $request->boolean('new_plan') || $forced || empty($video->plan['steps']);
+        // "Try again" on a stopped or failed video sends this form too, asking
+        // for a new plan or the same one whatever the switch says.
+        $newPlan = match ($request->query('plan')) {
+            'new' => true,
+            'same' => false,
+            default => $request->boolean('new_plan'),
+        };
+        $replan = $newPlan || $forced || empty($video->plan['steps']);
         $style = isset($data['style_id']) ? VideoStyle::find($data['style_id']) : null;
         $estimate = $replan ? $estimator->estimate($data['model'], $data['effort'], (int) $data['target_seconds'], $code->routeCount()) : null;
 
@@ -547,7 +570,7 @@ class VideoController extends Controller
         ]);
         $video->addLog(match (true) {
             ! $replan => 'Queued to record the same plan again',
-            $forced && ! $request->boolean('new_plan') => 'Queued for a new plan: the user, the data or the language changed, so the old plan may not fit',
+            $forced && ! $newPlan => 'Queued for a new plan: the user, the data or the language changed, so the old plan may not fit',
             default => 'Queued for a new plan',
         });
         GenerateVideo::dispatch($video, replan: $replan);
@@ -608,7 +631,7 @@ class VideoController extends Controller
             return back()->with('error', 'Could not publish: '.$e->getMessage());
         }
 
-        return back()->with('status', 'Published to the library.');
+        return back()->with('status', 'Published to the library.'.Publisher::deployNote());
     }
 
     /**
@@ -674,7 +697,8 @@ class VideoController extends Controller
 
         $verb = $data['action'] === 'publish' ? 'Published' : 'Unpublished';
         $message = sprintf('%s %d %s.', $verb, $done, Str::plural('video', $done))
-            .($skipped ? sprintf(' Skipped %d: %s.', $skipped, $data['action'] === 'publish' ? 'not ready, or already published at their latest version' : 'not published') : '');
+            .($skipped ? sprintf(' Skipped %d: %s.', $skipped, $data['action'] === 'publish' ? 'not ready, or already published at their latest version' : 'not published') : '')
+            .($done ? Publisher::deployNote() : '');
 
         return redirect()->route('video-demo.studio.index')
             ->with('status', $message)
@@ -688,7 +712,7 @@ class VideoController extends Controller
     {
         $publisher->unpublish($video);
 
-        return back()->with('status', 'Removed from the library.');
+        return back()->with('status', 'Removed from the library.'.Publisher::deployNote());
     }
 
     /**

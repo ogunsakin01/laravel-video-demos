@@ -59,6 +59,11 @@ class Publisher
             ];
         }
 
+        // What the studio needs to manage the video and record it again, so
+        // it can be brought back if the studio's database loses it.
+        $record = $this->manifest->path("{$video->slug}-v{$video->version}.json");
+        $disk->put($record, json_encode($video->only(Restorer::FIELDS), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+
         $primary = $sources[Devices::primary($devices)];
         $this->manifest->put([
             'slug' => $video->slug,
@@ -77,11 +82,12 @@ class Publisher
             // The pages it shows, so <x-video-demo::help /> can list it on them.
             'routes' => Routes::describe(Plan::fromArray($video->plan ?? [])->paths()),
             'version' => $video->version,
+            'record' => $record,
             'published_at' => now()->toIso8601String(),
         ]);
 
         if ($old) {
-            $kept = collect($sources)->flatMap(fn ($s) => array_filter([$s['video'], $s['poster'], $s['subtitles']]))->all();
+            $kept = [...collect($sources)->flatMap(fn ($s) => array_filter([$s['video'], $s['poster'], $s['subtitles']]))->all(), $record];
             $disk->delete(array_diff(Manifest::files($old), $kept));
         }
 
@@ -98,5 +104,18 @@ class Publisher
         }
 
         $video->update(['published_at' => null]);
+    }
+
+    /**
+     * Say what puts a change to the library live, for the studio's messages:
+     * with the videos kept in the app's public folder, a commit and a deploy.
+     */
+    public static function deployNote(): string
+    {
+        if (config('video-demo.storage.disk') !== Manifest::REPOSITORY_DISK) {
+            return '';
+        }
+
+        return ' Commit public/'.trim((string) config('video-demo.storage.path'), '/').' and deploy to put it live.';
     }
 }

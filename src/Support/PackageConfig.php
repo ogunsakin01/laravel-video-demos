@@ -36,6 +36,7 @@ class PackageConfig
         '62f6c6c240b45f402baa94255fd878d0d457767a' => 'v0.15.0',
         '3892068c18b47de942d8f2a4e893ff3ccdfc39d2' => 'v0.17.0',
         '30b70cd47e078cf560f339ef3374b2241e2c2b9c' => 'v0.17.5',
+        '3f2f59a7a2ff40cedd0a1a2826b44d749c76e717' => 'v0.17.11',
     ];
 
     /**

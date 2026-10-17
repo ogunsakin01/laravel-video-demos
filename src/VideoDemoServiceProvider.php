@@ -88,6 +88,7 @@ class VideoDemoServiceProvider extends ServiceProvider
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
 
         $this->registerRoutes();
+        $this->registerRepositoryDisk();
         $this->useRecorderLocale();
 
         // Queue workers leave a heartbeat, so the studio can say when none is running.
@@ -115,6 +116,29 @@ class VideoDemoServiceProvider extends ServiceProvider
                 WorkCommand::class,
             ]);
         }
+    }
+
+    /**
+     * Add the disk VIDEO_DEMO_DISK=video-demo-repo names: the app's public
+     * folder, so published videos are committed with the code and reach
+     * production with each deploy. An app's own disk of that name wins.
+     */
+    protected function registerRepositoryDisk(): void
+    {
+        $config = $this->app->make('config');
+        $key = 'filesystems.disks.'.Manifest::REPOSITORY_DISK;
+        if ($config->has($key)) {
+            return;
+        }
+
+        $config->set($key, [
+            'driver' => 'local',
+            'root' => public_path(),
+            'url' => rtrim((string) $config->get('app.url'), '/'),
+            'visibility' => 'public',
+            'throw' => false,
+            'report' => false,
+        ]);
     }
 
     /**

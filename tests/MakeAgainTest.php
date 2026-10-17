@@ -59,6 +59,30 @@ class MakeAgainTest extends TestCase
         Queue::assertPushed(GenerateVideo::class, fn ($job) => $job->replan);
     }
 
+    public function test_trying_a_stopped_video_again_uses_the_changes_made_to_it(): void
+    {
+        Queue::fake();
+        $video = $this->video(['status' => VideoStatus::Stopped, 'stop_requested' => true]);
+
+        // "Try again" sends the "Make it again" form, so what was changed there is used.
+        $page = $this->get("/video-demo/studio/{$video->id}")->assertOk();
+        $page->assertSee('form="vd-again" formaction="'.route('video-demo.studio.again', [$video, 'plan' => 'new']).'"', false)
+            ->assertSee('form="vd-again" formaction="'.route('video-demo.studio.again', [$video, 'plan' => 'same']).'"', false)
+            ->assertDontSee(route('video-demo.studio.retry', $video), false);
+
+        // A new plan, whatever the switch says.
+        $this->post(route('video-demo.studio.again', [$video, 'plan' => 'new']), $this->form($video, ['prompt' => 'How a recruiter closes a job', 'target_seconds' => 45]))
+            ->assertRedirect(route('video-demo.studio.show', $video));
+        $video->refresh();
+        $this->assertSame(['How a recruiter closes a job', 45, VideoStatus::Queued, false], [$video->prompt, $video->target_seconds, $video->status, $video->stop_requested]);
+        Queue::assertPushed(GenerateVideo::class, fn ($job) => $job->replan === true);
+
+        // The same plan, with the new length and speed.
+        $video->update(['status' => VideoStatus::Stopped]);
+        $this->post(route('video-demo.studio.again', [$video, 'plan' => 'same']), $this->form($video, ['target_seconds' => 60, 'new_plan' => '1']));
+        $this->assertSame([60, 'Queued to record the same plan again'], [$video->fresh()->target_seconds, collect($video->fresh()->log)->last()['message']]);
+    }
+
     public function test_a_new_user_or_data_or_no_plan_always_means_a_new_plan(): void
     {
         Queue::fake();

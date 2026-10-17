@@ -35,6 +35,7 @@ Route::middleware(AuthorizeStudio::class)->group(function () {
     Route::get('/styles/{style}/logo', [StyleController::class, 'logo'])->name('styles.logo');
 
     Route::post('/bulk', [VideoController::class, 'bulk'])->name('bulk');
+    Route::post('/restore', [VideoController::class, 'restore'])->name('restore');
     Route::get('/delete', [VideoController::class, 'confirmDelete'])->name('delete');
     Route::get('/spending', [VideoController::class, 'spending'])->name('spending');
     Route::get('/stats', [VideoController::class, 'stats'])->name('stats');

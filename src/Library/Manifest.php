@@ -19,13 +19,19 @@ class Manifest
     protected const CACHE_KEY = 'video-demo.manifest';
 
     /**
+     * The disk that keeps published videos in the app's public folder, to be
+     * committed and deployed with the code (VIDEO_DEMO_DISK=video-demo-repo).
+     */
+    public const REPOSITORY_DISK = 'video-demo-repo';
+
+    /**
      * Get every published video.
      *
      * @return list<array<string, mixed>>
      */
     public function all(): array
     {
-        return Cache::remember(self::CACHE_KEY, (int) config('video-demo.library.cache_seconds', 300), function () {
+        return Cache::remember($this->cacheKey(), (int) config('video-demo.library.cache_seconds', 300), function () {
             $disk = $this->disk();
 
             return $disk->exists($this->path())
@@ -171,6 +177,7 @@ class Manifest
             $video['video'] ?? null,
             $video['poster'] ?? null,
             $video['subtitles'] ?? null,
+            $video['record'] ?? null,
             ...collect($video['sources'] ?? [])->flatMap(fn ($s) => [$s['video'] ?? null, $s['poster'] ?? null, $s['subtitles'] ?? null])->all(),
         ])));
     }
@@ -283,7 +290,7 @@ class Manifest
      */
     protected function fresh(): array
     {
-        Cache::forget(self::CACHE_KEY);
+        Cache::forget($this->cacheKey());
 
         return $this->all();
     }
@@ -294,6 +301,23 @@ class Manifest
     protected function write(array $videos): void
     {
         $this->disk()->put($this->path(), json_encode(['videos' => $videos], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
-        Cache::forget(self::CACHE_KEY);
+        Cache::forget($this->cacheKey());
+    }
+
+    /**
+     * Get the cache key of the manifest. On a disk in the app's own folders,
+     * such as one committed with the code, a new manifest arrives with a
+     * deploy, so its time is part of the key and production shows it at once.
+     */
+    protected function cacheKey(): string
+    {
+        if (config('filesystems.disks.'.config('video-demo.storage.disk').'.driver') !== 'local') {
+            return self::CACHE_KEY;
+        }
+
+        $file = $this->disk()->path($this->path());
+        clearstatcache(true, $file);
+
+        return self::CACHE_KEY.'.'.(is_file($file) ? filemtime($file) : 0);
     }
 }

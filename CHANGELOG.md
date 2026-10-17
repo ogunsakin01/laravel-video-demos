@@ -2,6 +2,17 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/). While the version is 0.x, minor releases may include breaking changes; they will be listed here.
 
+## v0.17.11 - 2026-10-17
+
+### Added
+
+- **Keep published videos in your codebase.** Set `VIDEO_DEMO_DISK=video-demo-repo` and publishing writes the videos, posters and the list of published videos to `public/video-demo`. Commit that folder and the videos reach production with your next deploy, with no S3 or other shared storage. The studio reminds you to commit and deploy after publishing. Production shows a deployed change at once, rather than when its 5-minute cache runs out.
+
+### Fixed
+
+- **Trying again uses your changes.** On a stopped or failed video, **Try again** and **Record the same plan again** now send the "Make it again" form, so a description, length, style, voice or model changed there is used. Before, they made the video again with its old settings and dropped your changes.
+- **Published videos are never left without a way to manage them.** The studio keeps its videos in the app's database and the library keeps the published ones on the storage disk, so when the database was reset, published videos kept playing but disappeared from the studio. Each published video now has its studio record (prompt, plan, style, voice, recordings) saved next to its files. `video-demo:install` brings back any published video the studio doesn't have, and the studio's videos page offers **Bring them back** too, with their files copied back so they play, publish and record again. Videos published before this version come back from what the library lists; plan them again to record them again.
+
 ## v0.17.10 - 2026-10-16
 
 ### Changed

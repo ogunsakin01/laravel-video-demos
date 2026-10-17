@@ -21,6 +21,18 @@
   @if ($queueWarning)
     <div class="vd-flash vd-flash-warn" role="status">{{ $queueWarning }}</div>
   @endif
+  @if ($lost !== [])
+    <div class="vd-flash vd-flash-warn vd-lost" role="status">
+      <span>
+        {{ count($lost) === 1 ? 'A published video isn\'t' : count($lost).' published videos aren\'t' }} in the studio, so you can't manage {{ count($lost) === 1 ? 'it' : 'them' }} here:
+        {{ collect($lost)->pluck('title')->implode(', ') }}. This happens when the database was reset. They are still in the library.
+      </span>
+      <form method="post" action="{{ route('video-demo.studio.restore') }}">
+        @csrf
+        <button class="vd-btn vd-btn-sm">Bring {{ count($lost) === 1 ? 'it' : 'them' }} back</button>
+      </form>
+    </div>
+  @endif
 
   <div class="vd-split">
     <div class="vd-card vd-card-flush vd-scroll">

@@ -2,10 +2,12 @@
 
 namespace Ogunsakin01\VideoDemo\Tests;
 
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 use Ogunsakin01\VideoDemo\Enums\VideoStatus;
 use Ogunsakin01\VideoDemo\Library\Manifest;
 use Ogunsakin01\VideoDemo\Library\Publisher;
+use Ogunsakin01\VideoDemo\Library\Restorer;
 use Ogunsakin01\VideoDemo\Models\Video;
 use Ogunsakin01\VideoDemo\Models\VideoRequest;
 
@@ -62,6 +64,92 @@ class LibraryTest extends TestCase
         app(Publisher::class)->unpublish($video);
         $this->assertNull(app(Manifest::class)->find('post-a-job', 'public'));
         Storage::disk('public')->assertMissing(['video-demo/post-a-job-v2-desktop.mp4', 'video-demo/post-a-job-v2-mobile.mp4']);
+    }
+
+    public function test_published_videos_the_studio_lost_are_brought_back(): void
+    {
+        $video = Video::create([
+            'title' => 'Post a job', 'prompt' => 'How a recruiter posts a job', 'target_seconds' => 45,
+            'model' => 'claude-opus-5-5', 'effort' => 'high', 'visibility' => 'private', 'voice' => 'kokoro:af_heart',
+            'status' => VideoStatus::Ready, 'version' => 3, 'duration_seconds' => 40.0, 'devices' => ['desktop'],
+            'plan' => ['title' => 'Post a job', 'summary' => 'Posting a job.', 'steps' => [['action' => 'goto', 'url' => '/jobs']]],
+            'recordings' => ['desktop' => ['seconds' => 40.0, 'chapters' => [['title' => 'Start', 'at' => 0.0]]]],
+        ]);
+        Storage::disk('local')->put($video->workFile('desktop'), 'mp4');
+        Storage::disk('local')->put($video->workFile('desktop', 'poster'), 'jpg');
+        app(Publisher::class)->publish($video);
+        Storage::disk('public')->assertExists('video-demo/post-a-job-v3.json');
+
+        // One published before records were saved: only what the library lists.
+        app(Manifest::class)->put($this->manifestVideo(['slug' => 'run-payroll', 'title' => 'Run payroll', 'summary' => 'Paying the team.']));
+        Storage::disk('public')->put('video-demo/post-a-job-v1.mp4', 'old-mp4');
+
+        // The studio's database is reset; the library is not.
+        Video::query()->delete();
+        $this->get(route('video-demo.studio.index'))->assertOk()
+            ->assertSee("2 published videos aren't in the studio")->assertSee('Post a job, Run payroll')->assertSee('Bring them back');
+
+        $this->post(route('video-demo.studio.restore'))->assertRedirect(route('video-demo.studio.index'))
+            ->assertSessionHas('status', 'Brought back 2 published videos. 1 was published before plans were saved with videos, so to record it again, ask for a new plan.');
+
+        $back = Video::where('slug', 'post-a-job')->first();
+        $this->assertSame([VideoStatus::Ready, 3, 'private', 'How a recruiter posts a job', 'kokoro:af_heart', '/jobs'], [$back->status, $back->version, $back->visibility, $back->prompt, $back->voice, $back->plan['steps'][0]['url']]);
+        $this->assertNotNull($back->published_at);
+        // Its files are back on the work disk, so it plays and can be published again.
+        $this->assertSame('mp4', Storage::disk('local')->get($back->workFile('desktop')));
+        $this->assertTrue($back->hasRecording());
+        app(Publisher::class)->publish($back->fresh());
+
+        $old = Video::where('slug', 'run-payroll')->first();
+        $this->assertSame(['Run payroll', 'Paying the team.', false], [$old->title, $old->prompt, $old->hasPlan()]);
+        $this->assertSame('old-mp4', Storage::disk('local')->get($old->workFile('desktop')));
+
+        // Nothing left to bring back.
+        $this->get(route('video-demo.studio.index'))->assertDontSee('Bring them back');
+        $this->assertSame([], app(Restorer::class)->restore());
+    }
+
+    public function test_install_brings_back_published_videos_the_studio_lost(): void
+    {
+        app(Manifest::class)->put($this->manifestVideo(['slug' => 'run-payroll', 'title' => 'Run payroll']));
+
+        try {
+            $this->artisan('video-demo:install', ['--no-browser' => true, '--no-sample-data' => true])
+                ->expectsOutputToContain("Brought back 1 published video the studio's database no longer had: Run payroll.")
+                ->assertSuccessful();
+            $this->assertTrue(Video::where('slug', 'run-payroll')->exists());
+        } finally {
+            File::delete([config_path('video-demo.php'), storage_path('video-demo/.gitignore')]);
+        }
+    }
+
+    public function test_videos_can_be_kept_in_the_public_folder_and_deployed_with_the_code(): void
+    {
+        // The package's disk is the app's public folder.
+        $this->assertSame(['local', public_path()], [config('filesystems.disks.video-demo-repo.driver'), config('filesystems.disks.video-demo-repo.root')]);
+
+        // Here a temporary folder stands in for it.
+        $public = sys_get_temp_dir().'/video-demo-repo-'.uniqid();
+        config(['video-demo.storage.disk' => 'video-demo-repo', 'filesystems.disks.video-demo-repo.root' => $public]);
+        Storage::forgetDisk('video-demo-repo');
+
+        try {
+            $manifest = app(Manifest::class);
+            $manifest->put($this->manifestVideo(['video' => 'video-demo/post-a-job-v1.mp4']));
+            $this->assertFileExists("$public/video-demo/manifest.json");
+            // The studio says what puts it live.
+            $this->assertSame(' Commit public/video-demo and deploy to put it live.', Publisher::deployNote());
+            // Played from the app's own address, wherever it runs.
+            $this->assertSame('/video-demo/post-a-job-v1.mp4', $manifest->url($manifest->find('post-a-job', 'public')));
+
+            // A deploy brings a new manifest: production shows it at once, not when its cache runs out.
+            $this->assertNull($manifest->find('payroll', 'public'));
+            File::put("$public/video-demo/manifest.json", json_encode(['videos' => [$this->manifestVideo(['slug' => 'payroll'])]]));
+            touch("$public/video-demo/manifest.json", time() + 5);
+            $this->assertNotNull($manifest->find('payroll', 'public'));
+        } finally {
+            File::deleteDirectory($public);
+        }
     }
 
     public function test_public_library_hides_private_videos(): void

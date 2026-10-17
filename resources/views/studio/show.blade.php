@@ -30,15 +30,10 @@
         <div class="vd-actions">
           {{-- Opens a page that first says where the video is used: the library, and pages that show it. --}}
           <a class="vd-btn vd-btn-ghost vd-btn-danger" href="{{ route('video-demo.studio.delete', ['videos' => [$video->id]]) }}">Delete…</a>
-          <form method="post" action="{{ route('video-demo.studio.retry', $video) }}">@csrf
-            <input type="hidden" name="mode" value="plan">
-            <button class="vd-btn vd-btn-primary">{{ $hasPlan ? 'Try again with a new plan' : 'Try again' }}</button>
-          </form>
+          {{-- Sends the "Make it again" form, so changes made there are used. --}}
+          <button class="vd-btn vd-btn-primary" form="vd-again" formaction="{{ route('video-demo.studio.again', [$video, 'plan' => 'new']) }}">{{ $hasPlan ? 'Try again with a new plan' : 'Try again' }}</button>
           @if ($hasPlan)
-            <form method="post" action="{{ route('video-demo.studio.retry', $video) }}">@csrf
-              <input type="hidden" name="mode" value="record">
-              <button class="vd-btn">Record the same plan again</button>
-            </form>
+            <button class="vd-btn" form="vd-again" formaction="{{ route('video-demo.studio.again', [$video, 'plan' => 'same']) }}">Record the same plan again</button>
           @endif
         </div>
     @endif
@@ -159,18 +154,13 @@
             @include('video-demo::studio.partials.error-details')
           @endif
           @if ($video->status === VideoStatus::Failed)
-            <p class="vd-small" style="margin:0;color:var(--vd-bad)">Trying again uses the same description, style, versions and model. To change any of them, use "Make it again" below.</p>
+            <p class="vd-small" style="margin:0;color:var(--vd-bad)">Trying again uses what is in "Make it again" below. Change the description, style, versions or model there first.</p>
             @php($hasPlan = $video->hasPlan())
         <div class="vd-actions">
-          <form method="post" action="{{ route('video-demo.studio.retry', $video) }}">@csrf
-            <input type="hidden" name="mode" value="plan">
-            <button class="vd-btn vd-btn-primary">{{ $hasPlan ? 'Try again with a new plan' : 'Try again' }}</button>
-          </form>
+          {{-- Sends the "Make it again" form, so changes made there are used. --}}
+          <button class="vd-btn vd-btn-primary" form="vd-again" formaction="{{ route('video-demo.studio.again', [$video, 'plan' => 'new']) }}">{{ $hasPlan ? 'Try again with a new plan' : 'Try again' }}</button>
           @if ($hasPlan)
-            <form method="post" action="{{ route('video-demo.studio.retry', $video) }}">@csrf
-              <input type="hidden" name="mode" value="record">
-              <button class="vd-btn">Record the same plan again</button>
-            </form>
+            <button class="vd-btn" form="vd-again" formaction="{{ route('video-demo.studio.again', [$video, 'plan' => 'same']) }}">Record the same plan again</button>
           @endif
         </div>
           @endif

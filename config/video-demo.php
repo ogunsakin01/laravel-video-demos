@@ -86,7 +86,9 @@ return [
     |
     | Published videos, posters and the manifest go to this disk. For videos
     | made on your machine to appear in production, use a disk both can
-    | reach, such as S3 or R2. Studio working files stay on "work_disk".
+    | reach, such as S3 or R2, or "video-demo-repo": the app's public folder
+    | (public/video-demo), so you commit published videos and they deploy
+    | with the code. Studio working files stay on "work_disk".
     |
     */
 
