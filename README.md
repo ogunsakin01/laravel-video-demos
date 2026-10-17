@@ -13,6 +13,15 @@ Describe a flow in your Laravel app and get a recorded how-to video of it. An AI
 
 Videos are made on your machine and published to any Laravel disk. Your production app shows them in a ready-made help library, or inside your own pages with a Blade component.
 
+**It works with both kinds of Laravel app:**
+
+| Your app | What to do |
+| --- | --- |
+| **A full-stack Laravel app**: Blade, Livewire, Inertia, or Vue or React inside the same project | Install it and make videos. Nothing else to set up. |
+| **A Laravel API with a separate frontend**: a Vue, React or other app in its own repository, on its own address | Install it in the Laravel API and set `VIDEO_DEMO_FRONTEND_URL`. Videos are recorded on the frontend, signed in with a session, Sanctum token, JWT, or your own way (SSO included). See [Separate Frontend](https://github.com/ogunsakin01/laravel-video-demos/wiki/Separate-Frontend). |
+
+Either way the package goes in the Laravel app, the AI reads its code, and videos are recorded on [sample data](https://github.com/ogunsakin01/laravel-video-demos/wiki/Sample-Data), so your own data isn't touched.
+
 ```bash
 composer require ogunsakin01/laravel-video-demos
 php artisan video-demo:install
