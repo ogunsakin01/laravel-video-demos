@@ -7,13 +7,16 @@ use Illuminate\Contracts\Foundation\CachesConfiguration;
 use Illuminate\Routing\Events\RouteMatched;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Mcp\Server\Registrar;
 use Ogunsakin01\VideoDemo\Ai\Claude;
 use Ogunsakin01\VideoDemo\Console\CleanCommand;
+use Ogunsakin01\VideoDemo\Console\DoctorCommand;
 use Ogunsakin01\VideoDemo\Console\ExportCommand;
 use Ogunsakin01\VideoDemo\Console\GenerateCommand;
 use Ogunsakin01\VideoDemo\Console\InstallCommand;
 use Ogunsakin01\VideoDemo\Console\InstallVoiceCommand;
 use Ogunsakin01\VideoDemo\Console\ListCommand;
+use Ogunsakin01\VideoDemo\Console\PreviewCommand;
 use Ogunsakin01\VideoDemo\Console\PublishCommand;
 use Ogunsakin01\VideoDemo\Console\RefreshCommand;
 use Ogunsakin01\VideoDemo\Console\SampleDatabaseCommand;
@@ -85,10 +88,12 @@ class VideoDemoServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'video-demo');
+        $this->loadTranslationsFrom(__DIR__.'/../resources/lang', 'video-demo');
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
 
         $this->registerRoutes();
         $this->registerRepositoryDisk();
+        $this->registerMcpServer();
         $this->useRecorderLocale();
 
         // Queue workers leave a heartbeat, so the studio can say when none is running.
@@ -97,15 +102,18 @@ class VideoDemoServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->publishes([__DIR__.'/../config/video-demo.php' => config_path('video-demo.php')], 'video-demo-config');
             $this->publishes([__DIR__.'/../resources/views' => resource_path('views/vendor/video-demo')], 'video-demo-views');
+            $this->publishes([__DIR__.'/../resources/lang' => $this->app->langPath('vendor/video-demo')], 'video-demo-lang');
             $this->publishes([__DIR__.'/../database/migrations' => database_path('migrations')], 'video-demo-migrations');
 
             $this->commands([
                 InstallCommand::class,
                 InstallVoiceCommand::class,
                 CleanCommand::class,
+                DoctorCommand::class,
                 ExportCommand::class,
                 GenerateCommand::class,
                 ListCommand::class,
+                PreviewCommand::class,
                 PublishCommand::class,
                 RefreshCommand::class,
                 SampleDataCommand::class,
@@ -115,6 +123,18 @@ class VideoDemoServiceProvider extends ServiceProvider
                 VerifyCommand::class,
                 WorkCommand::class,
             ]);
+        }
+    }
+
+    /**
+     * Give coding agents the package's MCP server, "video-demos" (php artisan
+     * mcp:start video-demos), when the app has laravel/mcp and the studio is
+     * enabled here.
+     */
+    protected function registerMcpServer(): void
+    {
+        if (static::studioEnabled() && class_exists(Registrar::class) && $this->app->bound(Registrar::class)) {
+            \Laravel\Mcp\Facades\Mcp::local('video-demos', Mcp\VideoDemosServer::class);
         }
     }
 

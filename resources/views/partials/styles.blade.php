@@ -419,6 +419,10 @@
   .vd-star[hidden] { display: none; }
   .vd-star > span:first-child { flex: 1 1 280px; }
   .vd-star-actions { display: flex; gap: 8px; }
+  .vd-setup ul { margin: 8px 0 10px; padding-left: 18px; }
+  .vd-setup li { padding: 3px 0; }
+  .vd-setup-fix { display: block; color: var(--vd-ink); font-size: 13.5px; }
+  .vd-setup-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .vd-lost { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
   .vd-lost span { flex: 1 1 280px; }
 
@@ -502,6 +506,12 @@
   .vd-tile-body { padding: 12px 14px 14px; }
   .vd-tile-title { font-weight: 600; color: var(--vd-strong); letter-spacing: -.01em; }
   .vd-chapters { list-style: none; padding: 0; margin: 0; }
+  .vd-guide h3 { font-size: 14px; margin: 18px 0 6px; }
+  .vd-guide ol { margin: 0; padding-left: 22px; }
+  .vd-guide li { padding: 4px 0; line-height: 1.55; }
+  .vd-guide li::marker { color: var(--vd-muted-ink); font-variant-numeric: tabular-nums; }
+  .vd-guide-note { margin: 8px 0; padding: 8px 12px; border-left: 3px solid var(--vd-border); color: var(--vd-muted-ink); font-size: 14px; line-height: 1.55; }
+  .vd-guide-note strong { color: var(--vd-ink); }
   .vd-chapters li + li { border-top: 1px solid var(--vd-border); }
   .vd-chapters button, .vd-chapters a { all: unset; box-sizing: border-box; cursor: pointer; display: flex; gap: 12px; width: 100%; padding: 9px 2px; font-size: 13.5px; color: var(--vd-ink); }
   .vd-chapters button:hover, .vd-chapters a:hover { color: var(--vd-strong); text-decoration: underline; text-underline-offset: 3px; }

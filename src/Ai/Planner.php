@@ -462,7 +462,11 @@ class Planner
             return '';
         }
 
-        return "\n\nThis app's pages are a separate frontend (a single-page app), and the Laravel code you can read is its API. goto paths are the frontend's own page paths, from its router, not Laravel's routes, which are API endpoints. Read the API's controllers and validation to learn what the pages send and get back. The frontend's source isn't readable here, so take page paths from the developer's description, and labels from looking at the pages (look_at_page) or from the page contents the recorder returns when a step fails.";
+        $code = config('video-demo.frontend.path')
+            ? 'Its code is readable under frontend/ (the folders listed for list_files): read its router for the page paths, and its components for the labels people see.'
+            : "The frontend's source isn't readable here, so take page paths from the developer's description, and labels from looking at the pages (look_at_page) or from the page contents the recorder returns when a step fails.";
+
+        return "\n\nThis app's pages are a separate frontend (a single-page app), and the Laravel code you can read is its API. goto paths are the frontend's own page paths, from its router, not Laravel's routes, which are API endpoints. Read the API's controllers and validation to learn what the pages send and get back. ".$code;
     }
 
     /**

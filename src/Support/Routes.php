@@ -41,9 +41,14 @@ final class Routes
     public static function describe(array $paths): array
     {
         $routes = [];
+        $frontend = (bool) config('video-demo.frontend.url');
         foreach ($paths as $path) {
             if ($route = self::match($path)) {
                 $routes[$route->uri()] = ['name' => $route->getName(), 'uri' => $route->uri()];
+            } elseif ($frontend) {
+                // A separate frontend's pages aren't Laravel routes: they are kept by their path.
+                $uri = trim((string) parse_url($path, PHP_URL_PATH), '/');
+                $routes[$uri] ??= ['name' => null, 'uri' => $uri];
             }
         }
 

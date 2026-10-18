@@ -323,6 +323,16 @@ return [
 
         // The localStorage key the frontend reads its token from.
         'token_key' => env('VIDEO_DEMO_TOKEN_KEY', 'token'),
+
+        // The frontend's repository on this machine, such as ../web (from
+        // this app's root), so the AI reads its pages and labels as it reads
+        // this app's code (under frontend/), and video-demo:verify,
+        // refresh and preview --frontend-changed see what changed in it.
+        'path' => env('VIDEO_DEMO_FRONTEND_PATH'),
+
+        // The folders of it the AI may read. Files matching ai.code.deny
+        // (such as .env) are never read, and secrets are hidden as in code.
+        'code' => ['src'],
     ],
 
     /*

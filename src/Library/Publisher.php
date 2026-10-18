@@ -83,6 +83,8 @@ class Publisher
             'routes' => Routes::describe(Plan::fromArray($video->plan ?? [])->paths()),
             'version' => $video->version,
             'record' => $record,
+            // The written guide under the video in the library.
+            'guide' => Guide::fromSteps($video->plan['steps'] ?? [], Devices::primary($devices)),
             'published_at' => now()->toIso8601String(),
         ]);
 

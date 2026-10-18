@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Facade;
  * Make, publish and look up videos from your own code.
  *
  * @method static void signInUsing(\Closure $callback)
+ * @method static string pestTest(\Ogunsakin01\VideoDemo\Models\Video $video)
  * @method static \Ogunsakin01\VideoDemo\Models\Video make(string $description, array $options = [])
  * @method static \Ogunsakin01\VideoDemo\Models\Video create(string $description, array $options = [], string $log = 'Queued')
  * @method static array estimate(?string $model = null, ?string $effort = null, int $seconds = 60)

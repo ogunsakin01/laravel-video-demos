@@ -31,6 +31,7 @@ class RefreshCommand extends Command
     protected $signature = 'video-demo:refresh
         {slug?* : Only these videos}
         {--changed= : Only the videos made from code that differs from this git ref, such as the commit deployed before}
+        {--frontend-changed= : Also the videos made from a separate frontend\'s code that differs from this git ref in its repository (VIDEO_DEMO_FRONTEND_PATH)}
         {--fix : When a plan no longer works, ask the AI for a new one (this costs what a new plan costs)}
         {--json : Print the result as JSON, for scripts and CI}';
 
@@ -51,9 +52,9 @@ class RefreshCommand extends Command
         }
 
         $changed = null;
-        if ($ref = $this->option('changed')) {
+        if (($ref = $this->option('changed')) || $this->option('frontend-changed')) {
             try {
-                $changed = Verifier::changedFiles($ref);
+                $changed = Verifier::changedFiles($ref ? (string) $ref : null, $this->option('frontend-changed') ?: null);
             } catch (RuntimeException $e) {
                 return $this->refuse($e->getMessage());
             }
@@ -215,7 +216,7 @@ class RefreshCommand extends Command
 
         $done = $summary['refreshed'] + $summary['fixed'];
         if ($done + $summary['failed'] === 0) {
-            $this->components->info($this->option('changed') ? 'No published video was made from the changed code.' : 'No published videos to record again.');
+            $this->components->info(($this->option('changed') || $this->option('frontend-changed')) ? 'No published video was made from the changed code.' : 'No published videos to record again.');
 
             return;
         }

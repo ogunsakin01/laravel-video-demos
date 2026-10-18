@@ -17,6 +17,7 @@
     </dl>
   </section>
 
+  @include('video-demo::studio.partials.setup')
   @include('video-demo::studio.partials.worker-warning')
   @if ($queueWarning)
     <div class="vd-flash vd-flash-warn" role="status">{{ $queueWarning }}</div>

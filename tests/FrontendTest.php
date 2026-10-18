@@ -5,12 +5,17 @@ namespace Ogunsakin01\VideoDemo\Tests;
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\URL;
+use Ogunsakin01\VideoDemo\Ai\CodeTools;
+use Ogunsakin01\VideoDemo\Enums\VideoStatus;
 use Ogunsakin01\VideoDemo\Facades\VideoDemo;
+use Ogunsakin01\VideoDemo\Models\Video;
 use Ogunsakin01\VideoDemo\Recording\Recorder;
 use Ogunsakin01\VideoDemo\Recording\SignIn;
+use Ogunsakin01\VideoDemo\Recording\Verifier;
 use Ogunsakin01\VideoDemo\SampleData\Sandbox;
 use Ogunsakin01\VideoDemo\Studio\Pages;
 
@@ -180,6 +185,58 @@ class FrontendTest extends TestCase
         // They are its API.
         config(['video-demo.frontend.url' => 'http://localhost:5173']);
         $this->assertSame([], app(Pages::class)->candidates());
+    }
+
+    public function test_the_ai_reads_the_frontends_code_under_frontend_with_the_same_rules(): void
+    {
+        $app = $this->root.'/app-root';
+        File::ensureDirectoryExists("$app/app");
+        File::put("$app/app/JobController.php", '<?php // jobs');
+        $web = $this->root.'/web';
+        File::ensureDirectoryExists("$web/src/views");
+        File::put("$web/src/router.ts", "{ path: '/jobs/new', component: NewJob }");
+        File::put("$web/src/views/NewJob.vue", '<label for="t">Job title</label>');
+        File::put("$web/src/.env", 'VITE_SECRET=x');
+        File::put("$web/secret.txt", 'outside src');
+        config(['video-demo.ai.code.paths' => ['app']]);
+
+        // What the AI is told when it may not read something.
+        $attempt = fn (CodeTools $tools, string $tool, array $input) => rescue(fn () => $tools->run($tool, $input), fn ($e) => $e->getMessage(), false);
+
+        // Without a frontend there is no frontend/ to read.
+        $this->assertStringContainsString('does not exist', $attempt(new CodeTools($app), 'list_files', ['path' => 'frontend/src']));
+
+        config(['video-demo.frontend.path' => '../web']);
+        $tools = new CodeTools($app);
+        $this->assertStringContainsString('Readable folders: app, frontend/src.', json_encode($tools->definitions(), JSON_UNESCAPED_SLASHES));
+        $this->assertSame("frontend/src/router.ts\nfrontend/src/views/NewJob.vue", $tools->run('list_files', ['path' => 'frontend/src']));
+        $this->assertStringContainsString("path: '/jobs/new'", $tools->run('read_file', ['path' => 'frontend/src/router.ts']));
+        $this->assertStringContainsString('frontend/src/views/NewJob.vue:1', $tools->run('search_code', ['pattern' => 'Job title']));
+        // The same rules: secrets files, and anything outside the folders allowed.
+        $this->assertStringContainsString('may contain secrets', $attempt($tools, 'read_file', ['path' => 'frontend/src/.env']));
+        $this->assertStringContainsString('outside the folders you can read', $attempt($tools, 'read_file', ['path' => 'frontend/secret.txt']));
+        $this->assertStringContainsString('outside the folders you can read', $attempt($tools, 'read_file', ['path' => 'frontend/src/../secret.txt']));
+        $this->assertStringContainsString('outside the folders you can read', $attempt($tools, 'read_file', ['path' => 'frontend/../app-root/app/JobController.php']));
+        // What it read is noted, so changes to it flag the video.
+        $this->assertContains('frontend/src/router.ts', $tools->takeReadFiles());
+    }
+
+    public function test_changes_in_the_frontends_repository_flag_the_videos_made_from_them(): void
+    {
+        config(['video-demo.frontend.path' => '../web']);
+        Process::fake(fn ($process) => Process::result(str_ends_with((string) $process->path, 'web') ? "src/views/NewJob.vue\n" : "app/Http/Controllers/JobController.php\n"));
+
+        $changed = Verifier::changedFiles('main', 'origin/main');
+        $this->assertSame(['app/Http/Controllers/JobController.php', 'frontend/src/views/NewJob.vue'], $changed);
+        $this->assertSame(['frontend/src/views/NewJob.vue'], Verifier::changedFiles(null, 'origin/main'));
+
+        $video = Video::create(['prompt' => 'x', 'target_seconds' => 30, 'model' => 'claude-sonnet-5-5', 'effort' => 'high', 'status' => VideoStatus::Ready,
+            'source_files' => ['frontend/src/views/NewJob.vue'], 'plan' => ['title' => 'x', 'summary' => '', 'steps' => [['action' => 'goto', 'url' => '/jobs/new']]]]);
+        $this->assertSame(['frontend/src/views/NewJob.vue'], Verifier::touched($video, $changed));
+
+        config(['video-demo.frontend.path' => null]);
+        $this->expectExceptionMessage('There is no frontend to compare');
+        Verifier::changedFiles(null, 'origin/main');
     }
 }
 

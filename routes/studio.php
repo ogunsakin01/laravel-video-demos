@@ -36,6 +36,7 @@ Route::middleware(AuthorizeStudio::class)->group(function () {
 
     Route::post('/bulk', [VideoController::class, 'bulk'])->name('bulk');
     Route::post('/restore', [VideoController::class, 'restore'])->name('restore');
+    Route::get('/setup', [VideoController::class, 'setup'])->name('setup');
     Route::get('/delete', [VideoController::class, 'confirmDelete'])->name('delete');
     Route::get('/spending', [VideoController::class, 'spending'])->name('spending');
     Route::get('/stats', [VideoController::class, 'stats'])->name('stats');
@@ -51,6 +52,7 @@ Route::middleware(AuthorizeStudio::class)->group(function () {
     Route::post('/{video}/improve', [VideoController::class, 'improve'])->name('improve');
     Route::post('/{video}/retry', [VideoController::class, 'retry'])->name('retry');
     Route::post('/{video}/exports', [VideoController::class, 'export'])->name('export');
+    Route::get('/{video}/pest-test', [VideoController::class, 'pestTest'])->name('pest-test');
     Route::get('/{video}/exports/{format}', [VideoController::class, 'download'])->whereIn('format', ['gif', 'square', 'vertical'])->name('download');
     Route::post('/{video}/translations', [VideoController::class, 'translate'])->name('translate');
     Route::put('/{video}/plan', [VideoController::class, 'updatePlan'])->name('plan');

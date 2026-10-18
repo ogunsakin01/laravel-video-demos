@@ -4,7 +4,7 @@ This app makes recorded how-to videos of itself. An AI model reads the app's cod
 
 - Videos are made only where the studio is enabled (`APP_ENV=local` or `VIDEO_DEMO_STUDIO=true`). Never point the recorder at production.
 - Planning a video spends the app owner's AI credit, within each video's spending limit (`--max-cost`, $0.50 by default). Recording an existing plan again costs nothing. Say what a command will cost before running one that plans.
-- Prefer the commands with `--json`: `video-demo:generate`, `list`, `publish`, `verify`, `refresh`, `translate`, `export`, `suggest`.
+- Prefer the commands with `--json`: `video-demo:generate`, `list`, `publish`, `verify`, `refresh`, `translate`, `export`, `suggest`. When something about making videos fails, run `php artisan video-demo:doctor --json` first: it checks the setup and gives the fix. With laravel/mcp installed, the "video-demos" MCP server offers the same as tools.
 - Queued videos run on the `video-demo` queue connection (`php artisan video-demo:work`). After updating the package, run `php artisan video-demo:install` and restart the workers.
 - After changing views, routes or labels, run `php artisan video-demo:verify --changed=origin/main --json` to find published videos the change broke.
 - Embed with `<x-video-demo::player slug="…" />` and, in a layout, `<x-video-demo::help />`. Both render nothing until the video is published.

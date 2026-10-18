@@ -24,6 +24,7 @@ The app records how-to videos of itself. An AI model reads the app's code and pl
 ## Making a video
 
 ```bash
+php artisan video-demo:doctor --json    # first, or when something fails: checks the setup and says how to fix it
 php artisan video-demo:suggest --json   # the videos worth making first, from the app's routes
 php artisan video-demo:generate "How a recruiter posts a job, from the jobs page to a live listing" \
   --length=60 --style=clean --devices=desktop,mobile --as=recruiter --max-cost=0.50 --json
@@ -65,7 +66,7 @@ Listen for `Ogunsakin01\VideoDemo\Events\VideoStatusChanged` (`$video`, `$from`,
 <x-video-demo::search placeholder="How do I…" />
 ```
 
-- The library is at `/help/videos` (public videos) and `/admin/videos` (private ones too); prefixes and middleware are under `library` in the config.
+- The library is at `/help/videos` (public videos) and `/admin/videos` (private ones too); prefixes and middleware are under `library` in the config. Each video page shows a written guide made from its plan, and `/help/videos/sitemap.xml` lists the public videos for search engines.
 - `VideoDemo::library()`, `search($query)`, `forPage($routeName)` and `url($entry)` return the published videos for custom pages.
 - Components render nothing for a video that isn't published, so they are safe to add before the video exists.
 
@@ -85,6 +86,7 @@ For a Vue, React or other frontend on its own address that uses this app as its 
 VIDEO_DEMO_FRONTEND_URL=http://localhost:5173   # where videos are recorded
 VIDEO_DEMO_SIGN_IN=sanctum-token                # session (default, also Sanctum cookie sign-in), sanctum-token, jwt or custom
 VIDEO_DEMO_TOKEN_KEY=token                      # the localStorage key the frontend reads its token from
+VIDEO_DEMO_FRONTEND_PATH=../web                 # the frontend's repository: the AI reads its src/ under frontend/
 ```
 
 For any other sign-in (Passport, headers, sessionStorage, the app's own session after SSO), set `custom` and register it:
@@ -96,13 +98,14 @@ use Ogunsakin01\VideoDemo\Recording\SignIn;
 VideoDemo::signInUsing(fn ($user) => SignIn::header('Authorization', 'Bearer '.$user->createToken('video-demo')->accessToken));
 ```
 
-`APP_URL` stays this app's address. The AI can't read the frontend's source yet: describe flows with its page paths, and it looks at the pages for their labels. The frontend must call the API at `APP_URL` (or through its own address, such as Vite's `/api` proxy): only those requests reach the sample database. A change a step sends (POST, PUT, PATCH, DELETE) that the app refuses with a 4xx fails that step with Laravel's message.
+Show published videos inside the frontend with `<script src="{APP_URL}/help/videos/embed.js" defer></script>` and `<video-demo-player slug="post-a-job"></video-demo-player>` (public videos). `APP_URL` stays this app's address. With `VIDEO_DEMO_FRONTEND_PATH` the AI reads the frontend's code (under `frontend/`) and `--frontend-changed=<ref>` on `verify`, `refresh` and `preview` flags videos a frontend change touches; without it, describe flows with the frontend's page paths and the AI looks at the pages for labels. `<video-demo-help></video-demo-help>` lists a page's videos. The frontend must call the API at `APP_URL` (or through its own address, such as Vite's `/api` proxy): only those requests reach the sample database. A change a step sends (POST, PUT, PATCH, DELETE) that the app refuses with a 4xx fails that step with Laravel's message.
 
 ## After UI changes
 
 ```bash
 php artisan video-demo:verify --changed=origin/main --json     # which published videos a change broke; no recording, no AI
 php artisan video-demo:verify post-a-job --fix --json           # plan the broken ones again, record and republish
+php artisan video-demo:preview --changed=origin/main --out=video-demo-previews   # record the videos a change touches (MP4, GIF, summary.md) without publishing
 php artisan video-demo:refresh --changed=<commit deployed before> --fix --json   # on deploy: record again only the videos the change touched
 ```
 
@@ -123,6 +126,7 @@ Plan steps have an `action` (`goto`, `click`, `type`, `select`, `check`, `press`
 ```bash
 php artisan video-demo:translate post-a-job fr es --publish --json   # the same video in other languages, from its plan
 php artisan video-demo:export post-a-job --format=gif --out=docs/post-a-job.gif   # gif, square or vertical
+php artisan video-demo:export post-a-job --format=pest --out=tests/Browser/PostAJobTest.php   # the plan as a Pest browser test
 php artisan video-demo:clean --dry-run                                # free disk space
 ```
 

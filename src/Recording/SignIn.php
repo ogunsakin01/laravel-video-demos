@@ -54,6 +54,14 @@ final class SignIn
     }
 
     /**
+     * Determine if the app registered its own way to sign in.
+     */
+    public static function hasCallback(): bool
+    {
+        return self::$using !== null;
+    }
+
+    /**
      * Start with a cookie, sent to this app's API.
      */
     public static function cookie(string $name, string $value): self

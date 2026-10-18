@@ -111,3 +111,26 @@ jobs:
           VIDEO_DEMO_TEST_FFMPEG: ffmpeg
         run: vendor/bin/phpunit --filter RecorderTest
 
+
+  windows:
+    # Informational until the suite is known to pass there: Windows paths,
+    # processes and the computer's own voice (System.Speech) are exercised,
+    # but a failure doesn't block a change.
+    name: Windows, PHP 8.4, Laravel 13
+    runs-on: windows-latest
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_sqlite, sqlite3, fileinfo
+          coverage: none
+
+      - name: Install dependencies
+        run: composer update --prefer-dist --no-interaction --no-progress
+
+      - name: Run tests
+        run: vendor/bin/phpunit

@@ -2,14 +2,18 @@
 
 namespace Ogunsakin01\VideoDemo\Tests;
 
+use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Ogunsakin01\VideoDemo\Enums\VideoStatus;
+use Ogunsakin01\VideoDemo\Library\Guide;
 use Ogunsakin01\VideoDemo\Library\Manifest;
 use Ogunsakin01\VideoDemo\Library\Publisher;
 use Ogunsakin01\VideoDemo\Library\Restorer;
 use Ogunsakin01\VideoDemo\Models\Video;
 use Ogunsakin01\VideoDemo\Models\VideoRequest;
+use Ogunsakin01\VideoDemo\Support\Routes;
 
 /**
  * Tests publishing, the video library and the player component.
@@ -54,6 +58,8 @@ class LibraryTest extends TestCase
         $this->assertSame('video-demo/post-a-job-v1-desktop.mp4', $entry['video']);
         $this->assertSame(390, $entry['sources']['mobile']['width']);
         $this->assertSame(66.0, (float) $entry['sources']['mobile']['duration']);
+        // The written guide is saved with it.
+        $this->assertArrayHasKey('guide', $entry);
 
         // A new cut replaces the old files.
         $video->update(['version' => 2]);
@@ -150,6 +156,94 @@ class LibraryTest extends TestCase
         } finally {
             File::deleteDirectory($public);
         }
+    }
+
+    public function test_a_video_page_has_a_written_guide_and_tells_search_engines_about_it(): void
+    {
+        $guide = Guide::fromSteps([
+            ['action' => 'click', 'target' => ['role' => 'link', 'name' => 'Post a job'], 'chapter' => 'Open the form'],
+            ['action' => 'type', 'target' => ['label' => 'Job title'], 'value' => 'Head of Support'],
+        ]);
+        $manifest = app(Manifest::class);
+        $manifest->put($this->manifestVideo(['guide' => $guide, 'title' => 'Post a job </script><script>alert(1)</script>']));
+        $manifest->put($this->manifestVideo(['slug' => 'payroll', 'title' => 'Run payroll', 'visibility' => 'private']));
+
+        $page = $this->get('/help/videos/post-a-job')->assertOk();
+        $page->assertSee('Step by step')->assertSee('<strong>Post a job</strong>', false)->assertSee('Fill in <strong>Job title</strong>.', false)
+            ->assertDontSee('Head of Support');
+        // A description, link previews and structured data, with nothing able to end the script.
+        $page->assertSee('<meta property="og:video:type" content="video/mp4">', false)->assertSee('<link rel="canonical" href="'.route('video-demo.public.show', 'post-a-job').'">', false);
+        preg_match('/<script type="application\/ld\+json">(.*?)<\/script>/s', $page->getContent(), $m);
+        $schema = json_decode($m[1], true);
+        $this->assertSame(['VideoObject', 'PT1M2S'], [$schema['@type'], $schema['duration']]);
+        $this->assertStringNotContainsString('</script><script>', $m[1]);
+
+        // Private videos aren't indexed, and have no sitemap.
+        $this->get('/admin/videos/payroll')->assertOk()->assertSee('<meta name="robots" content="noindex">', false)->assertDontSee('application/ld+json', false);
+        $this->get('/admin/videos/sitemap.xml')->assertNotFound();
+        $sitemap = $this->get('/help/videos/sitemap.xml')->assertOk()->assertHeader('Content-Type', 'application/xml');
+        $this->assertStringContainsString('<loc>'.route('video-demo.public.show', 'post-a-job').'</loc>', $sitemap->getContent());
+        $this->assertStringContainsString('<video:duration>62</video:duration>', $sitemap->getContent());
+        $this->assertStringNotContainsString('payroll', $sitemap->getContent());
+    }
+
+    public function test_videos_published_before_guides_get_one_from_their_saved_plan(): void
+    {
+        Storage::disk('public')->put('video-demo/post-a-job-v1.json', json_encode(['plan' => ['steps' => [
+            ['action' => 'click', 'target' => ['role' => 'button', 'name' => 'Publish job']],
+        ]]]));
+        app(Manifest::class)->put($this->manifestVideo(['record' => 'video-demo/post-a-job-v1.json']));
+
+        $this->get('/help/videos/post-a-job')->assertOk()->assertSee('Click <strong>Publish job</strong>.', false);
+    }
+
+    public function test_frontends_that_arent_blade_get_the_video_as_json_and_a_web_component(): void
+    {
+        $manifest = app(Manifest::class);
+        $manifest->put($this->manifestVideo(['sources' => [
+            'desktop' => ['video' => 'video-demo/post-a-job-v1-desktop.mp4', 'poster' => 'video-demo/post-a-job-v1-desktop.jpg', 'subtitles' => null, 'width' => 1280, 'height' => 800, 'duration' => 62.4, 'chapters' => []],
+            'mobile' => ['video' => 'video-demo/post-a-job-v1-mobile.mp4', 'poster' => 'video-demo/post-a-job-v1-mobile.jpg', 'subtitles' => 'video-demo/post-a-job-v1-mobile.vtt', 'width' => 390, 'height' => 844, 'duration' => 66.0, 'chapters' => []],
+        ]]));
+        $manifest->put($this->manifestVideo(['slug' => 'payroll', 'visibility' => 'private']));
+
+        // Any frontend may fetch a public video, with full addresses for each version.
+        $json = $this->getJson('/help/videos/post-a-job.json')->assertOk()->assertHeader('Access-Control-Allow-Origin', '*');
+        $this->assertSame(['desktop', 'mobile'], array_keys($json->json('sources')));
+        $this->assertStringStartsWith('http', $json->json('sources.mobile.video'));
+        $this->assertStringEndsWith('post-a-job-v1-mobile.vtt', $json->json('sources.mobile.subtitles'));
+        $this->assertSame(route('video-demo.public.show', 'post-a-job'), $json->json('page'));
+        // A private one isn't public.
+        $this->getJson('/help/videos/payroll.json')->assertNotFound();
+        $this->getJson('/help/videos/missing.json')->assertNotFound();
+
+        // Plays are counted from other sites too, when the app counts them: without a CSRF token.
+        $this->assertNull($json->json('stats'));
+        config(['video-demo.library.stats' => true]);
+        $this->assertSame(route('video-demo.public.events', 'post-a-job'), $this->getJson('/help/videos/post-a-job.json')->json('stats'));
+        // Whatever the web group checks CSRF with (Laravel 13 calls it PreventRequestForgery), the events route skips it.
+        $csrf = collect(app(Kernel::class)->getMiddlewareGroups()['web'])->first(fn ($m) => preg_match('/Csrf|Forgery/', $m));
+        $this->assertNotNull($csrf);
+        $this->assertContains($csrf, Route::getRoutes()->getByName('video-demo.public.events')->excludedMiddleware());
+
+        $script = $this->get('/help/videos/embed.js')->assertOk()->assertHeader('Access-Control-Allow-Origin', '*');
+        $this->assertStringStartsWith('application/javascript', $script->headers->get('Content-Type'));
+        $this->assertStringContainsString("customElements.define('video-demo-player'", $script->getContent());
+    }
+
+    public function test_a_frontends_pages_list_their_videos_by_path(): void
+    {
+        // Published from a separate frontend, its pages are kept by their path.
+        config(['video-demo.frontend.url' => 'http://localhost:5173']);
+        $this->assertSame([['name' => null, 'uri' => 'jobs/new']], Routes::describe(['/jobs/new', '/jobs/new?tab=2']));
+
+        $manifest = app(Manifest::class);
+        $manifest->put($this->manifestVideo(['routes' => [['name' => null, 'uri' => 'jobs/new']]]));
+        $manifest->put($this->manifestVideo(['slug' => 'payroll', 'title' => 'Run payroll', 'visibility' => 'private', 'routes' => [['name' => null, 'uri' => 'jobs/new']]]));
+
+        $json = $this->getJson('/help/videos/for-page.json?path=/jobs/new')->assertOk()->assertHeader('Access-Control-Allow-Origin', '*');
+        $this->assertSame(['post-a-job'], array_column($json->json('videos'), 'slug'));
+        $this->assertSame([], $this->getJson('/help/videos/for-page.json?path=/settings')->json('videos'));
+        $this->assertStringContainsString("customElements.define('video-demo-help'", $this->get('/help/videos/embed.js')->getContent());
     }
 
     public function test_public_library_hides_private_videos(): void

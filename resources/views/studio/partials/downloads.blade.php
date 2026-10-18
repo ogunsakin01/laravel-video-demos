@@ -29,6 +29,17 @@
       @endif
     @endforeach
 
+    @if ($video->hasPlan())
+      <li>
+        <span class="vd-num">PHP</span>
+        <span style="flex:1;min-width:160px">
+          <span style="color:var(--vd-strong)">Pest browser test</span>
+          <span class="vd-small vd-muted" style="display:block">The video's steps as a test that the flow still works, for pestphp/pest-plugin-browser. Made from the plan.</span>
+        </span>
+        <a class="vd-btn vd-btn-sm" href="{{ route('video-demo.studio.pest-test', $video) }}?v={{ $video->version }}">Download</a>
+      </li>
+    @endif
+
     @foreach (Exporter::FORMATS as $format => $info)
       @php($export = $exports[$format] ?? null)
       @php($current = Exporter::isCurrent($video, $format))

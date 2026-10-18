@@ -16,6 +16,7 @@
     <div class="vd-flash vd-flash-error" role="alert">Set <code>ANTHROPIC_API_KEY</code> (or <a href="https://github.com/ogunsakin01/laravel-video-demos/wiki/AI-Providers-and-Costs#providers" target="_blank" rel="noopener">another provider's key</a>) in your <code>.env</code> to generate videos.</div>
   @endunless
 
+  @include('video-demo::studio.partials.setup')
   @include('video-demo::studio.partials.worker-warning')
   @if ($queueWarning)
     <div class="vd-flash vd-flash-warn" role="status">{{ $queueWarning }}</div>

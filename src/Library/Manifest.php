@@ -41,6 +41,32 @@ class Manifest
     }
 
     /**
+     * Get the written guide for a published video: saved with it when it was
+     * published, or, for one published before guides were, made from the
+     * plan saved next to it (kept for an hour, as a version never changes).
+     *
+     * @return list<array{title: ?string, items: list<array<string, mixed>>}>
+     */
+    public function guide(array $video): array
+    {
+        if (isset($video['guide'])) {
+            return $video['guide'];
+        }
+        if (empty($video['record'])) {
+            return [];
+        }
+
+        return Cache::remember('video-demo.guide.'.sha1($video['record']), 3600, function () use ($video) {
+            $disk = $this->disk();
+            $record = $disk->exists($video['record']) ? (array) json_decode((string) $disk->get($video['record']), true) : [];
+
+            $primary = collect(static::sources($video))->search(fn ($s) => $s['video'] === ($video['video'] ?? null));
+
+            return Guide::fromSteps($record['plan']['steps'] ?? [], is_string($primary) ? $primary : 'desktop');
+        });
+    }
+
+    /**
      * Get the videos a library area shows: the public area shows public videos,
      * the private area shows all.
      */
@@ -58,7 +84,7 @@ class Manifest
      *
      * @return list<array<string, mixed>>
      */
-    protected function visible(string $area): array
+    public function visible(string $area): array
     {
         return array_values(array_filter(
             $this->all(),

@@ -31,6 +31,7 @@ class VerifyCommand extends Command
         {slug?* : Only these videos}
         {--all : Check every video with a plan, not only published ones}
         {--changed= : Only the videos made from code that differs from this git ref, such as origin/main}
+        {--frontend-changed= : Also the videos made from a separate frontend\'s code that differs from this git ref in its repository (VIDEO_DEMO_FRONTEND_PATH)}
         {--fix : Ask the AI for a new plan for each broken video, record it, and publish it again if it was published}
         {--json : Print the result as JSON, for CI, scripts and AI agents}';
 
@@ -52,9 +53,9 @@ class VerifyCommand extends Command
 
         $videos = $this->videos();
         $changed = null;
-        if ($ref = $this->option('changed')) {
+        if (($ref = $this->option('changed')) || $this->option('frontend-changed')) {
             try {
-                $changed = Verifier::changedFiles($ref);
+                $changed = Verifier::changedFiles($ref ? (string) $ref : null, $this->option('frontend-changed') ?: null);
             } catch (RuntimeException $e) {
                 return $this->refuse($e->getMessage());
             }

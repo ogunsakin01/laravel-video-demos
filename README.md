@@ -27,7 +27,7 @@ composer require ogunsakin01/laravel-video-demos
 php artisan video-demo:install
 ```
 
-Then follow the [setup checklist](https://github.com/ogunsakin01/laravel-video-demos/wiki/Setup-Checklist). Everything else is in the **[wiki](https://github.com/ogunsakin01/laravel-video-demos/wiki)**.
+Run `php artisan video-demo:doctor` to check everything is set up, then follow the [setup checklist](https://github.com/ogunsakin01/laravel-video-demos/wiki/Setup-Checklist). Everything else is in the **[wiki](https://github.com/ogunsakin01/laravel-video-demos/wiki)**.
 
 ## See it
 
@@ -94,15 +94,15 @@ The plan is stored with the video, so after a redesign you can record it again a
 - **[Sample data](https://github.com/ogunsakin01/laravel-video-demos/wiki/Sample-Data)**: recorded as any type of user (Admin, Member…) on a database made for the video, never your own.
 - **[Voice-over and music](https://github.com/ogunsakin01/laravel-video-demos/wiki/Voice-Over-and-Music)**: a narrator that speaks a line at each step, with free local voices or OpenAI, Gemini and ElevenLabs ones, and background music (four built-in tracks, or your own) that steps aside while the voice speaks. Subtitles come with it. Off unless you choose them.
 - **Where to put it**: for a finished video, two or three spots in your app where it would help, each checked not to upset the layout on desktop and phone, with pictures of the video in place and the exact line of code to paste a collapsible player at.
-- **[Up to date](https://github.com/ogunsakin01/laravel-video-demos/wiki/Keeping-Videos-Up-To-Date)**: `video-demo:verify` finds the videos a change broke, in CI too, at no AI cost, and fixes them with `--fix`. [On each deploy](https://github.com/ogunsakin01/laravel-video-demos/wiki/Keeping-Videos-Up-To-Date#on-deploy), `video-demo:refresh --changed --fix` records again just the videos the change touched. Edit a plan by hand to reword a caption or fix a button name, and record it again for free.
+- **[Up to date](https://github.com/ogunsakin01/laravel-video-demos/wiki/Keeping-Videos-Up-To-Date)**: `video-demo:verify` finds the videos a change broke, in CI too, at no AI cost, and fixes them with `--fix`. [On each pull request](https://github.com/ogunsakin01/laravel-video-demos/wiki/Keeping-Videos-Up-To-Date#on-pull-requests), `video-demo:preview` records the videos it touches, for reviewers to watch. [On each deploy](https://github.com/ogunsakin01/laravel-video-demos/wiki/Keeping-Videos-Up-To-Date#on-deploy), `video-demo:refresh --changed --fix` records again just the videos the change touched. Edit a plan by hand to reword a caption or fix a button name, and record it again for free.
 - **Your app's language, and others**: titles, captions and the voice-over are written in the language of your app's pages, or one you choose per video. Make the same video in more languages from its plan, for about a cent each; viewers see their own.
-- **Downloads**: a GIF for READMEs and emails, and square and vertical copies for social posts.
+- **Downloads**: a GIF for READMEs and emails, square and vertical copies for social posts, and the video's steps as a Pest browser test, so every help video is also a test that the flow still works.
 - **[Styles and screens](https://github.com/ogunsakin01/laravel-video-demos/wiki/Styles-and-Screens)**: from step-by-step tutorials to the Spotlight feature reel and a Promo reel with bold headlines, on desktop, TV, tablet and mobile, at the speed you choose, with your logo and an end card if you like.
-- **[A help library](https://github.com/ogunsakin01/laravel-video-demos/wiki/The-Library)** for your users, a Blade tag to put any video on any page, and `<x-video-demo::help />` to show each page's own videos. Optional counts show how far viewers get and what they searched for in vain.
-- **[A separate frontend](https://github.com/ogunsakin01/laravel-video-demos/wiki/Separate-Frontend)**: a Vue, React or other app on its own address that uses your Laravel app as its API, signed in with a session, Sanctum token, JWT or your own way (SSO included), on sample data.
+- **[A help library](https://github.com/ogunsakin01/laravel-video-demos/wiki/The-Library)** for your users, with a written step-by-step guide under each video and pages search engines can index, a Blade tag to put any video on any page, and `<x-video-demo::help />` to show each page's own videos. Optional counts show how far viewers get and what they searched for in vain.
+- **[A separate frontend](https://github.com/ogunsakin01/laravel-video-demos/wiki/Separate-Frontend)**: a Vue, React or other app on its own address that uses your Laravel app as its API, signed in with a session, Sanctum token, JWT or your own way (SSO included), on sample data, and played inside it with `<video-demo-player>`.
 - **[Cost control](https://github.com/ogunsakin01/laravel-video-demos/wiki/AI-Providers-and-Costs)**: an estimate first, a spending limit on every video ($0.50 unless you change it), and the real cost afterwards.
 - **[Any model](https://github.com/ogunsakin01/laravel-video-demos/wiki/AI-Providers-and-Costs#providers)**: Claude by default, or OpenAI, Gemini, Mistral, a local model with Ollama, and others through Prism.
-- **[Commands](https://github.com/ogunsakin01/laravel-video-demos/wiki/Command-Line)** with JSON output for scripts and AI agents, and **[a facade](https://github.com/ogunsakin01/laravel-video-demos/wiki/Using-It-From-Code)** to build your own screens.
+- **[Commands](https://github.com/ogunsakin01/laravel-video-demos/wiki/Command-Line)** with JSON output for scripts and AI agents, [an MCP server](https://github.com/ogunsakin01/laravel-video-demos/wiki/Command-Line#for-ai-agents) for coding agents (Claude Code, Cursor), and **[a facade](https://github.com/ogunsakin01/laravel-video-demos/wiki/Using-It-From-Code)** to build your own screens.
 
 ## Documentation
 

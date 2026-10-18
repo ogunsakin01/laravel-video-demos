@@ -5,6 +5,7 @@ namespace Ogunsakin01\VideoDemo\Http\Controllers\Studio;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -36,12 +37,14 @@ use Ogunsakin01\VideoDemo\Models\VideoRequest;
 use Ogunsakin01\VideoDemo\Models\VideoStyle;
 use Ogunsakin01\VideoDemo\Recording\Devices;
 use Ogunsakin01\VideoDemo\Recording\Exporter;
+use Ogunsakin01\VideoDemo\Recording\PestTest;
 use Ogunsakin01\VideoDemo\Recording\RecordAs;
 use Ogunsakin01\VideoDemo\Recording\Recorder;
 use Ogunsakin01\VideoDemo\Studio\Embeds;
 use Ogunsakin01\VideoDemo\Studio\Examples;
 use Ogunsakin01\VideoDemo\Studio\Pages;
 use Ogunsakin01\VideoDemo\Studio\Progress;
+use Ogunsakin01\VideoDemo\Support\Doctor;
 use Ogunsakin01\VideoDemo\Support\Language;
 use Ogunsakin01\VideoDemo\Support\Worker;
 use Ogunsakin01\VideoDemo\VideoDemo;
@@ -66,6 +69,35 @@ class VideoController extends Controller
             'totalCost' => Spend::total(),
             'queueWarning' => VideoDemoServiceProvider::queueWarning(),
             'lost' => rescue(fn () => $restorer->missing(), [], false),
+        ]);
+    }
+
+    /**
+     * Get what isn't set up for making videos, for the studio's notice: the
+     * checks video-demo:doctor runs, kept for ten minutes as some start
+     * programs. ?fresh=1 checks again.
+     */
+    public function setup(Request $request, Doctor $doctor): JsonResponse
+    {
+        if ($request->boolean('fresh')) {
+            Cache::forget('video-demo.studio.setup');
+        }
+        $checks = Cache::remember('video-demo.studio.setup', 600, fn () => $doctor->run(web: true));
+
+        // The studio's pages say what's wrong with the queue themselves.
+        return response()->json(['problems' => array_values(array_filter($checks, fn ($c) => $c['status'] === 'fail' && $c['check'] !== 'The queue'))]);
+    }
+
+    /**
+     * Download the video's plan as a Pest browser test.
+     */
+    public function pestTest(Video $video): Response
+    {
+        abort_unless($video->hasPlan(), 404);
+
+        return response(PestTest::for($video), 200, [
+            'Content-Type' => 'text/x-php; charset=utf-8',
+            'Content-Disposition' => 'attachment; filename="'.PestTest::fileName($video).'"',
         ]);
     }
 

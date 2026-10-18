@@ -1,4 +1,10 @@
 <x-video-demo::layout :title="$query !== '' ? 'Search' : null" :badge="$area === 'private' ? 'Staff' : null" :home="route('video-demo.'.$area.'.index')">
+  <x-slot:head>
+    <meta name="description" content="How-to videos: watch how to do each task in {{ config('app.name') }}, step by step.">
+    @if ($area === 'private' || $query !== '')
+      <meta name="robots" content="noindex">
+    @endif
+  </x-slot:head>
   <section class="vd-hero">
     @include('video-demo::partials.art', ['name' => 'book'])
     <div>

@@ -1,4 +1,46 @@
+@php
+  $manifest = app(\Ogunsakin01\VideoDemo\Library\Manifest::class);
+  $guide = $manifest->guide($video);
+  $language = $video['language'] ?? null;
+  $absolute = fn (?string $u) => $u !== null && str_starts_with($u, '/') ? url($u) : $u;
+  $description = trim((string) ($video['summary'] ?? '')) ?: $video['title'];
+@endphp
 <x-video-demo::layout :title="$video['title']" :badge="$area === 'private' ? 'Staff' : null" :home="route('video-demo.'.$area.'.index')">
+  <x-slot:head>
+    <meta name="description" content="{{ \Illuminate\Support\Str::limit($description, 300) }}">
+    @if ($area === 'private')
+      <meta name="robots" content="noindex">
+    @else
+      {{-- For search engines and link previews: the poster, the video and what it shows. --}}
+      @php($poster = $absolute($manifest->url($video, 'poster')))
+      @php($mp4 = $absolute($manifest->url($video)))
+      @php($seconds = (int) round($video['duration'] ?? 0))
+      <link rel="canonical" href="{{ route('video-demo.public.show', $video['slug']) }}">
+      <meta property="og:type" content="video.other">
+      <meta property="og:title" content="{{ $video['title'] }}">
+      <meta property="og:description" content="{{ \Illuminate\Support\Str::limit($description, 300) }}">
+      <meta property="og:url" content="{{ route('video-demo.public.show', $video['slug']) }}">
+      @if ($poster)<meta property="og:image" content="{{ $poster }}">@endif
+      @if ($mp4)
+        <meta property="og:video" content="{{ $mp4 }}">
+        <meta property="og:video:type" content="video/mp4">
+      @endif
+      <meta name="twitter:card" content="summary_large_image">
+      @php($schema = array_filter([
+        '@context' => 'https://schema.org',
+        '@type' => 'VideoObject',
+        'name' => $video['title'],
+        'description' => $description,
+        'thumbnailUrl' => $poster,
+        'contentUrl' => $mp4,
+        'uploadDate' => $video['published_at'] ?? null,
+        'duration' => sprintf('PT%dM%dS', intdiv($seconds, 60), $seconds % 60),
+        'inLanguage' => $language,
+      ]))
+      {{-- Encoded so nothing in a title can end the script tag. --}}
+      <script type="application/ld+json">{!! json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!}</script>
+    @endif
+  </x-slot:head>
   <x-slot:nav>
     <a class="vd-btn" href="{{ route('video-demo.'.$area.'.index') }}">All videos</a>
   </x-slot:nav>
@@ -22,6 +64,29 @@
             <button type="button" class="vd-segment" data-device="{{ $key }}">{{ config("video-demo.devices.$key.label", ucfirst($key)) }}</button>
           @endforeach
         </div>
+      @endif
+
+      @if ($guide !== [])
+        {{-- The video's steps in writing, made from its plan. --}}
+        <section class="vd-card vd-guide" aria-labelledby="vd-guide-title" @if ($language) lang="{{ $language }}" @endif>
+          <h2 id="vd-guide-title">{{ __('video-demo::guide.heading', [], \Ogunsakin01\VideoDemo\Library\Guide::locale($language)) }}</h2>
+          @php($number = 1)
+          @foreach ($guide as $section)
+            @if ($section['title'])<h3>{{ $section['title'] }}</h3>@endif
+            @foreach (\Ogunsakin01\VideoDemo\Library\Guide::blocks($section['items']) as $block)
+              @if (isset($block['note']))
+                <p class="vd-guide-note">@if ($block['note']['title'])<strong>{{ $block['note']['text'] !== '' && ! preg_match('/[.!?:]$/u', $block['note']['title']) ? $block['note']['title'].'.' : $block['note']['title'] }}</strong>@endif {{ $block['note']['text'] }}</p>
+              @else
+                <ol start="{{ $number }}">
+                  @foreach ($block['steps'] as $item)
+                    <li>{{ \Ogunsakin01\VideoDemo\Library\Guide::sentence($item, $language) }}</li>
+                  @endforeach
+                </ol>
+                @php($number += count($block['steps']))
+              @endif
+            @endforeach
+          @endforeach
+        </section>
       @endif
     </div>
 

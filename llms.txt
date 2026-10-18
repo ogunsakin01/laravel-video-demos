@@ -18,6 +18,7 @@ After updating the package, restart queue workers (`php artisan queue:restart`):
 ## Make videos (CLI, for agents and scripts)
 
 ```bash
+php artisan video-demo:doctor --json    # check everything making videos needs (Node, Playwright, ffmpeg, AI key, queue, the app's address…), with fixes
 php artisan video-demo:suggest --json   # the videos worth making first, from the app's routes
 php artisan video-demo:generate "How a recruiter posts a job" --length=60 --style=clean --devices=desktop,mobile --json
 php artisan video-demo:generate "Show off posting a job" --style=ad --publish --json
@@ -29,7 +30,8 @@ php artisan video-demo:verify --json  # check published videos still work (no re
 php artisan video-demo:verify --changed=origin/main --json  # only videos made from code that differs from the ref (for CI)
 php artisan video-demo:verify --fix   # new plan for each broken video, recorded and republished
 php artisan video-demo:translate post-a-job fr es --publish --json  # the same video in other languages, from its plan
-php artisan video-demo:export post-a-job --format=gif --out=docs/post-a-job.gif  # gif, square or vertical (9:16)
+php artisan video-demo:export post-a-job --format=gif --out=docs/post-a-job.gif  # gif, square or vertical (9:16); --format=pest for a Pest browser test
+php artisan video-demo:preview --changed=<base> --out=video-demo-previews  # on a pull request: record the published videos it touches (MP4, GIF, summary.md), without publishing
 ```
 
 `verify` needs the studio enabled (it signs in through it) and the app running at `APP_URL`; in CI set `VIDEO_DEMO_STUDIO=true`. Each video's result is kept in `verify_result` (`ok`, `device`, `step`, `action`, `error`, `url`), and `Ogunsakin01\VideoDemo\Events\VideoBroke` fires for a broken one.
@@ -50,9 +52,12 @@ VideoDemo::verify($video);                    // ['ok' => false, 'step' => 3, 'd
 VideoDemo::updatePlan($video, ['steps' => [...]]); VideoDemo::rerecord($video);  // edit the plan by hand, record it free
 VideoDemo::translate($video, 'fr');           // a linked video in French, made from the plan
 VideoDemo::export($video, 'vertical');        // path of a gif, square or vertical copy
+VideoDemo::pestTest($video);                  // the plan as a Pest browser test (PHP file contents); also video-demo:export <slug> --format=pest --out=tests/Browser/XTest.php
 VideoDemo::forPage('jobs.create');            // published videos that show a page (route name or path)
 VideoDemo::signInUsing(fn ($user) => \Ogunsakin01\VideoDemo\Recording\SignIn::header('Authorization', 'Bearer '.$user->createToken('video-demo')->accessToken));  // a separate frontend's own sign-in (VIDEO_DEMO_SIGN_IN=custom), here Passport
 ```
+
+With `laravel/mcp` installed (and the studio enabled), coding agents get the MCP server "video-demos" (`php artisan mcp:start video-demos`), with tools check-setup, list-videos, get-video, make-video, verify-videos, publish-video and pest-test.
 
 `Ogunsakin01\VideoDemo\Events\VideoStatusChanged` fires when a video's status changes. `php artisan video-demo:clean` frees disk space.
 
@@ -67,7 +72,7 @@ VideoDemo::signInUsing(fn ($user) => \Ogunsakin01\VideoDemo\Recording\SignIn::he
 <x-video-demo::search placeholder="How do I…" />
 ```
 
-Library pages: `/help/videos` (public) and `/admin/videos` (private videos too).
+Library pages: `/help/videos` (public) and `/admin/videos` (private videos too). Each video page has a written step-by-step guide made from its plan (no AI; words translatable with `vendor:publish --tag=video-demo-lang`), link-preview tags and `VideoObject` structured data; `/help/videos/sitemap.xml` lists the public videos. Frontends that aren't Blade load `/help/videos/embed.js` and use `<video-demo-player slug="…">` (public videos; JSON at `/help/videos/{slug}.json`).
 
 ## Key facts
 
@@ -85,7 +90,7 @@ Library pages: `/help/videos` (public) and `/admin/videos` (private videos too).
 - The default model is the cheapest one marked `reliable` whose provider has a key (Claude Sonnet 5.5); `VIDEO_DEMO_MODEL` overrides it.
 - Pages are checked for errors (HTTP errors, sign-in redirects, JavaScript errors) before planning and recording, so no AI is spent on broken pages. On sample data each new plan is then rehearsed on every screen without recording, on a copy of the database, so a step that doesn't work goes back to the AI before the voice-over or recording (`VIDEO_DEMO_REHEARSE`, no AI cost; a failed rehearsal counts as one of `limits.max_repairs`).
 - While planning, the AI reads the code, and looks at a page as the video's user when the code doesn't settle a label (a translation key, a component, text from the database): up to `limits.page_looks` (3) per video, redacted like code.
-- A separate frontend (Vue, React… on its own address, using the Laravel app as its API): set `VIDEO_DEMO_FRONTEND_URL`. Videos are recorded on the frontend; `VIDEO_DEMO_SIGN_IN` is `session` (also Sanctum cookie sign-in), `sanctum-token` or `jwt` (put in localStorage under `VIDEO_DEMO_TOKEN_KEY`), or `custom` with `VideoDemo::signInUsing(fn ($user) => SignIn::header(...)->withCookie(...)->withLocalStorage(...))`. Sample data reaches the API through a signed header the recorder adds to requests to the app's address (`VIDEO_DEMO_BASE_URL`, else `APP_URL`) and to the frontend's own address (dev-server proxies); the frontend must call one of those. A change a step sends (POST, PUT, PATCH, DELETE) that the app refuses with a 4xx fails that step with Laravel's message; GETs, Laravel Precognition, broadcasting sign-in and a guest's 401 are left alone.
+- A separate frontend (Vue, React… on its own address, using the Laravel app as its API): set `VIDEO_DEMO_FRONTEND_URL`. Videos are recorded on the frontend; `VIDEO_DEMO_SIGN_IN` is `session` (also Sanctum cookie sign-in), `sanctum-token` or `jwt` (put in localStorage under `VIDEO_DEMO_TOKEN_KEY`), or `custom` with `VideoDemo::signInUsing(fn ($user) => SignIn::header(...)->withCookie(...)->withLocalStorage(...))`. With `VIDEO_DEMO_FRONTEND_PATH` (the frontend's repository, such as ../web), the AI reads its code under frontend/ and `--frontend-changed=<ref>` flags videos a frontend change touches; `<video-demo-help>` lists a frontend page's videos. Sample data reaches the API through a signed header the recorder adds to requests to the app's address (`VIDEO_DEMO_BASE_URL`, else `APP_URL`) and to the frontend's own address (dev-server proxies); the frontend must call one of those. A change a step sends (POST, PUT, PATCH, DELETE) that the app refuses with a 4xx fails that step with Laravel's message; GETs, Laravel Precognition, broadcasting sign-in and a guest's 401 are left alone.
 - Published videos go to `VIDEO_DEMO_DISK`: a disk production also reads (S3, R2), or `video-demo-repo` (`public/video-demo`, committed and deployed with the code). Each published video's studio record is saved next to it, and `video-demo:install` brings back published videos the studio's database lost.
 - Videos are recorded as a type of user (found from spatie/laravel-permission, Laratrust, Bouncer, a role column or an is_admin flag, or `recorder.user_types`), or as a guest.
 - Suggested ideas are saved in the database and can be added to or replaced.

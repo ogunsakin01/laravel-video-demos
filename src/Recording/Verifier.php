@@ -115,18 +115,44 @@ class Verifier
 
     /**
      * Get the files that differ from a git ref, such as origin/main,
-     * including changes not committed yet, relative to the app's root.
+     * including changes not committed yet, relative to the app's root; and
+     * with $frontendRef, a separate frontend's that differ from it, as
+     * frontend/…. Either ref may be left out.
      *
      * @return list<string>
      *
      * @throws RuntimeException When git can't compare them.
      */
-    public static function changedFiles(string $ref): array
+    public static function changedFiles(?string $ref, ?string $frontendRef = null): array
+    {
+        $files = $ref !== null && $ref !== '' ? static::diff(base_path(), $ref) : [];
+
+        // A separate frontend's changes, named as the AI reads its files: frontend/….
+        $frontend = (string) config('video-demo.frontend.path');
+        if ($frontendRef !== null && $frontendRef !== '') {
+            if ($frontend === '') {
+                throw new RuntimeException('There is no frontend to compare: set VIDEO_DEMO_FRONTEND_PATH to its repository.');
+            }
+            $root = str_starts_with($frontend, '/') ? $frontend : base_path($frontend);
+            $files = [...$files, ...array_map(fn ($f) => "frontend/$f", static::diff($root, $frontendRef))];
+        }
+
+        return $files;
+    }
+
+    /**
+     * List the files that differ from a git ref in a repository.
+     *
+     * @return list<string>
+     *
+     * @throws RuntimeException When the ref isn't one, or git can't compare.
+     */
+    protected static function diff(string $path, string $ref): array
     {
         if (str_starts_with($ref, '-')) {
             throw new RuntimeException("[$ref] isn't a git ref.");
         }
-        $result = Process::path(base_path())->run(['git', 'diff', '--name-only', $ref, '--']);
+        $result = Process::path($path)->run(['git', 'diff', '--name-only', $ref, '--']);
         if ($result->failed()) {
             throw new RuntimeException("git couldn't compare with [$ref]: ".trim($result->errorOutput() ?: $result->output()));
         }

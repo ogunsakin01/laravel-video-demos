@@ -232,7 +232,7 @@ class CodeTools
     protected function search(string $pattern, ?string $path): string
     {
         $dirs = $path ? [$this->resolve($path, mustBeDir: true)] : array_filter(
-            array_map(fn ($p) => $this->root.'/'.$p, $this->allowedPaths()),
+            array_map(fn ($p) => implode('/', array_filter($this->mount($p), fn ($part) => $part !== '')), $this->allowedPaths()),
             'is_dir',
         );
         $regex = '~'.str_replace('~', '\~', $pattern).'~i';
@@ -265,7 +265,8 @@ class CodeTools
      */
     protected function resolve(string $path, bool $mustBeDir = false): string
     {
-        $real = realpath($this->root.'/'.ltrim($path, '/'));
+        [$base, $inner] = $this->mount(ltrim($path, '/'));
+        $real = realpath($base.'/'.$inner);
 
         if ($real === false) {
             throw new RuntimeException("$path does not exist.");
@@ -276,7 +277,7 @@ class CodeTools
             fn ($p) => $relative === $p || str_starts_with($relative, $p.'/')
         );
 
-        if (! str_starts_with($real, $this->root.'/') || ! $allowed) {
+        if (! str_starts_with($real, $base.'/') || ! $allowed) {
             throw new RuntimeException("$path is outside the folders you can read: ".implode(', ', $this->allowedPaths()).'.');
         }
         if ($this->denied($relative)) {
@@ -307,16 +308,60 @@ class CodeTools
 
     protected function relative(string $absolute): string
     {
+        $frontend = $this->frontendRoot();
+        if ($frontend !== null && str_starts_with($absolute, $frontend.'/')) {
+            return 'frontend/'.ltrim(Str::after($absolute, $frontend), '/');
+        }
+
         return ltrim(Str::after($absolute, $this->root), '/');
     }
 
     /**
-     * Get the folders the model may read, relative to the app's root.
+     * Get the folders the model may read, relative to the app's root, and a
+     * separate frontend's under frontend/.
      *
      * @return list<string>
      */
     protected function allowedPaths(): array
     {
-        return array_values(array_map(fn ($p) => trim($p, '/'), config('video-demo.ai.code.paths', [])));
+        $paths = array_map(fn ($p) => trim($p, '/'), config('video-demo.ai.code.paths', []));
+        if ($this->frontendRoot() !== null) {
+            foreach ((array) config('video-demo.frontend.code', ['src']) as $p) {
+                $paths[] = 'frontend/'.trim((string) $p, '/');
+            }
+        }
+
+        return array_values($paths);
+    }
+
+    /**
+     * Get the folder a path the model gives lives in, and the rest of it: a
+     * separate frontend's repository for frontend/…, the app's otherwise.
+     *
+     * @return array{0: string, 1: string}
+     */
+    protected function mount(string $path): array
+    {
+        $frontend = $this->frontendRoot();
+        if ($frontend !== null && ($path === 'frontend' || str_starts_with($path, 'frontend/'))) {
+            return [$frontend, ltrim(substr($path, strlen('frontend')), '/')];
+        }
+
+        return [$this->root, $path];
+    }
+
+    /**
+     * Get the separate frontend's repository (video-demo.frontend.path, from
+     * the app's root when relative), or null when there is none.
+     */
+    protected function frontendRoot(): ?string
+    {
+        $path = (string) config('video-demo.frontend.path');
+        if ($path === '') {
+            return null;
+        }
+        $real = realpath(str_starts_with($path, '/') ? $path : $this->root.'/'.$path);
+
+        return $real === false ? null : rtrim($real, '/');
     }
 }

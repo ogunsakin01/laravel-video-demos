@@ -21,6 +21,7 @@ use Ogunsakin01\VideoDemo\Models\VideoIdea;
 use Ogunsakin01\VideoDemo\Models\VideoStyle;
 use Ogunsakin01\VideoDemo\Recording\Devices;
 use Ogunsakin01\VideoDemo\Recording\Exporter;
+use Ogunsakin01\VideoDemo\Recording\PestTest;
 use Ogunsakin01\VideoDemo\Recording\Plan;
 use Ogunsakin01\VideoDemo\Recording\RecordAs;
 use Ogunsakin01\VideoDemo\Recording\Recorder;
@@ -419,6 +420,19 @@ class VideoDemo
         ]);
 
         return Storage::disk(config('video-demo.storage.work_disk'))->path($file);
+    }
+
+    /**
+     * Get a Pest browser test made from the video's plan, as the contents of
+     * a PHP file: the flow the video shows, checked as a test. No AI is used.
+     */
+    public function pestTest(Video $video): string
+    {
+        if (! $video->hasPlan()) {
+            throw new RuntimeException('This video has no plan to make a test from yet.');
+        }
+
+        return PestTest::for($video);
     }
 
     /**
