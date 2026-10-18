@@ -79,8 +79,9 @@ final class Routes
             return [];
         }
 
-        $root = rtrim(base_path(), '/').'/';
+        $root = rtrim(Paths::slashes(base_path()), '/').'/';
+        $file = is_string($file) ? Paths::slashes($file) : null;
 
-        return is_string($file) && str_starts_with($file, $root) ? [substr($file, strlen($root))] : [];
+        return $file !== null && str_starts_with($file, $root) ? [substr($file, strlen($root))] : [];
     }
 }

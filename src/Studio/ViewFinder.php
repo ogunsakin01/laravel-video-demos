@@ -219,7 +219,7 @@ class ViewFinder
             $score += preg_match($quoted, $lines[$hits[0]]) ? 2 : 0;
             if ($best === null || $score > $best['score']) {
                 $best = [
-                    'file' => ltrim(Str::after($file->getPathname(), base_path()), '/'),
+                    'file' => ltrim(Str::after(Paths::slashes($file->getPathname()), Paths::slashes(base_path())), '/'),
                     'line' => $hits[0] + 1,
                     'text' => Str::limit(trim($lines[$hits[0]]), 160),
                     'score' => $score,

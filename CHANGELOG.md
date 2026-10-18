@@ -6,7 +6,7 @@ All notable changes to this package are listed here. The format follows [Keep a 
 
 ### Fixed
 
-- **Windows.** The AI can read the app's code there (every file was refused as outside the folders it may read), `--out` takes a path such as `D:\docs\video.gif`, finding where a video is shown and the frontend's repository work with Windows paths, and `video-demo:work` and stopping a video work without Unix signals.
+- **Windows.** The AI can read the app's code there (every file was refused as outside the folders it may read), `--out` takes a path such as `D:\docs\video.gif`, finding where a video is shown, the view showing some text, the controllers behind a video's pages (so `--changed` flags it when they change) and the frontend's repository work with Windows paths, and `video-demo:work` and stopping a video work without Unix signals.
 
 ## v0.18.1 - 2026-10-18
 
