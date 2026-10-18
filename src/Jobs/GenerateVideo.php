@@ -97,6 +97,14 @@ class GenerateVideo implements ShouldQueue
     protected array $rehearsalErrors = [];
 
     /**
+     * The errors the app reported while the version that failed was
+     * recorded, on its own copy of the sample database.
+     *
+     * @var list<array<string, mixed>>
+     */
+    protected array $recordingErrors = [];
+
+    /**
      * Execute the job.
      */
     public function handle(Planner $planner, Recorder $recorder, Encoder $encoder, Narrator $narrator, Speaker $speaker, Soundtrack $soundtrack): void
@@ -194,7 +202,7 @@ class GenerateVideo implements ShouldQueue
 
                 // A step that doesn't work is found by a quick rehearsal, before the
                 // voice-over is paid for or anything is recorded, while the AI can still fix it.
-                $failure = $this->rehearse($recorder, $video, $plan, $devices, $sandbox, $shouldStop, canRepair: $session !== null && $session->repairs < $maxRepairs);
+                $failure = $this->rehearse($recorder, $video, $plan, $devices, $sandbox, $shouldStop);
 
                 if (! $failure) {
                     // A voice that can't speak the video's language would read it out wrongly.
@@ -211,8 +219,20 @@ class GenerateVideo implements ShouldQueue
                 foreach ($failure ? [] : $devices as $device) {
                     $this->stopIfAsked($video);
                     $video->moveTo(VideoStatus::Recording, 'Recording the '.Devices::get($device)['label'].' version');
-                    // The style's end card goes after the last step; the plan itself keeps without it.
-                    $result = $recorder->record($plan->withEndCard($video->style ?? []), "$dir/$device", $video->style ?? [], $device, $video->record_as, $shouldStop, $video->playbackSpeed(), array_map(fn ($c) => $c['seconds'], $clips ?? []));
+                    // Each version starts from the same sample data, on its own copy: what
+                    // one version saves (a goal set, a job posted) mustn't change the next.
+                    $copy = $sandbox?->copy();
+                    $recorder->sandbox = $copy;
+                    try {
+                        // The style's end card goes after the last step; the plan itself keeps without it.
+                        $result = $recorder->record($plan->withEndCard($video->style ?? []), "$dir/$device", $video->style ?? [], $device, $video->record_as, $shouldStop, $video->playbackSpeed(), array_map(fn ($c) => $c['seconds'], $clips ?? []));
+                        if (! $result->ok && $copy) {
+                            $this->recordingErrors = $copy->appErrors();
+                        }
+                    } finally {
+                        $recorder->sandbox = $sandbox;
+                        $copy?->delete();
+                    }
                     $video->addLog($result->summary());
 
                     if (! $result->ok) {
@@ -250,7 +270,7 @@ class GenerateVideo implements ShouldQueue
 
             return;
         } finally {
-            $this->appErrors = [...$this->rehearsalErrors, ...($sandbox?->appErrors() ?? [])];
+            $this->appErrors = [...$this->rehearsalErrors, ...$this->recordingErrors, ...($sandbox?->appErrors() ?? [])];
             $sandbox?->delete();
             $recorder->sandbox = null;
             $recorder->locale = null;
@@ -451,15 +471,16 @@ class GenerateVideo implements ShouldQueue
      * that isn't there) goes back to the AI before anything is recorded. It
      * runs on a copy of the sample database, so the recording starts from the
      * same data. On the app's own data it is skipped: it would make every
-     * change twice. So is a plan the AI can't fix any more, such as one
-     * recorded again as it was, which is recorded as before. It costs no AI.
+     * change twice. A plan the AI can't fix any more, such as one recorded
+     * again as it was, is rehearsed too, so a step that no longer works stops
+     * the video in seconds, not partway through recording. It costs no AI.
      *
      * @param  list<string>  $devices
      */
-    protected function rehearse(Recorder $recorder, Video $video, Plan $plan, array $devices, ?Sandbox $sandbox, Closure $shouldStop, bool $canRepair): ?RecordingResult
+    protected function rehearse(Recorder $recorder, Video $video, Plan $plan, array $devices, ?Sandbox $sandbox, Closure $shouldStop): ?RecordingResult
     {
         $this->rehearsalErrors = [];
-        if (! $canRepair || ! config('video-demo.recorder.rehearse', true) || ! $plan->hasActions()) {
+        if (! config('video-demo.recorder.rehearse', true) || ! $plan->hasActions()) {
             return null;
         }
         if (! $sandbox) {

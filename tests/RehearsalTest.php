@@ -12,6 +12,7 @@ use Ogunsakin01\VideoDemo\Models\Video;
 use Ogunsakin01\VideoDemo\Recording\Encoder;
 use Ogunsakin01\VideoDemo\Recording\Plan;
 use Ogunsakin01\VideoDemo\Recording\Recorder;
+use Ogunsakin01\VideoDemo\Recording\RecordingFailed;
 use Ogunsakin01\VideoDemo\Recording\RecordingResult;
 use Ogunsakin01\VideoDemo\Recording\Timeline;
 use Ogunsakin01\VideoDemo\SampleData\Sandbox;
@@ -172,12 +173,13 @@ class RehearsalTest extends TestCase
         $this->assertContains('Rehearsing the plan', $messages);
         $this->assertContains('Rehearsal: Step 2 failed (Desktop): Could not find a visible element with role "button", name "Old button".', $messages);
 
-        // Rehearsals run on copies of the sample database, deleted afterwards; the recording on the original.
-        $this->assertSame([...array_fill(0, 3, sys_get_temp_dir().'/1-rehearsaldb1.sqlite'), ...array_fill(0, 2, sys_get_temp_dir().'/1-recordingdb12.sqlite')], $recorder->sandboxes);
-        $this->assertCount(3, static::$deleted);
+        // Rehearsals and each version's recording run on copies of the sample database, deleted
+        // afterwards: what the desktop version saves (a goal set) doesn't change what mobile shows.
+        $this->assertSame(array_fill(0, 5, sys_get_temp_dir().'/1-rehearsaldb1.sqlite'), $recorder->sandboxes);
+        $this->assertCount(5, static::$deleted);
     }
 
-    public function test_videos_on_the_apps_own_data_recorded_as_they_were_or_with_rehearsals_off_are_recorded_straight_away(): void
+    public function test_videos_on_the_apps_own_data_or_with_rehearsals_off_are_recorded_straight_away(): void
     {
         $recorder = $this->fakeApp();
 
@@ -188,15 +190,22 @@ class RehearsalTest extends TestCase
         $this->assertSame(['Old button (desktop)'], $recorder->recorded);
         $this->assertContains('Recording without a rehearsal first: on your own data it would make every change twice', collect($video->fresh()->log)->pluck('message'));
 
-        // A plan recorded again as it was, which no AI can fix, is recorded as before.
+        // A plan recorded again as it was is rehearsed too: a step that no longer works stops
+        // it in seconds, before the voice-over or any recording, saying to plan it again.
         $recorder->recorded = [];
         $video = $this->video(['devices' => ['desktop'], 'plan' => ['title' => 'x', 'summary' => '', 'steps' => [
             ['action' => 'goto', 'url' => '/jobs'],
             ['action' => 'click', 'target' => ['role' => 'button', 'name' => 'Old button']],
         ]]]);
-        $this->make($video, replan: false);
-        $this->assertSame([], $recorder->rehearsed);
-        $this->assertSame(['Old button (desktop)'], $recorder->recorded);
+        try {
+            $this->make($video, replan: false);
+            $this->fail('The rehearsal should stop it.');
+        } catch (RecordingFailed) {
+        }
+        $this->assertSame(['Old button (desktop)'], $recorder->rehearsed);
+        $this->assertSame([], $recorder->recorded);
+        $this->assertStringContainsString('Try again with a new plan to let the AI fix it.', $video->fresh()->error);
+        $recorder->rehearsed = [];
 
         config(['video-demo.recorder.rehearse' => false]);
         $recorder->recorded = [];
@@ -227,7 +236,7 @@ class RehearsalTest extends TestCase
                 return $this->rehearse($recorder, $video, Plan::fromArray(['title' => 'x', 'summary' => '', 'steps' => [
                     ['action' => 'goto', 'url' => '/jobs'],
                     ['action' => 'click', 'target' => ['role' => 'button', 'name' => 'Old button']],
-                ]]), ['desktop'], $sandbox, fn () => false, canRepair: true);
+                ]]), ['desktop'], $sandbox, fn () => false);
             }
         };
         $sandbox = new class(sys_get_temp_dir().'/1-recordingdb12.sqlite') extends Sandbox

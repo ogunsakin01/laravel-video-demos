@@ -2,6 +2,13 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/). While the version is 0.x, minor releases may include breaking changes; they will be listed here.
 
+## Unreleased
+
+### Fixed
+
+- **A version recorded after another saw what the first one saved.** On sample data, every version (desktop, then mobile…) was recorded on the same database, so a goal the desktop version set made the mobile version's page show "Change goal" instead of the form, failing a step the rehearsal had passed. Each version is now recorded on its own fresh copy, the way it was rehearsed.
+- **Record the same plan again is rehearsed first.** A step that no longer works stops it in seconds, before the voice-over or any recording, instead of partway through the recording.
+
 ## v0.18.4 - 2026-10-18
 
 ### Fixed
