@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Storage;
 use Ogunsakin01\VideoDemo\Events\VideoBroke;
 use Ogunsakin01\VideoDemo\Models\Video;
 use Ogunsakin01\VideoDemo\SampleData\Sandbox;
+use Ogunsakin01\VideoDemo\Support\Paths;
 use Ogunsakin01\VideoDemo\Support\Routes;
 use RuntimeException;
 use Throwable;
@@ -133,7 +134,7 @@ class Verifier
             if ($frontend === '') {
                 throw new RuntimeException('There is no frontend to compare: set VIDEO_DEMO_FRONTEND_PATH to its repository.');
             }
-            $root = str_starts_with($frontend, '/') ? $frontend : base_path($frontend);
+            $root = Paths::fromBase($frontend);
             $files = [...$files, ...array_map(fn ($f) => "frontend/$f", static::diff($root, $frontendRef))];
         }
 

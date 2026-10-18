@@ -135,7 +135,7 @@ class Doctor
 
         $modules = (string) config('video-demo.recorder.node_modules');
         if (! is_file("$modules/playwright/package.json")) {
-            $this->add('fail', 'Playwright', 'Not installed in '.str_replace(base_path().'/', '', $modules), 'Run php artisan video-demo:install.');
+            $this->add('fail', 'Playwright', 'Not installed in '.str_replace(Paths::slashes(base_path()).'/', '', Paths::slashes($modules)), 'Run php artisan video-demo:install.');
 
             return;
         }

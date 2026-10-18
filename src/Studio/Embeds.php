@@ -3,6 +3,7 @@
 namespace Ogunsakin01\VideoDemo\Studio;
 
 use Illuminate\Support\Str;
+use Ogunsakin01\VideoDemo\Support\Paths;
 use Symfony\Component\Finder\Finder;
 
 /**
@@ -56,7 +57,7 @@ class Embeds
                 foreach ($mentioned as $slug) {
                     if (static::shows($line, $slug) && count($found[$slug]) < self::LIMIT) {
                         $found[$slug][] = [
-                            'file' => ltrim(Str::after($file->getPathname(), base_path()), '/'),
+                            'file' => ltrim(Str::after(Paths::slashes($file->getPathname()), Paths::slashes(base_path())), '/'),
                             'line' => $i + 1,
                             'text' => Str::limit(trim($line), 160),
                         ];

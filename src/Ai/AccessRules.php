@@ -5,6 +5,7 @@ namespace Ogunsakin01\VideoDemo\Ai;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route as Router;
 use Illuminate\Support\Str;
+use Ogunsakin01\VideoDemo\Support\Paths;
 use ReflectionClass;
 use Throwable;
 
@@ -106,6 +107,6 @@ class AccessRules
 
     protected function relative(string $file): string
     {
-        return ltrim(Str::after($file, base_path()), '/');
+        return ltrim(Str::after(Paths::slashes($file), Paths::slashes(base_path())), '/');
     }
 }

@@ -11,6 +11,7 @@ use Ogunsakin01\VideoDemo\Models\Video;
 use Ogunsakin01\VideoDemo\Models\VideoStyle;
 use Ogunsakin01\VideoDemo\SampleData\Sandbox;
 use Ogunsakin01\VideoDemo\Support\PackageConfig;
+use Ogunsakin01\VideoDemo\Support\Paths;
 use Ogunsakin01\VideoDemo\VideoDemo;
 use Ogunsakin01\VideoDemo\VideoDemoServiceProvider;
 use Ogunsakin01\VideoDemo\Voice\Voices;
@@ -176,7 +177,7 @@ class InstallCommand extends Command
         $dir = dirname($modules);
         File::ensureDirectoryExists($dir);
         // A recorder installed elsewhere in the app is kept out of git too.
-        if (str_starts_with(realpath($dir) ?: $dir, base_path().'/') && ! str_starts_with($dir, storage_path('video-demo'))) {
+        if (str_starts_with(Paths::slashes(realpath($dir) ?: $dir), Paths::slashes(base_path()).'/') && ! str_starts_with(Paths::slashes($dir), Paths::slashes(storage_path('video-demo')))) {
             $this->ignoreInGit($dir);
         }
         if (! File::exists("$dir/package.json")) {

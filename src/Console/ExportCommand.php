@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\File;
 use Ogunsakin01\VideoDemo\Enums\VideoStatus;
 use Ogunsakin01\VideoDemo\Models\Video;
 use Ogunsakin01\VideoDemo\Recording\Exporter;
+use Ogunsakin01\VideoDemo\Support\Paths;
 use Ogunsakin01\VideoDemo\VideoDemo;
 use Throwable;
 
@@ -57,7 +58,7 @@ class ExportCommand extends Command
             }
             $file = $demo->export($video, $format, $this->option('device') ?: null);
             if ($out = $this->option('out')) {
-                $out = str_starts_with($out, '/') ? $out : base_path($out);
+                $out = Paths::fromBase($out);
                 File::ensureDirectoryExists(dirname($out));
                 File::copy($file, $out);
                 $file = $out;
@@ -94,7 +95,7 @@ class ExportCommand extends Command
             return self::SUCCESS;
         }
 
-        $out = str_starts_with($out, '/') ? $out : base_path($out);
+        $out = Paths::fromBase($out);
         File::ensureDirectoryExists(dirname($out));
         File::put($out, $test);
         $this->option('json')

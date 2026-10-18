@@ -54,9 +54,12 @@ class WorkCommand extends Command
         $this->components->info("Making up to $count videos at once. Press Ctrl+C to stop.");
         $this->line('<fg=gray>Each video opens its own browser, so your app must answer several requests at once: Herd, Valet, Sail or Octane do; with php artisan serve, set PHP_CLI_SERVER_WORKERS=4 or more.</>');
 
-        $this->trap([SIGINT, SIGTERM], function (): void {
-            $this->stopping = true;
-        });
+        // Signals need pcntl, which Windows doesn't have; there Ctrl+C ends the workers with this command.
+        if (defined('SIGINT')) {
+            $this->trap([SIGINT, SIGTERM], function (): void {
+                $this->stopping = true;
+            });
+        }
 
         /** @var array<int, InvokedProcess> $workers */
         $workers = [];

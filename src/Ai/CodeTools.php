@@ -5,6 +5,7 @@ namespace Ogunsakin01\VideoDemo\Ai;
 use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\Route as Router;
 use Illuminate\Support\Str;
+use Ogunsakin01\VideoDemo\Support\Paths;
 use RuntimeException;
 use Symfony\Component\Finder\Finder;
 
@@ -34,7 +35,7 @@ class CodeTools
     {
         $this->redactor = $redactor ?? new Redactor;
         $root ??= base_path();
-        $this->root = rtrim(realpath($root) ?: $root, '/');
+        $this->root = rtrim(Paths::slashes(realpath($root) ?: $root), '/');
     }
 
     /**
@@ -271,6 +272,7 @@ class CodeTools
         if ($real === false) {
             throw new RuntimeException("$path does not exist.");
         }
+        $real = Paths::slashes($real);
 
         $relative = $this->relative($real);
         $allowed = collect($this->allowedPaths())->contains(
@@ -308,6 +310,7 @@ class CodeTools
 
     protected function relative(string $absolute): string
     {
+        $absolute = Paths::slashes($absolute);
         $frontend = $this->frontendRoot();
         if ($frontend !== null && str_starts_with($absolute, $frontend.'/')) {
             return 'frontend/'.ltrim(Str::after($absolute, $frontend), '/');
@@ -360,8 +363,8 @@ class CodeTools
         if ($path === '') {
             return null;
         }
-        $real = realpath(str_starts_with($path, '/') ? $path : $this->root.'/'.$path);
+        $real = realpath(Paths::fromBase($path, $this->root));
 
-        return $real === false ? null : rtrim($real, '/');
+        return $real === false ? null : rtrim(Paths::slashes($real), '/');
     }
 }

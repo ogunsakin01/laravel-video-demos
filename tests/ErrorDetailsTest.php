@@ -78,7 +78,8 @@ class ErrorDetailsTest extends TestCase
         $this->assertSame(VideoStatus::Failed, $video->status);
         $report = $video->error_details;
         $this->assertSame(RecordingFailed::class, $report['exception']['class']);
-        $this->assertSame('src/Jobs/GenerateVideo.php', str_replace('\\', '/', substr($report['exception']['file'], strpos($report['exception']['file'], 'src/'))));
+        $file = str_replace('\\', '/', $report['exception']['file']);
+        $this->assertSame('src/Jobs/GenerateVideo.php', substr($file, strpos($file, 'src/')));
         // The frame it was thrown in comes with the code around the line.
         $first = $report['exception']['frames'][0];
         $this->assertNotEmpty($first['code']['lines']);

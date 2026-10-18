@@ -463,10 +463,15 @@ class Recorder
 
         while ($process->running()) {
             if ($shouldStop && $shouldStop()) {
-                $process->signal(SIGTERM);
-                usleep(500_000);
-                if ($process->running()) {
-                    $process->signal(SIGKILL);
+                if (defined('SIGTERM')) {
+                    $process->signal(SIGTERM);
+                    usleep(500_000);
+                    if ($process->running()) {
+                        $process->signal(SIGKILL);
+                    }
+                } else {
+                    // Windows has no signals: stop it the way it can be.
+                    $process->stop(0.5);
                 }
 
                 throw new VideoStopped('Stopped by you.');

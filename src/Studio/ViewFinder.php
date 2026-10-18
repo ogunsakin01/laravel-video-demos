@@ -3,6 +3,7 @@
 namespace Ogunsakin01\VideoDemo\Studio;
 
 use Illuminate\Support\Str;
+use Ogunsakin01\VideoDemo\Support\Paths;
 use Symfony\Component\Finder\Finder;
 
 /**
@@ -205,7 +206,7 @@ class ViewFinder
                 continue;
             }
 
-            $name = Str::lower($file->getRelativePathname());
+            $name = Str::lower(Paths::slashes($file->getRelativePathname()));
             $score = count(array_filter($words, fn ($w) => str_contains($name, Str::singular($w))));
             // Text shown on the page beats the same words in an attribute, such as a title="…".
             $lines = explode("\n", $contents);

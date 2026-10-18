@@ -2,6 +2,12 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/). While the version is 0.x, minor releases may include breaking changes; they will be listed here.
 
+## Unreleased
+
+### Fixed
+
+- **Windows.** The AI can read the app's code there (every file was refused as outside the folders it may read), `--out` takes a path such as `D:\docs\video.gif`, finding where a video is shown and the frontend's repository work with Windows paths, and `video-demo:work` and stopping a video work without Unix signals.
+
 ## v0.18.1 - 2026-10-18
 
 ### Added

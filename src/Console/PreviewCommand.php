@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\File;
 use Ogunsakin01\VideoDemo\Models\Video;
 use Ogunsakin01\VideoDemo\Recording\Preview;
 use Ogunsakin01\VideoDemo\Recording\Verifier;
+use Ogunsakin01\VideoDemo\Support\Paths;
 use Ogunsakin01\VideoDemo\VideoDemoServiceProvider;
 use RuntimeException;
 
@@ -59,7 +60,7 @@ class PreviewCommand extends Command
         }
 
         $out = (string) $this->option('out');
-        $out = str_starts_with($out, '/') ? $out : base_path($out);
+        $out = Paths::fromBase($out);
         File::ensureDirectoryExists($out);
 
         /** @var list<array<string, mixed>> $results */
