@@ -120,6 +120,21 @@ async function settle(page) {
   await waiting(() => browserKit.settle(page, RECORDING_QUIET));
 }
 
+// Say why a page that answered 4xx can't be in the video, with what it says.
+async function blockedPage(page, hit) {
+  const where = new URL(hit.url).pathname;
+  const says = await page.evaluate(() => {
+    const text = el => (el?.innerText || '').trim().replace(/\s+/g, ' ');
+    return [text(document.querySelector('h1')), text(document.querySelector('main p, p'))].filter(Boolean).join(' ').slice(0, 240);
+  }).catch(() => '');
+  const why = hit.status === 403
+    ? "This user isn't allowed to see it yet. On sample data, give them what the page checks for with seed_data (a sign_in step's user is @user_<type>) and say so in the video, or leave the page out."
+    : hit.status === 404 ? 'There is no such page, or its record is missing: check the path, or add the record with seed_data.'
+    : hit.status === 401 ? 'It needs signing in: add a sign_in step before it.'
+    : 'Change the plan so it isn\'t shown.';
+  return `${where} answered HTTP ${hit.status}${says ? ` ("${says}")` : ''}, so it can't be shown as if it worked. ${why}`;
+}
+
 async function run(page, step, isLast) {
   const extra = (step.ms || 0) * SPEED;
   switch (step.action) {
@@ -349,6 +364,12 @@ async function run(page, step, isLast) {
         if (fromApp) error.message = await browserKit.describeAppError(r);
       }
     });
+    // Pages the browser opened that answered 4xx: one this user may not see yet
+    // (a 403 profile gate) or one that isn't there. A video would read over them as if they worked.
+    const blocked = [];
+    page.on('response', r => {
+      if (r.request().isNavigationRequest() && r.frame() === page.mainFrame() && r.status() >= 400 && r.status() < 500) blocked.push({ status: r.status(), url: r.url(), at: Date.now() });
+    });
     page.on('pageerror', e => appErrors.push({ kind: 'javascript', message: String(e.message || e).split('\n')[0], url: page.url(), at: Date.now() }));
     page.on('pageerror', e => log('exception', e.stack || e.message || e, { url: page.url() }));
     page.on('console', m => { if (['error', 'warning'].includes(m.type())) log(m.type(), m.text(), { url: m.location()?.url || null }); });
@@ -364,6 +385,8 @@ async function run(page, step, isLast) {
       if (step.hold_ms) result.speaking.push([stepStarted - started, stepStarted - started + step.hold_ms]);
       try {
         await run(page, step, i === plan.steps.length - 1);
+        const hit = blocked.filter(b => b.at >= stepStarted).pop();
+        if (hit) throw new Error(await blockedPage(page, hit));
         // A step with a spoken line lasts until the line is finished.
         const left = (step.hold_ms || 0) - (Date.now() - stepStarted);
         if (left > 0) await pause(page, left);

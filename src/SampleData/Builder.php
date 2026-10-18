@@ -115,13 +115,51 @@ class Builder
      */
     public function signInUser(array $input): array
     {
+        $name = self::signInRefName($input['type']['key'] ?? null);
         try {
-            $user = $this->user($input) ?? $this->makeUser(null);
+            $ref = $this->refs()[$name] ?? $this->signInRef($name);
         } catch (Throwable $e) {
             return ['ok' => false, 'error' => 'The user to sign in as could not be made in the sample database: '.$this->firstLine($e->getMessage())];
         }
 
-        return ['ok' => true, 'id' => $user->getAuthIdentifier()];
+        return ['ok' => true, 'id' => $ref['ids'][0] ?? null];
+    }
+
+    /**
+     * Get the ref a sign_in step's user is saved under: "user_member" for a
+     * type of user, "user_default" for the default user. The AI uses it to
+     * give that user what the pages after the step need.
+     */
+    public static function signInRefName(?string $typeKey): string
+    {
+        return 'user_'.(($typeKey ?? '') !== '' ? $typeKey : 'default');
+    }
+
+    /**
+     * Find or make the user a sign_in ref names, and save it under that ref:
+     * one of the type, or the default user (made when there is none). Null
+     * for a name that isn't a sign_in user's.
+     *
+     * @return ?array{ids: list<mixed>, table: string}
+     */
+    protected function signInRef(string $name): ?array
+    {
+        if (! preg_match('/^user_([\w-]+)$/', $name, $m)) {
+            return null;
+        }
+
+        if ($m[1] === 'default') {
+            $user = $this->user(['record_as' => null, 'login_as' => config('video-demo.recorder.login_as')]) ?? $this->makeUser(null);
+        } else {
+            $types = RecordAs::types();
+            $found = $types[$m[1]] ?? throw new RuntimeException("There is no type of user [{$m[1]}]. Types: ".(implode(', ', array_keys($types)) ?: 'none').'.');
+            $user = $this->userOfType(['key' => $m[1], 'label' => $found['label'], 'via' => $found['via'] ?? null, 'role' => $found['role'] ?? $m[1]]);
+        }
+
+        $ref = ['ids' => [$user->getAuthIdentifier()], 'table' => $user instanceof Model ? $user->getTable() : 'users'];
+        $this->saveRefs([$name => $ref]);
+
+        return $ref;
     }
 
     /**
@@ -187,7 +225,7 @@ class Builder
      *
      * Values may point at earlier records: "@ref" is the id of the record
      * saved under that ref, "@ref.column" another of its values, "@user" the
-     * recorder's user. "now" and "now +3 days" are dates.
+     * recorder's user, "@user_member" the user a sign_in step signs in as. "now" and "now +3 days" are dates.
      *
      * @param  array<string, mixed>  $record
      * @param  array<string, array{ids: list<mixed>, table: string}>  $refs
@@ -412,7 +450,7 @@ class Builder
         }
 
         if (preg_match('/^@([\w-]+)(?:\.(\w+))?$/', $value, $m)) {
-            $ref = $refs[$m[1]] ?? throw new RuntimeException("Nothing was saved as [@{$m[1]}] yet. Known: ".(implode(', ', array_map(fn ($r) => "@$r", array_keys($refs))) ?: 'none').'.');
+            $ref = $refs[$m[1]] ?? $this->signInRef($m[1]) ?? throw new RuntimeException("Nothing was saved as [@{$m[1]}] yet. Known: ".(implode(', ', array_map(fn ($r) => "@$r", array_keys($refs))) ?: 'none').'.');
             $id = $ref['ids'][0] ?? null;
 
             return isset($m[2]) ? DB::table($ref['table'])->where('id', $id)->value($m[2]) : $id;

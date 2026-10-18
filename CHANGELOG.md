@@ -2,6 +2,12 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/). While the version is 0.x, minor releases may include breaking changes; they will be listed here.
 
+## Unreleased
+
+### Fixed
+
+- **Pages behind a check, such as "complete your profile".** A page that answers 403 (or another 4xx), opened or clicked to, now fails its step with what the page says, instead of the video reading over a gate screen as if it worked. On sample data the AI can give the user a sign-in step uses what the pages need (a finished profile, a photo), as `@user_member` or `@user_default` in its sample data, and is told to say so in the video ("Once your profile is complete, …"). The rehearsal sends a page that still fails back to it before recording.
+
 ## v0.18.2 - 2026-10-18
 
 ### Added

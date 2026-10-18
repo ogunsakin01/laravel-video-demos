@@ -3,6 +3,7 @@
 namespace Ogunsakin01\VideoDemo\Tests;
 
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Foundation\Auth\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Gate;
@@ -156,6 +157,36 @@ class SampleDataTest extends TestCase
         $this->assertSame(1, $read['total']);
         $this->assertContains('subject varchar', $read['columns']);
         $this->assertSame('No rows in [tickets] match {"id":99}.', $builder->seed(['records' => [['table' => 'tickets', 'where' => ['id' => 99], 'data' => ['status' => 'x']]]])['results'][0]['error']);
+    }
+
+    public function test_the_user_a_sign_in_step_uses_can_be_given_what_pages_need(): void
+    {
+        Schema::create('users', function (Blueprint $table) {
+            $table->id();
+            $table->string('email');
+            $table->string('password')->nullable();
+            $table->string('role')->nullable();
+            $table->boolean('profile_complete')->default(false);
+            $table->timestamps();
+        });
+        config(['auth.providers.users.model' => User::class]);
+        User::forceCreate(['email' => 'admin@example.com', 'role' => 'admin']);
+        User::forceCreate(['email' => 'member@example.com', 'role' => 'member']);
+        File::ensureDirectoryExists($this->root);
+        config(['database.connections.'.Sandbox::CONNECTION.'.database' => $this->root.'/1-abcdefghijkl.sqlite']);
+        $builder = new Builder;
+
+        // "@user_member" is the member a sign_in step signs in as: here, its profile is finished first.
+        $result = $builder->seed(['records' => [
+            ['table' => 'users', 'where' => ['id' => '@user_member'], 'data' => ['profile_complete' => true]],
+            ['table' => 'users', 'where' => ['id' => '@user_owner'], 'data' => ['profile_complete' => true]],
+        ]])['results'];
+        $this->assertTrue($result[0]['ok'], (string) ($result[0]['error'] ?? ''));
+        $this->assertTrue((bool) User::where('email', 'member@example.com')->value('profile_complete'));
+        $this->assertStringContainsString('There is no type of user [owner]. Types: admin, member', $result[1]['error']);
+
+        // The recorder signs in as that same user.
+        $this->assertSame(['ok' => true, 'id' => 2], $builder->signInUser(['record_as' => 'type:member', 'type' => ['key' => 'member', 'label' => 'Member', 'via' => 'column:role', 'role' => 'member']]));
     }
 
     public function test_a_base_database_is_built_once_and_copied_for_each_video(): void

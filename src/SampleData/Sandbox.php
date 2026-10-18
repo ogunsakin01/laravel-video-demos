@@ -291,6 +291,10 @@ class Sandbox
     {
         $path = static::dir().'/'.Str::before(basename($this->path), '-').'-'.Str::lower(Str::random(12)).'.sqlite';
         File::copy($this->path, $path);
+        // The records the AI saved under a name, such as the users sign_in steps use.
+        if (File::exists($this->path.'.refs.json')) {
+            File::copy($this->path.'.refs.json', $path.'.refs.json');
+        }
         $copy = new self($path);
         $copy->info = $this->info;
         $copy->signInUsers = $this->signInUsers;

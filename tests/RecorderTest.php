@@ -448,6 +448,16 @@ class RecorderTest extends TestCase
             $result = $recorder->verify(new Plan('x', 'x', [$this->step('goto', ['url' => '/unverified'])]), $this->out, [], 'desktop', 'guest');
             $this->assertStringContainsString('went to the email verification page instead', (string) $result->error);
 
+            // A page behind a gate (a 403) fails its step with what it says, opened or clicked to.
+            $result = $recorder->verify(new Plan('x', 'x', [
+                $this->step('sign_in', ['url' => '/dashboard']),
+                $this->step('click', ['target' => ['role' => 'link', 'name' => 'Messages']]),
+                $this->step('caption', ['title' => 'Talk to other members']),
+            ]), $this->out, [], 'desktop', 'guest');
+            $this->assertSame(2, $result->failedStep);
+            $this->assertStringContainsString('/messages answered HTTP 403 ("Finish your profile Add your photo to meet other members."), so it can\'t be shown as if it worked.', (string) $result->error);
+            $this->assertStringContainsString('@user_<type>', (string) $result->error);
+
             // And it records, signed in partway through.
             $result = $recorder->record(new Plan('x', 'x', array_slice($plan->steps, 0, 3)), $this->out, [], 'desktop', 'guest');
             $this->assertTrue($result->ok, (string) $result->error);

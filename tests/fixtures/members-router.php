@@ -2,7 +2,8 @@
 
 // A small app with public pages, a cookie banner and a members' area (php -S
 // with this router). /sign-me-in/{id} stands in for the package's sign-in
-// link; /dashboard needs it, and /unverified sends to email verification.
+// link; /dashboard needs it, /messages is behind a profile gate, and
+// /unverified sends to email verification.
 $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $user = $_COOKIE['user'] ?? null;
 $banner = isset($_COOKIE['consent']) ? '' : '<div class="cookie-notice" style="position:fixed;bottom:0;left:0;padding:12px;background:#222;color:#fff">'
@@ -26,7 +27,12 @@ switch ($path) {
             header('Location: /login', true, 302);
             break;
         }
-        echo '<!doctype html><title>Dashboard</title><h1>Welcome back, member '.htmlspecialchars($user).'</h1>'.$banner;
+        echo '<!doctype html><title>Dashboard</title><h1>Welcome back, member '.htmlspecialchars($user).'</h1><a href="/messages">Messages</a>'.$banner;
+        break;
+    case '/messages':
+        // A gate in front of a page, at its own address, as a "complete your profile" check shows it.
+        http_response_code(403);
+        echo '<!doctype html><title>Messages</title><h1>Finish your profile</h1><p>Add your photo to meet other members.</p>';
         break;
     case '/unverified':
         header('Location: /email/verify', true, 302);

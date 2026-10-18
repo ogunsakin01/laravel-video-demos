@@ -428,6 +428,7 @@ class Planner
                 ."2. Read what the pages show, so they look lived in: lists with several entries (three to six), details and dashboards with real-looking content, and records by other users where the page shows other people.\n"
                 ."3. Check what is there with query_data, then add what is missing with seed_data. Values appear on screen, so make them realistic.\n"
                 .'4. Use the ids seed_data returns in the plan\'s paths, such as /tickets/3.',
+            'A sign_in step signs in as a user of this copy too: in seed_data and query_data, "@user_<type>" is the user it signs in as for that type (such as "@user_member"), and "@user_default" the default user. Give them what the pages after the step need, the same way: a finished profile or onboarding, a photo, a plan. Pages that check something more than signing in, such as "complete your profile to see members", answer 403 or show a gate page otherwise, and the step fails.',
             'Only this copy changes, and it is deleted after recording. If a page still fails before recording, you get the reason and can add data or change the plan.',
             '</sample_data>',
         ]));
@@ -511,7 +512,7 @@ class Planner
 
         Pace the plan to the target length: a caption reads in about 3 seconds, a card in about 4, and each click or field takes 1 to 2 seconds. The recorder adjusts captions and pauses to land close to the target, so get the content right rather than the exact timing. Type realistic sample values that will pass validation. Mark the start of each part of the flow with chapter so viewers can jump to it.
 
-        Show what the video talks about: every page a caption or the voice-over describes must be on screen while it is described, not narrated over another page. If a page can't be reached, leave it out.
+        Show what the video talks about: every page a caption or the voice-over describes must be on screen while it is described, not narrated over another page or an error. If a page can't be reached, leave it out. When a page needs the user to do something first that the video doesn't show, such as completing their profile, make the sample user meet it, and say so in a caption or line ("Once your profile is complete, you can message other members"), so viewers know.
 
         The video will be shown to the app's users, so explain things in their terms, not in terms of the code. Do not show secrets, other people's personal details, or admin-only screens unless the request is about them. Avoid steps that delete data or send messages to real people unless the request is about exactly that.
 
