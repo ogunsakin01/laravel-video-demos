@@ -17,6 +17,7 @@ use Ogunsakin01\VideoDemo\Recording\Devices;
 use Ogunsakin01\VideoDemo\Recording\Recorder;
 use Ogunsakin01\VideoDemo\Support\Language;
 use Ogunsakin01\VideoDemo\Voice\Voices;
+use Throwable;
 
 /**
  * A video made in the studio, with its plan, recordings, AI usage and log.
@@ -179,8 +180,12 @@ class Video extends Model
             return $value !== null;
         }
 
-        $value = $this->getConnection()->transaction(function () use ($column, $change) {
-            $saved = static::whereKey($this->getKey())->lockForUpdate()->firstOrFail([$this->getKeyName(), $column]);
+        // On SQLite, a write after a read in one transaction fails at once,
+        // without waiting, when another connection is about to write (the
+        // app's sessions, cache or queue in the same file), so it is tried
+        // again a few times, a moment apart.
+        $value = retry(6, fn () => $this->getConnection()->transaction(function () use ($column, $change) {
+            $saved = $this->newQueryWithoutScopes()->whereKey($this->getKey())->lockForUpdate()->firstOrFail([$this->getKeyName(), $column]);
             $value = $change($saved->{$column} ?? []);
             if ($value !== null) {
                 // Quietly: this copy holds only the one column, so the model's
@@ -190,7 +195,7 @@ class Video extends Model
             }
 
             return $value;
-        });
+        }), fn (int $attempt) => 150 * $attempt, fn (Throwable $e) => str_contains($e->getMessage(), 'database is locked'));
 
         if ($value === null) {
             return false;

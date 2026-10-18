@@ -2,6 +2,12 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/). While the version is 0.x, minor releases may include breaking changes; they will be listed here.
 
+## Unreleased
+
+### Fixed
+
+- **"database is locked" on SQLite.** Saving a video's progress read its row and then wrote it in one transaction, which SQLite refuses at once, without waiting, when another connection is about to write: the app's sessions, cache or queue in the same file. A finished recording could fail on it. The save now tries again a few times, a moment apart. `video-demo:doctor` and the studio's setup check suggest WAL mode and a busy timeout for an app on SQLite.
+
 ## v0.18.3 - 2026-10-18
 
 ### Fixed

@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
 use Ogunsakin01\VideoDemo\Ai\Drivers\Drivers;
 use Ogunsakin01\VideoDemo\Ai\Pricing;
+use Ogunsakin01\VideoDemo\Models\Video;
 use Ogunsakin01\VideoDemo\Recording\RecordAs;
 use Ogunsakin01\VideoDemo\Recording\Recorder;
 use Ogunsakin01\VideoDemo\Recording\SignIn;
@@ -53,6 +54,7 @@ class Doctor
         $this->node();
         $this->ffmpeg();
         $this->queue();
+        $this->sqlite();
         $this->users();
         $this->storage();
         $this->voice();
@@ -175,6 +177,27 @@ class Doctor
             false => $this->add('warn', 'A queue worker', 'None is running, so new videos would wait', 'Start one: php artisan video-demo:work'),
             null => $this->add('warn', 'A queue worker', 'Can\'t tell with the array cache', 'Use a shared cache (file, database, redis) so the studio can see workers.'),
         };
+    }
+
+    /**
+     * On SQLite, the studio, the queue and the app's sessions and cache write
+     * to one file at once. Without WAL and a busy timeout, one of them is
+     * told "database is locked" instead of waiting its turn.
+     */
+    protected function sqlite(): void
+    {
+        $name = (new Video)->getConnectionName() ?: config('database.default');
+        $settings = (array) config("database.connections.$name", []);
+        if (($settings['driver'] ?? null) !== 'sqlite' || ($settings['database'] ?? '') === ':memory:') {
+            return;
+        }
+
+        $wal = strtolower((string) ($settings['journal_mode'] ?? '')) === 'wal';
+        $wait = (int) ($settings['busy_timeout'] ?? 0) > 0;
+        $wal && $wait
+            ? $this->add('ok', 'SQLite', 'WAL, with a busy timeout')
+            : $this->add('warn', 'SQLite', 'Videos, the queue and the app\'s sessions write to one SQLite file, '.(! $wal ? 'not in WAL mode' : 'with no busy timeout').', so a write can fail with "database is locked" while a video is made',
+                "In config/database.php, set the [$name] connection's 'journal_mode' => 'wal' and 'busy_timeout' => 5000.");
     }
 
     protected function users(): void

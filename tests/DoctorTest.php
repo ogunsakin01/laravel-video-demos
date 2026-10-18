@@ -77,6 +77,18 @@ class DoctorTest extends TestCase
         $this->artisan('video-demo:doctor')->expectsOutputToContain('Everything needed is set up.')->assertSuccessful();
     }
 
+    public function test_an_sqlite_database_is_asked_for_wal_and_a_busy_timeout(): void
+    {
+        config(['database.connections.testing.database' => '/app/database/database.sqlite']);
+        $check = $this->doctor()[1]['SQLite'];
+        $this->assertSame('warn', $check['status']);
+        $this->assertStringContainsString('not in WAL mode', $check['found']);
+        $this->assertSame("In config/database.php, set the [testing] connection's 'journal_mode' => 'wal' and 'busy_timeout' => 5000.", $check['fix']);
+
+        config(['database.connections.testing.journal_mode' => 'wal', 'database.connections.testing.busy_timeout' => 5000]);
+        $this->assertSame('ok', $this->doctor()[1]['SQLite']['status']);
+    }
+
     public function test_what_is_missing_fails_with_how_to_fix_it(): void
     {
         config(['video-demo.ai.api_key' => null, 'video-demo.recorder.node_modules' => "$this->root/nowhere", 'video-demo.storage.disk' => 'public',
