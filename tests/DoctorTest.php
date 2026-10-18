@@ -31,6 +31,9 @@ class DoctorTest extends TestCase
             'video-demo.sample_data.default' => false,
             'video-demo.storage.disk' => 'local',
             'filesystems.disks.local.root' => "$this->root/storage",
+            // A queue fit for long videos, whatever the test app's default queue is (sync on a fresh install).
+            'video-demo.queue.connection' => 'video-demo-test',
+            'queue.connections.video-demo-test' => ['driver' => 'database', 'table' => 'jobs', 'queue' => 'video-demo', 'retry_after' => 7200],
         ]);
         Http::fake(['*' => Http::response('ok')]);
         // Node 22, its Chromium installed, and ffmpeg.
