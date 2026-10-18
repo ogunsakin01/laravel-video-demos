@@ -9,13 +9,13 @@ namespace Ogunsakin01\VideoDemo\Recording;
  */
 final class Plan
 {
-    public const ACTIONS = ['goto', 'click', 'type', 'select', 'check', 'press', 'hover', 'scroll', 'wait', 'caption', 'card', 'pause'];
+    public const ACTIONS = ['goto', 'sign_in', 'click', 'type', 'select', 'check', 'press', 'hover', 'scroll', 'wait', 'caption', 'card', 'pause'];
 
     /**
      * Rough time each action takes on screen, in milliseconds, before pauses.
      */
     protected const ACTION_MS = [
-        'goto' => 1500, 'click' => 1300, 'type' => 1000, 'select' => 1400, 'check' => 1200,
+        'goto' => 1500, 'sign_in' => 1500, 'click' => 1300, 'type' => 1000, 'select' => 1400, 'check' => 1200,
         'press' => 400, 'hover' => 1000, 'scroll' => 900, 'wait' => 500,
     ];
 
@@ -195,6 +195,20 @@ final class Plan
     }
 
     /**
+     * Get the pages the plan opens before it first signs in (sign_in), which
+     * are opened as the video's own user. Those after it are checked by the
+     * rehearsal, signed in as the step says.
+     *
+     * @return list<string>
+     */
+    public function pathsBeforeSignIn(): array
+    {
+        $first = collect($this->steps)->search(fn ($step) => ($step['action'] ?? null) === 'sign_in');
+
+        return $first === false ? $this->paths() : (new self($this->title, $this->summary, array_slice($this->steps, 0, $first)))->paths();
+    }
+
+    /**
      * Get the estimated length of the finished video, in seconds.
      *
      * At $speed above 1 the recording is played back faster: actions take
@@ -351,7 +365,7 @@ final class Plan
                 && array_filter(array_diff_key($step['target'], ['frame' => true]), fn ($v) => $v !== null && $v !== '') !== [];
 
             $missing = match ($action) {
-                'goto' => empty($step['url']) ? 'url' : null,
+                'goto', 'sign_in' => empty($step['url']) ? 'url' : null,
                 'click', 'hover', 'check' => $hasTarget ? null : 'target',
                 'type', 'select' => ! $hasTarget ? 'target' : (($step['value'] ?? '') === '' ? 'value' : null),
                 'press' => empty($step['value']) ? 'value' : null,
@@ -363,7 +377,7 @@ final class Plan
             if ($missing) {
                 $problems[] = "Step $n ($action) needs $missing.";
             }
-            if ($action === 'goto' && ! empty($step['url']) && preg_match('~^[a-z]+://~i', $step['url'])) {
+            if (in_array($action, ['goto', 'sign_in'], true) && ! empty($step['url']) && preg_match('~^[a-z]+://~i', $step['url'])) {
                 $problems[] = "Step $n: use a path such as /jobs, not a full URL.";
             }
             if ($unknown = array_diff((array) ($step['only_on'] ?? []), Devices::keys())) {
@@ -397,7 +411,7 @@ final class Plan
                         'properties' => [
                             'action' => ['type' => 'string', 'enum' => self::ACTIONS],
                             'why' => ['type' => 'string', 'description' => 'What this step is for, in a few words. Not shown in the video.'],
-                            'url' => $string('goto: a path such as /jobs/create. Empty for other actions.'),
+                            'url' => $string('goto: a path such as /jobs/create. sign_in: the path to open once signed in, such as /dashboard. Empty for other actions.'),
                             'target' => [
                                 'type' => 'object',
                                 'description' => 'The element to act on. Fill in one way to find it, the way a user would see it, and leave the rest empty. All empty for actions without an element.',
@@ -413,7 +427,7 @@ final class Plan
                                 'required' => self::TARGET_FIELDS,
                                 'additionalProperties' => false,
                             ],
-                            'value' => $string('type: the text; select: the option label; press: the key, such as Enter. Empty otherwise.'),
+                            'value' => $string('type: the text; select: the option label; press: the key, such as Enter; sign_in: the type of user to sign in as, from the list you were given, or empty for the default user. Empty otherwise.'),
                             'title' => $string('caption or card: the heading. Empty otherwise.'),
                             'text' => $string('caption or card: one short sentence under the heading. Empty otherwise.'),
                             'ms' => ['type' => 'integer', 'description' => 'caption, card, pause: how long it shows, in milliseconds. Other actions: an extra pause afterwards. 0 for the default.'],

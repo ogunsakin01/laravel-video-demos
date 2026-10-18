@@ -12,10 +12,11 @@
   $summary = match (true) {
       in_array($action, ['caption', 'card'], true) => $step['title'] ?? '',
       $action === 'goto' => $step['url'] ?? '',
+      $action === 'sign_in' => (($step['value'] ?? '') ?: 'default user').' → '.($step['url'] ?? ''),
       $action === 'pause' => '',
       default => collect($target)->filter()->except('frame')->map(fn ($v, $k) => "$k: $v")->implode(', '),
   };
-  $valueLabel = ['type' => 'Text typed', 'select' => 'Option', 'press' => 'Key'][$action] ?? null;
+  $valueLabel = ['type' => 'Text typed', 'select' => 'Option', 'press' => 'Key', 'sign_in' => 'Type of user (empty for the default user)'][$action] ?? null;
 @endphp
 <li class="vd-plan-step" data-step>
   <div class="vd-plan-step-head">
@@ -42,9 +43,9 @@
         <label for="{{ $id('text') }}">Sentence <span class="vd-optional">optional</span></label>
         <input type="text" id="{{ $id('text') }}" name="{{ $name('text') }}" value="{{ $step['text'] ?? '' }}" maxlength="400">
       </div>
-    @elseif ($action === 'goto')
+    @elseif (in_array($action, ['goto', 'sign_in'], true))
       <div class="vd-field">
-        <label for="{{ $id('url') }}">Page</label>
+        <label for="{{ $id('url') }}">{{ $action === 'sign_in' ? 'Page to open once signed in' : 'Page' }}</label>
         <input type="text" id="{{ $id('url') }}" name="{{ $name('url') }}" value="{{ $step['url'] ?? '' }}" maxlength="500" class="vd-mono" placeholder="/jobs" required>
       </div>
     @endif

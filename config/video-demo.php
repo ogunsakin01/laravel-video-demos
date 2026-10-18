@@ -250,6 +250,12 @@ return [
         // 'user_types' => ['Admin' => 'admin@example.com', 'Customer' => 'jane@example.com'],
         'user_types' => [],
 
+        // A cookie or consent banner, such as "We use cookies… Accept all".
+        // "accept" clicks its accept button before recording, out of view,
+        // so it shows on no page of the video; "leave" shows it as it is.
+        // When the button isn't found, give its CSS selector instead.
+        'cookie_banner' => env('VIDEO_DEMO_COOKIE_BANNER', 'accept'),
+
         // Playwright's own Chromium can't play MP4 (H.264) video. If your app
         // shows videos, set this to "chrome" to record with installed Chrome.
         'channel' => env('VIDEO_DEMO_BROWSER_CHANNEL'),

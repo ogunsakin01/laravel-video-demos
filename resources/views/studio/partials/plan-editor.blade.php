@@ -27,6 +27,8 @@
               “{{ $step['title'] }}”
             @elseif ($step['action'] === 'goto')
               <span class="vd-mono">{{ $step['url'] }}</span>
+            @elseif ($step['action'] === 'sign_in')
+              as {{ ($step['value'] ?? '') ?: 'the default user' }}, then <span class="vd-mono">{{ $step['url'] }}</span>
             @else
               {{ collect($step['target'] ?? [])->filter()->map(fn ($v, $k) => "$k: $v")->implode(', ') }}
               @if (! empty($step['value'])) → “{{ $step['value'] }}” @endif

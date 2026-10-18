@@ -6,6 +6,7 @@
 
 return [
     'heading' => 'Step by step',
+    'sign_in' => 'Sign in.',
     'click' => 'Click :what.',
     'check' => 'Tick :what.',
     'type' => 'Fill in :what.',

@@ -183,7 +183,7 @@ class GenerateVideo implements ShouldQueue
             while (true) {
                 // Checked first, as it finds the language of the pages, which the voice-over is spoken in.
                 $canRepair = $session?->sampleData && $session->repairs < $maxRepairs;
-                $problems = $this->checkPages($recorder, $video, $plan->paths(), 'Checking the pages in the plan', fail: ! $canRepair);
+                $problems = $this->checkPages($recorder, $video, $plan->pathsBeforeSignIn(), 'Checking the pages in the plan', fail: ! $canRepair);
                 if ($problems !== []) {
                     $video->moveTo(VideoStatus::Planning, 'Asking the AI to fix the data or the plan');
                     $planner->repairPages($session, $video, $problems);

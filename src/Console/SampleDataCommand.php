@@ -50,6 +50,7 @@ class SampleDataCommand extends Command
         $result = match ($this->argument('action')) {
             'build' => $builder->build($input),
             'prepare' => $builder->prepare($input),
+            'user' => $builder->signInUser($input),
             'seed' => $builder->seed($input),
             'query' => $builder->query($input),
             default => ['ok' => false, 'error' => 'Unknown action.'],

@@ -4,6 +4,7 @@
 
 return [
     'heading' => 'Étape par étape',
+    'sign_in' => 'Connectez-vous.',
     'click' => 'Cliquez sur :what.',
     'check' => 'Cochez :what.',
     'type' => 'Remplissez :what.',

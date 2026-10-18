@@ -4,7 +4,14 @@ All notable changes to this package are listed here. The format follows [Keep a 
 
 ## Unreleased
 
+### Added
+
+- **Videos that sign in partway through.** A video that starts signed out (or as one type of user) can sign in where its flow needs an account, with a new `sign_in` step: out of view, as a ready-made user of a type (such as Member) or the default user, then on to the next page as them. So "a visitor browses the public pages, joins, and looks around the member area" shows the member area, instead of describing it over the sign-up form. The AI uses it on its own, is told an account made during the video can't get past email verification, and is told to show every page the voice-over describes. It shows in the plan editor, the written guide and the Pest test.
+- **Cookie banners are accepted before recording.** Out of view, the recorder clicks the app's own "Accept all" (or "Accept", "Allow all", "I agree"… in the six languages, only inside something about cookies or consent) and keeps the choice, so the banner shows on no page of the video, the rehearsal, or the pages the AI looks at. `VIDEO_DEMO_COOKIE_BANNER=leave` shows it as it is; a CSS selector names the button when it isn't found.
+
 ### Fixed
+
+- **Pages behind sign-in or email verification.** Opening one while signed out now says to add a sign-in step, and landing on an email verification notice (`/email/verify`, `/verify-email`) fails the step with the reason, so the rehearsal sends it back to the AI instead of the video carrying on over the wrong page.
 
 - **Windows.** The AI can read the app's code there (every file was refused as outside the folders it may read), `--out` takes a path such as `D:\docs\video.gif`, finding where a video is shown, the view showing some text, the controllers behind a video's pages (so `--changed` flags it when they change) and the frontend's repository work with Windows paths, and `video-demo:work` and stopping a video work without Unix signals.
 

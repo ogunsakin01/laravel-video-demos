@@ -2,8 +2,10 @@
 
 namespace Ogunsakin01\VideoDemo\Tests;
 
+use Illuminate\Foundation\Auth\User;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\View\ComponentAttributeBag;
 use Ogunsakin01\VideoDemo\Enums\VideoStatus;
 use Ogunsakin01\VideoDemo\Models\Video;
@@ -395,6 +397,62 @@ class RecorderTest extends TestCase
         } finally {
             $api->stop();
             $spa->stop();
+        }
+    }
+
+    public function test_signs_in_partway_through_and_accepts_the_cookie_banner_before_recording(): void
+    {
+        $port = $this->freePort();
+        $server = Process::path(__DIR__.'/fixtures')->start(['php', '-S', "127.0.0.1:$port", 'members-router.php']);
+
+        try {
+            $this->waitForServer($port);
+            config(['video-demo.recorder.base_url' => "http://127.0.0.1:$port", 'video-demo.recorder.login_as' => '7']);
+            // The fixture's sign-in link stands in for the package's signed one.
+            $recorder = new class extends Recorder
+            {
+                protected function signedPath(int|string $id, string $route): string
+                {
+                    return "/sign-me-in/$id";
+                }
+            };
+            Schema::create('users', function ($table) {
+                $table->id();
+                $table->string('email');
+                $table->timestamps();
+            });
+            config(['auth.providers.users.model' => User::class]);
+            User::forceCreate(['id' => 7, 'email' => 'member@example.com']);
+
+            // A guest video: public page, then signed in as the default user for the members' page.
+            $plan = new Plan('x', 'x', [
+                $this->step('goto', ['url' => '/']),
+                $this->step('sign_in', ['url' => '/dashboard']),
+                $this->step('wait', ['target' => ['text' => 'Welcome back, member 7']]),
+                // The banner was accepted before recording, so no page shows it.
+                $this->step('wait', ['target' => ['text' => 'Necessary only'], 'ms' => 500]),
+            ]);
+            $result = $recorder->verify($plan, $this->out, [], 'desktop', 'guest');
+            $this->assertFalse($result->ok);
+            $this->assertSame(4, $result->failedStep, (string) $result->error);
+
+            // Left alone, the banner shows on every page.
+            config(['video-demo.recorder.cookie_banner' => 'leave']);
+            $this->assertTrue($recorder->verify($plan, $this->out, [], 'desktop', 'guest')->ok);
+            config(['video-demo.recorder.cookie_banner' => 'accept']);
+
+            // Without signing in, the members' page says what to add.
+            $result = $recorder->verify(new Plan('x', 'x', [$this->step('goto', ['url' => '/dashboard'])]), $this->out, [], 'desktop', 'guest');
+            $this->assertStringContainsString('add a sign_in step before this page', (string) $result->error);
+            // An email verification notice is named as such.
+            $result = $recorder->verify(new Plan('x', 'x', [$this->step('goto', ['url' => '/unverified'])]), $this->out, [], 'desktop', 'guest');
+            $this->assertStringContainsString('went to the email verification page instead', (string) $result->error);
+
+            // And it records, signed in partway through.
+            $result = $recorder->record(new Plan('x', 'x', array_slice($plan->steps, 0, 3)), $this->out, [], 'desktop', 'guest');
+            $this->assertTrue($result->ok, (string) $result->error);
+        } finally {
+            $server->stop();
         }
     }
 

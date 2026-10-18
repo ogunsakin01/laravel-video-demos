@@ -31,6 +31,7 @@ class Narrator
         foreach ($plan->steps as $i => $step) {
             $what = match ($step['action'] ?? '') {
                 'goto' => 'opens '.($step['url'] ?? ''),
+                'sign_in' => 'signs in as '.(($step['value'] ?? '') ?: 'a member').', then opens '.($step['url'] ?? ''),
                 'caption', 'card' => ($step['action']).' "'.($step['title'] ?? '').'"'.(! empty($step['text']) ? ': '.$step['text'] : ''),
                 default => ($step['action'] ?? '?').' '.collect($step['target'] ?? [])->filter()->implode(' ').(! empty($step['value']) ? ' "'.$step['value'].'"' : ''),
             };

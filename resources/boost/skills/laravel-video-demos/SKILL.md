@@ -119,7 +119,7 @@ VideoDemo::updatePlan($video, $plan);   // checked: refuses a plan that can't be
 VideoDemo::rerecord($video);
 ```
 
-Plan steps have an `action` (`goto`, `click`, `type`, `select`, `check`, `press`, `hover`, `scroll`, `wait`, `caption`, `card`, `pause`) and fill only what that action uses: `url` for `goto`; `target` (one of `role` + `name`, `label`, `placeholder`, `text`, or `selector`, plus `frame` for iframes) for elements; `value` for typing, options and keys; `title`, `text` and `ms` for captions and cards; `say` for the voice-over line; `chapter`; and `only_on` to limit a step to some devices.
+Plan steps have an `action` (`goto`, `sign_in`, `click`, `type`, `select`, `check`, `press`, `hover`, `scroll`, `wait`, `caption`, `card`, `pause`) and fill only what that action uses: `url` for `goto` and `sign_in` (the page to open once signed in, with `value` the type of user, or empty for the default user); `target` (one of `role` + `name`, `label`, `placeholder`, `text`, or `selector`, plus `frame` for iframes) for elements; `value` for typing, options and keys; `title`, `text` and `ms` for captions and cards; `say` for the voice-over line; `chapter`; and `only_on` to limit a step to some devices.
 
 ## More
 

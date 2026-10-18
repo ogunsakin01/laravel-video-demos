@@ -150,6 +150,70 @@ async function signIn(context, job) {
   }
 }
 
+// Sign in partway through a video (a sign_in step), in the browser the video
+// is recorded in, with the link the app made for that user: the login link
+// sets the session cookie, and a separate frontend's tokens are fetched and
+// put in place for the next page. Throws when that fails, saying why.
+async function signInAs(context, job, entry) {
+  if (entry.signIn) {
+    await signIn(context, { ...job, signInPath: entry.signIn, signIn: null });
+    return;
+  }
+  const res = await context.request.get(appUrl(job, entry.login), {
+    headers: job.sandboxHeader ? { [job.sandboxHeader.name]: job.sandboxHeader.value } : {},
+    timeout: TIMEOUTS.signIn,
+    failOnStatusCode: false,
+  });
+  if (!res.ok()) throw new Error(`Signing in failed with HTTP ${res.status()}. Is the studio enabled and the app running at ${job.baseUrl}?`);
+}
+
+// Whether an address is an email verification notice (Laravel's
+// /email/verify, Breeze and Jetstream's /verify-email), not a link in an email.
+function isVerifyEmail(u) {
+  return /\/(email\/verify|verify-email)\/?$/.test(new URL(u).pathname);
+}
+
+// The words on a cookie banner's accept button, in the languages the package
+// speaks, and the words that say a part of the page is a cookie banner.
+const ACCEPT = /^\s*(accept( all)?( cookies)?|allow( all)?( cookies)?|i agree|agree|got it|ok(ay)?|i understand|tout accepter|accepter|aceptar( todo| todas)?|alle akzeptieren|akzeptieren|aceitar( todos)?|accetta( tutti)?)\s*$/i;
+const BANNER = /cookie|consent|gdpr|datenschutz|confidentialit|privacidad|privacidade/i;
+
+// Accept a cookie or consent banner, so the pages show without it. Clicks the
+// accept button of a banner (a button inside a small part of the page about
+// cookies, never an "OK" elsewhere), or job.cookieBanner when it is a CSS
+// selector; does nothing with "leave". Waits a moment for banners that show
+// after the page. Returns whether it clicked one.
+async function acceptCookies(page, job) {
+  const how = job.cookieBanner || 'accept';
+  if (how === 'leave') return false;
+  for (let tries = 0; tries < 2; tries++) {
+    const candidates = how === 'accept' ? [page.getByRole('button', { name: ACCEPT }), page.getByRole('link', { name: ACCEPT })] : [page.locator(how)];
+    for (const found of candidates) {
+      const count = Math.min(await found.count().catch(() => 0), 10);
+      for (let i = 0; i < count; i++) {
+        const button = found.nth(i);
+        if (!(await button.isVisible().catch(() => false))) continue;
+        if (how === 'accept') {
+          const onBanner = await button.evaluate((el, words) => {
+            const re = new RegExp(words, 'i');
+            for (let n = el.parentElement, depth = 0; n && n !== document.body && depth < 5; n = n.parentElement, depth++) {
+              const text = n.innerText || '';
+              if (text.length < 2000 && re.test(text)) return true;
+            }
+            return false;
+          }, BANNER.source).catch(() => false);
+          if (!onBanner) continue;
+        }
+        await button.click({ timeout: 5000 }).catch(() => {});
+        await page.waitForTimeout(400);
+        return true;
+      }
+    }
+    if (tries === 0) await page.waitForTimeout(1200);
+  }
+  return false;
+}
+
 // Wait for the page to load and its network to go quiet, without failing if it
 // never does: a slow image or script from another site doesn't make it broken.
 async function settle(page, quiet = TIMEOUTS.quiet) {
@@ -209,4 +273,4 @@ async function snapshot(page, limit = 12000) {
 // The first line of an error, for a result.
 const firstLine = e => String(e?.message || e).split('\n')[0];
 
-module.exports = { TIMEOUTS, url, appUrl, toApp, toFrontend, isAppCall, describeAppError, snapshot, isSignIn, launch, contextOptions, newContext, signIn, settle, open, firstLine };
+module.exports = { TIMEOUTS, url, appUrl, toApp, toFrontend, isAppCall, describeAppError, snapshot, isSignIn, isVerifyEmail, launch, contextOptions, newContext, signIn, signInAs, acceptCookies, settle, open, firstLine };

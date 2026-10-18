@@ -52,7 +52,7 @@ class Verifier
             }
 
             $devices = $video->recordedDevices() ?: $video->deviceList();
-            if (config('video-demo.recorder.check_pages', true) && ($issues = $this->recorder->checkPages($plan->paths(), $video->record_as, $devices[0])) !== []) {
+            if (config('video-demo.recorder.check_pages', true) && ($issues = $this->recorder->checkPages($plan->pathsBeforeSignIn(), $video->record_as, $devices[0])) !== []) {
                 $result = [...$result, 'ok' => false, 'issues' => $issues, 'url' => $issues[0]['url'] ?? null,
                     'error' => count($issues) === 1 ? "{$issues[0]['path']}: {$issues[0]['problem']}." : count($issues).' of its pages fail to open.'];
             }

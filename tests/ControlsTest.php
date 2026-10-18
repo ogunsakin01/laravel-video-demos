@@ -17,6 +17,7 @@ use Ogunsakin01\VideoDemo\Library\Manifest;
 use Ogunsakin01\VideoDemo\Models\Video;
 use Ogunsakin01\VideoDemo\Models\VideoIdea;
 use Ogunsakin01\VideoDemo\Models\VideoStyle;
+use Ogunsakin01\VideoDemo\Recording\Plan;
 use Ogunsakin01\VideoDemo\Recording\RecordAs;
 use Ogunsakin01\VideoDemo\Recording\Recorder;
 use Ogunsakin01\VideoDemo\Studio\Pages;
@@ -55,6 +56,31 @@ class ControlsTest extends TestCase
             User::forceCreate(['email' => 'member@example.com', 'password' => 'x', 'role' => 'member']);
             User::forceCreate(['email' => 'second-member@example.com', 'password' => 'x', 'role' => 'member']);
         }
+    }
+
+    public function test_a_sign_in_partway_through_signs_in_as_a_user_of_its_type(): void
+    {
+        $this->users();
+        config(['video-demo.recorder.login_as' => 'admin@example.com']);
+        $recorder = new class extends Recorder
+        {
+            public function paths(Plan $plan): array
+            {
+                return $this->signInPaths($plan);
+            }
+        };
+        $step = fn (string $value) => ['action' => 'sign_in', 'url' => '/dashboard', 'value' => $value];
+
+        $paths = $recorder->paths(new Plan('x', 'y', [$step('member'), $step('type:admin'), $step(''), $step('member')]));
+        $this->assertSame(['member', 'type:admin', ''], array_keys($paths));
+        $this->assertStringContainsString('/_recorder/login/2?', $paths['member']['login']);
+        $this->assertStringContainsString('/_recorder/login/1?', $paths['type:admin']['login']);
+        // Empty is the default user.
+        $this->assertStringContainsString('/_recorder/login/1?', $paths['']['login']);
+        $this->assertSame([], $recorder->paths(new Plan('x', 'y', [['action' => 'goto', 'url' => '/']])));
+
+        // The planner is told who it can sign in as.
+        $this->assertStringContainsString('admin (Admin), member (Member)', (new \ReflectionMethod(Planner::class, 'signInTypes'))->invoke(app(Planner::class)));
     }
 
     public function test_prices_match_the_published_rates(): void

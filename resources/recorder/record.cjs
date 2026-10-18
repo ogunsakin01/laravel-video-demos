@@ -28,6 +28,8 @@ const focus = [];
 // How many title cards and captions have been shown, to number them in styles that do.
 let headlines = 0;
 let started = 0;
+// Whether the browser is signed in: from the start, or since a sign_in step.
+let signedIn = !!(job.loginPath || job.signInPath);
 
 // Time spent waiting on the app (pages loading, something appearing), in ms
 // since recording started. Most of it is cut from the video, so a click goes
@@ -127,11 +129,23 @@ async function run(page, step, isLast) {
       await waiting(() => page.goto(url(step.url), { waitUntil: 'domcontentloaded', timeout: 60000 }));
       await settle(page);
       if (browserKit.isSignIn(page.url()) && !browserKit.isSignIn(url(step.url))) {
-        throw new Error(`Opening ${step.url} went to the sign-in page instead. ${job.loginPath || job.signInPath ? "The recorder's user may not have access." : 'The recorder is signed out; set video-demo.recorder.login_as.'}`);
+        throw new Error(`Opening ${step.url} went to the sign-in page instead. ${signedIn ? "The recorder's user may not have access." : 'The video is signed out here: add a sign_in step before this page.'}`);
+      }
+      if (browserKit.isVerifyEmail(page.url()) && !browserKit.isVerifyEmail(url(step.url))) {
+        throw new Error(`Opening ${step.url} went to the email verification page instead: this user hasn't verified their email, which a recording can't do. ${signedIn ? 'Sign in with a sign_in step as a user whose email is verified.' : 'Add a sign_in step before this page.'}`);
       }
       // Time to take in the new page before anything moves.
       await pause(page, 1100 + extra);
       return;
+    case 'sign_in': {
+      // Signs in out of view, then opens the page as that user, as goto does.
+      const entry = (job.signInAs || {})[(step.value || '').trim()];
+      if (!entry) throw new Error('There is no sign-in for this step\'s user. Record the video again so the app makes one.');
+      await waiting(() => browserKit.signInAs(page.context(), job, entry));
+      signedIn = true;
+      await run(page, { ...step, action: 'goto' }, isLast);
+      return;
+    }
     case 'click': {
       const loc = await find(page, step.target);
       await focusOn(page, loc);
@@ -249,11 +263,26 @@ async function run(page, step, isLast) {
     // The app is recorded in light or dark mode, for apps that follow the system setting.
     const theme = style.app_theme === 'dark' || style.app_theme === 'light' ? { colorScheme: style.app_theme } : {};
 
-    // Sign in first, outside the recording.
+    // Sign in first, and accept a cookie banner, outside the recording: the
+    // banner's choice is kept, so it shows on no page of the video.
     let storageState;
-    if (job.loginPath || job.signInPath) {
+    const banner = (job.cookieBanner || 'accept') !== 'leave';
+    if (job.loginPath || job.signInPath || banner) {
       const ctx = await browserKit.newContext(browser, job, job, theme);
       await browserKit.signIn(ctx, job);
+      if (banner) {
+        const first = plan.steps.find(s => s.action === 'goto' && s.url);
+        const tab = await ctx.newPage();
+        try {
+          await tab.goto(url(first ? first.url : '/'), { waitUntil: 'domcontentloaded', timeout: 60000 });
+          await browserKit.settle(tab);
+          await browserKit.acceptCookies(tab, job);
+        } catch {
+          // A page that doesn't open here fails in the recording, with its reason.
+        } finally {
+          await tab.close().catch(() => {});
+        }
+      }
       storageState = await ctx.storageState();
       await ctx.close();
     }
@@ -293,7 +322,6 @@ async function run(page, step, isLast) {
     const appRefusals = [];
     const sentAt = new WeakMap();
     page.on('request', r => sentAt.set(r, Date.now()));
-    const guest = !job.signInPath && !job.loginPath;
     // Fail on the app's refusals, blaming the step that sent the request. The
     // responses are given a moment to arrive, longer after the last step.
     async function checkRefusals(wait) {
@@ -310,7 +338,7 @@ async function run(page, step, isLast) {
     page.on('response', async r => {
       // A separate frontend's pages load their data from the app, so its errors count too.
       const fromApp = browserKit.toApp(job, r.url()) || browserKit.isAppCall(job, r.request());
-      if (fromApp && r.status() >= 400 && r.status() < 500 && r.request().method() !== 'GET' && browserKit.isAppCall(job, r.request()) && !(r.status() === 401 && guest)) {
+      if (fromApp && r.status() >= 400 && r.status() < 500 && r.request().method() !== 'GET' && browserKit.isAppCall(job, r.request()) && !(r.status() === 401 && !signedIn)) {
         const refusal = { sent: sentAt.get(r.request()) ?? Date.now(), status: r.status(), text: '' };
         refusal.done = browserKit.describeAppError(r).then(text => { refusal.text = text; });
         appRefusals.push(refusal);

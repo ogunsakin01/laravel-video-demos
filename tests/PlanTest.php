@@ -97,6 +97,23 @@ class PlanTest extends TestCase
         ], $problems);
     }
 
+    public function test_a_video_can_sign_in_partway_through(): void
+    {
+        $plan = new Plan('Why join', 'x', [
+            $this->step('goto', ['url' => '/']),
+            $this->step('goto', ['url' => '/register']),
+            $this->step('sign_in', ['url' => '/dashboard', 'value' => 'member']),
+            $this->step('goto', ['url' => '/growth']),
+        ]);
+
+        $this->assertSame([], $plan->problems());
+        // Pages before it are checked as the video's user; the rest are rehearsed signed in.
+        $this->assertSame(['/', '/register'], $plan->pathsBeforeSignIn());
+        $this->assertSame(['/', '/register', '/growth'], $plan->paths());
+        $this->assertSame(['Step 1 (sign_in) needs url.'], (new Plan('x', 'y', [$this->step('sign_in', ['value' => 'member'])]))->problems());
+        $this->assertContains('sign_in', Plan::schema()['properties']['steps']['items']['properties']['action']['enum']);
+    }
+
     public function test_steps_can_be_limited_to_some_versions(): void
     {
         $plan = new Plan('x', 'y', [

@@ -72,6 +72,7 @@ class Recorder
         File::put("$dir/plan.json", json_encode($plan->toArray(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
         File::put("$dir/job.json", json_encode([
             ...$this->browserSettings($screen, $recordAs),
+            'signInAs' => $this->signInPaths($plan),
             'planPath' => "$dir/plan.json",
             'outDir' => $dir,
             'speed' => $speed,
@@ -118,6 +119,7 @@ class Recorder
         File::put("$dir/plan.json", json_encode($plan->toArray(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
         File::put("$dir/job.json", json_encode([
             ...$this->browserSettings(Devices::get($device), $recordAs),
+            'signInAs' => $this->signInPaths($plan),
             'planPath' => "$dir/plan.json",
             'outDir' => $dir,
             'dryRun' => true,
@@ -447,6 +449,8 @@ class Recorder
                 $this->sandbox ? [...$this->sandbox->cookie(), 'url' => rtrim((string) config('video-demo.recorder.base_url'), '/').'/'] : null,
                 $this->locale ? ['name' => self::LOCALE_COOKIE, 'value' => $this->locale, 'url' => rtrim((string) config('video-demo.recorder.base_url'), '/').'/'] : null,
             ])),
+            // A cookie or consent banner: accepted before recording (accept), left alone (leave), or the button to click (a CSS selector).
+            'cookieBanner' => (string) (config('video-demo.recorder.cookie_banner') ?: 'accept'),
             // The browser's own language too, for apps that read Accept-Language or navigator.language.
             'locale' => $this->locale,
         ];
@@ -527,10 +531,47 @@ class Recorder
         // On sample data, the user is the one made in the sample database.
         $id = $this->sandbox ? $this->sandbox->userId() : RecordAs::resolve($recordAs)?->getAuthIdentifier();
 
-        if ($id === null) {
-            return null;
+        return $id === null ? null : $this->signedPath($id, $route);
+    }
+
+    /**
+     * Get the sign-in link for each user the plan's sign_in steps sign in as,
+     * keyed by the step's value: the login link, or for a separate
+     * frontend's tokens the link its sign-in is fetched from.
+     *
+     * @return array<string, array{login?: string, signIn?: string}>
+     *
+     * @throws RuntimeException When a step's user can't be found.
+     */
+    protected function signInPaths(Plan $plan): array
+    {
+        $paths = [];
+        foreach ($plan->steps as $step) {
+            $value = trim((string) ($step['value'] ?? ''));
+            if (($step['action'] ?? null) !== 'sign_in' || isset($paths[$value])) {
+                continue;
+            }
+
+            // "member", "type:member", or empty for the default user.
+            $as = $value === '' ? null : (str_starts_with($value, RecordAs::TYPE) ? $value : RecordAs::TYPE.$value);
+            $id = $this->sandbox ? $this->sandbox->userFor($as) : RecordAs::resolve($as)?->getAuthIdentifier();
+            if ($id === null) {
+                throw new RuntimeException('A sign_in step has no user to sign in as: name a type of user in it, or set video-demo.recorder.login_as.');
+            }
+
+            $paths[$value] = SignIn::usesTokens()
+                ? ['signIn' => $this->signedPath($id, 'video-demo.studio.recorder-sign-in')]
+                : ['login' => $this->signedPath($id, 'video-demo.studio.recorder-login')];
         }
 
+        return $paths;
+    }
+
+    /**
+     * Get a signed, short-lived link to a recorder sign-in route for a user.
+     */
+    protected function signedPath(int|string $id, string $route): string
+    {
         return URL::temporarySignedRoute(
             $route,
             now()->addMinutes(10),

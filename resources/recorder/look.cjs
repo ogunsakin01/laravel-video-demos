@@ -18,6 +18,8 @@ const job = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
     const context = await browserKit.newContext(browser, job);
     await browserKit.signIn(context, job);
     const { page, status } = await browserKit.open(context, job, job.path);
+    // What the AI sees matches the video, which has no cookie banner.
+    await browserKit.acceptCookies(page, job);
     result.status = status;
     result.url = page.url();
     result.title = await page.title().catch(() => '');

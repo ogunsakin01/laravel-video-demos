@@ -59,6 +59,13 @@ class Sandbox
     public array $info = ['user' => null, 'tables' => [], 'seeded' => [], 'warnings' => []];
 
     /**
+     * The users sign_in steps sign in as, by what they name.
+     *
+     * @var array<string, int|string>
+     */
+    protected array $signInUsers = [];
+
+    /**
      * Create a new sandbox instance for the database at the given path.
      */
     public function __construct(public readonly string $path) {}
@@ -212,16 +219,9 @@ class Sandbox
      */
     public function prepare(?string $recordAs): array
     {
-        $type = null;
-        if (str_starts_with((string) $recordAs, RecordAs::TYPE)) {
-            $key = substr($recordAs, strlen(RecordAs::TYPE));
-            $found = RecordAs::types()[$key] ?? null;
-            $type = ['key' => $key, 'label' => $found['label'] ?? Str::headline($key), 'via' => $found['via'] ?? null, 'role' => $found['role'] ?? $key];
-        }
-
         $result = $this->call('prepare', [
             'record_as' => $recordAs,
-            'type' => $type,
+            'type' => $this->type($recordAs),
             'login_as' => config('video-demo.recorder.login_as'),
         ]);
 
@@ -230,6 +230,32 @@ class Sandbox
         }
 
         return $this->info = [...$this->info, 'user' => $result['user'] ?? null, 'tables' => $result['tables'] ?? []];
+    }
+
+    /**
+     * Get the id of the user a sign_in step signs in as, in this copy: one of
+     * the type ("type:member"), or the default user for null, made when
+     * there is none. Each is looked up once.
+     *
+     * @throws RuntimeException
+     */
+    public function userFor(?string $as): int|string
+    {
+        $key = (string) $as;
+        if (isset($this->signInUsers[$key])) {
+            return $this->signInUsers[$key];
+        }
+
+        $result = $this->call('user', [
+            'record_as' => $as,
+            'type' => $this->type($as),
+            'login_as' => config('video-demo.recorder.login_as'),
+        ]);
+        if (! ($result['ok'] ?? false) || ! isset($result['id'])) {
+            throw new RuntimeException($result['error'] ?? 'The user to sign in as could not be made in the sample database.');
+        }
+
+        return $this->signInUsers[$key] = $result['id'];
     }
 
     /**
@@ -267,6 +293,7 @@ class Sandbox
         File::copy($this->path, $path);
         $copy = new self($path);
         $copy->info = $this->info;
+        $copy->signInUsers = $this->signInUsers;
 
         return $copy;
     }
@@ -277,6 +304,22 @@ class Sandbox
     public function userId(): int|string|null
     {
         return $this->info['user']['id'] ?? null;
+    }
+
+    /**
+     * Describe the type of user a "type:…" record-as names, for the sample-data command.
+     *
+     * @return ?array{key: string, label: string, via: ?string, role: string}
+     */
+    protected function type(?string $recordAs): ?array
+    {
+        if (! str_starts_with((string) $recordAs, RecordAs::TYPE)) {
+            return null;
+        }
+        $key = substr((string) $recordAs, strlen(RecordAs::TYPE));
+        $found = RecordAs::types()[$key] ?? null;
+
+        return ['key' => $key, 'label' => $found['label'] ?? Str::headline($key), 'via' => $found['via'] ?? null, 'role' => $found['role'] ?? $key];
     }
 
     /**

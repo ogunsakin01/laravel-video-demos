@@ -39,6 +39,14 @@ final class PestTest
             $target = array_filter((array) ($step['target'] ?? []));
             $value = (string) ($step['value'] ?? '');
 
+            if ($action === 'sign_in') {
+                // A browser test signs in before visiting, so the rest is the second half of a flow.
+                $parts[] = ['lines' => ['// The video signs in here as '.(trim($value) !== '' ? trim($value) : 'the default user').'. Sign in on the page, or test what follows in its own test with actingAs().']];
+                $visited ? $chain('navigate('.self::string((string) $step['url']).')') : $parts[] = ['lines' => ['$page = visit('.self::string((string) $step['url']).');']];
+                $visited = true;
+
+                continue;
+            }
             if ($action === 'goto') {
                 if (! $visited) {
                     $parts[] = ['lines' => ['$page = visit('.self::string((string) $step['url']).');']];

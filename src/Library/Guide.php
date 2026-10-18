@@ -78,6 +78,10 @@ final class Guide
             return $title === '' && $text === '' ? null : ['do' => 'note', 'title' => $title, 'text' => $text];
         }
 
+        if ($action === 'sign_in') {
+            return ['do' => 'sign_in', 'what' => []];
+        }
+
         $target = (array) ($step['target'] ?? []);
         $name = trim((string) ($target['name'] ?? '') ?: ($target['label'] ?? '') ?: ($target['text'] ?? '') ?: ($target['placeholder'] ?? ''));
         // An element found only by a CSS selector has no name a reader would recognise.

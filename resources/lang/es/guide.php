@@ -4,6 +4,7 @@
 
 return [
     'heading' => 'Paso a paso',
+    'sign_in' => 'Inicia sesión.',
     'click' => 'Haz clic en :what.',
     'check' => 'Marca :what.',
     'type' => 'Rellena :what.',

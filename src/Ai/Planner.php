@@ -13,6 +13,7 @@ use Ogunsakin01\VideoDemo\Recording\RecordAs;
 use Ogunsakin01\VideoDemo\Recording\RecordingResult;
 use Ogunsakin01\VideoDemo\SampleData\Sandbox;
 use RuntimeException;
+use Throwable;
 
 /**
  * Asks the model to read the app's code and write a step-by-step plan for the video,
@@ -338,9 +339,10 @@ class Planner
         $notes = trim((string) config('video-demo.ai.notes'));
         $devices = $video->deviceList();
         $user = $sandbox ? $this->describeSampleUser($video, $sandbox) : RecordAs::describe($video);
-        $signedIn = $user === null
-            ? 'The recorder is signed out (a guest) when the video starts, so use only pages that don\'t need signing in.'
-            : "The recorder is already signed in as $user when the video starts; plan only what that user can see and do.";
+        $signedIn = ($user === null
+            ? 'The recorder is signed out (a guest) when the video starts. Pages that need signing in can only come after a sign_in step.'
+            : "The recorder is already signed in as $user when the video starts; plan only what that user can see and do, unless a sign_in step switches to another user.")
+            .' '.$this->signInTypes();
 
         return implode("\n\n", array_filter([
             "<video_request>\n{$video->prompt}\n</video_request>",
@@ -362,6 +364,23 @@ class Planner
             $sandbox && ($rules = (new AccessRules)->describe()) !== '' ? "<access_rules>\n$rules\n</access_rules>" : null,
             "<routes>\n".$this->code->routeList(allMiddleware: $sandbox !== null)."\n</routes>",
         ]));
+    }
+
+    /**
+     * Describe who a sign_in step can sign in as: the app's types of user, or the default user.
+     */
+    protected function signInTypes(): string
+    {
+        try {
+            $types = RecordAs::types();
+        } catch (Throwable) {
+            $types = [];
+        }
+        $list = collect($types)->map(fn ($type, $key) => "$key ({$type['label']})")->implode(', ');
+
+        return $list !== ''
+            ? "sign_in can sign in as one of these types of user, by the name before the brackets: $list. Leave its value empty for the default user."
+            : 'sign_in signs in as the default user: leave its value empty.';
     }
 
     /**
@@ -481,15 +500,18 @@ class Planner
 
         Then call submit_plan once with the plan. Each step is one thing that happens on screen:
         - goto opens a path. Use it to start and when a viewer would naturally arrive at a page, not to skip steps the video is meant to teach.
+        - sign_in signs the browser in out of view, as a ready-made user (value: a type of user, or empty for the default user), then opens url as that user. Use it where the video moves from public pages to pages that need an account, or to another type of user. An account made during the video (by registering) usually can't get past email verification or a CAPTCHA, so when the video is about joining, show the sign-up form, then sign_in as a member to show what members get, with a caption saying so.
         - click, hover and check act on an element; type fills a field with value; select picks an option by its label; press sends a key such as Enter; scroll moves the page (target scrolls to an element; otherwise ms is ignored and the page scrolls by one screen); wait waits for an element to appear.
         - caption shows a short title and sentence over the bottom of the page while the app stays visible; card shows a full-screen title card. Use a card to open and close the video, and captions to explain what the viewer is looking at. Keep each caption title under 8 words and its sentence under 20.
         - pause holds still so the viewer can take in a result.
 
-        Payments and other services often show their fields inside an iframe, such as the card fields of Stripe Elements or a PayPal button. Give the iframe's CSS selector in target.frame for those, and check the developer's notes for test card numbers and test accounts; never use real payment details. Hosted pages on another site (a Stripe Checkout page, say) are reached by clicking through from the app, not with goto. Steps that need an email, a text message or a CAPTCHA can't be recorded; if the flow depends on one, say so in a caption and skip to what the user sees next.
+        Payments and other services often show their fields inside an iframe, such as the card fields of Stripe Elements or a PayPal button. Give the iframe's CSS selector in target.frame for those, and check the developer's notes for test card numbers and test accounts; never use real payment details. Hosted pages on another site (a Stripe Checkout page, say) are reached by clicking through from the app, not with goto. Steps that need an email, a text message or a CAPTCHA can't be recorded; if the flow depends on one, say so in a caption and skip to what the user sees next, with sign_in when that needs an account.
 
         Identify elements the way a user sees them. Prefer role and name together (role "button", name "Post job"), then label for form fields, then visible text. Use a CSS selector only when nothing visible identifies the element. Labels must match what the rendered page shows, after translations and components are applied, so check the view and any component it uses.
 
         Pace the plan to the target length: a caption reads in about 3 seconds, a card in about 4, and each click or field takes 1 to 2 seconds. The recorder adjusts captions and pauses to land close to the target, so get the content right rather than the exact timing. Type realistic sample values that will pass validation. Mark the start of each part of the flow with chapter so viewers can jump to it.
+
+        Show what the video talks about: every page a caption or the voice-over describes must be on screen while it is described, not narrated over another page. If a page can't be reached, leave it out.
 
         The video will be shown to the app's users, so explain things in their terms, not in terms of the code. Do not show secrets, other people's personal details, or admin-only screens unless the request is about them. Avoid steps that delete data or send messages to real people unless the request is about exactly that.
 

@@ -263,6 +263,10 @@ class FindSpots implements ShouldQueue
     {
         $paths = [$video->start_path ?: null];
         foreach ($video->plan['steps'] ?? [] as $step) {
+            // Pages after a sign_in are another user's, which the video's user may not see.
+            if (($step['action'] ?? '') === 'sign_in') {
+                break;
+            }
             if (($step['action'] ?? '') === 'goto' && is_string($step['url'] ?? null) && str_starts_with($step['url'], '/')) {
                 $paths[] = $step['url'];
             }

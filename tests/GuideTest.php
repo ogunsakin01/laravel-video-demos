@@ -54,6 +54,20 @@ class GuideTest extends TestCase
         $this->assertSame('Füllen Sie <strong>Titel</strong> und <strong>Ort</strong> aus.', (string) Guide::sentence($fill, 'de'));
     }
 
+    public function test_signing_in_partway_through_is_a_step(): void
+    {
+        $guide = Guide::fromSteps([
+            ['action' => 'goto', 'url' => '/'],
+            ['action' => 'sign_in', 'url' => '/dashboard', 'value' => 'member'],
+            ['action' => 'click', 'target' => ['role' => 'link', 'name' => 'Growth']],
+        ]);
+        $items = $guide[0]['items'];
+
+        $this->assertSame(['sign_in', 'click'], array_column($items, 'do'));
+        $this->assertSame('Sign in.', (string) Guide::sentence($items[0]));
+        $this->assertSame('Connectez-vous.', (string) Guide::sentence($items[0], 'fr'));
+    }
+
     public function test_a_plan_with_nothing_to_do_has_no_guide(): void
     {
         $this->assertSame([], Guide::fromSteps([

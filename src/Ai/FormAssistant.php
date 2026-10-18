@@ -153,6 +153,7 @@ class FormAssistant
         foreach (array_slice($steps, 0, 80) as $i => $step) {
             $what = match ($step['action'] ?? '') {
                 'goto' => $step['url'] ?? '',
+                'sign_in' => 'as '.(($step['value'] ?? '') ?: 'the default user').', then '.($step['url'] ?? ''),
                 'caption', 'card' => '"'.($step['title'] ?? '').'"'.(! empty($step['text']) ? ' — '.$step['text'] : ''),
                 default => collect($step['target'] ?? [])->filter()->map(fn ($v, $k) => "$k: $v")->implode(', ').(! empty($step['value']) ? ' → "'.$step['value'].'"' : ''),
             };

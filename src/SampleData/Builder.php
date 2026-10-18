@@ -107,6 +107,24 @@ class Builder
     }
 
     /**
+     * Find or make the user a video signs in as partway through (a sign_in
+     * step): one of the type, or the default user, or else a new user.
+     *
+     * @param  array{record_as?: ?string, type?: ?array{key: string, label: string, via: ?string, role: string}, login_as?: mixed}  $input
+     * @return array<string, mixed>
+     */
+    public function signInUser(array $input): array
+    {
+        try {
+            $user = $this->user($input) ?? $this->makeUser(null);
+        } catch (Throwable $e) {
+            return ['ok' => false, 'error' => 'The user to sign in as could not be made in the sample database: '.$this->firstLine($e->getMessage())];
+        }
+
+        return ['ok' => true, 'id' => $user->getAuthIdentifier()];
+    }
+
+    /**
      * Add records, each in its own transaction, so one that fails leaves the
      * others in place.
      *
