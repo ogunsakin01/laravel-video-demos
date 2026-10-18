@@ -105,6 +105,20 @@ class GenerateVideo implements ShouldQueue
     protected array $recordingErrors = [];
 
     /**
+     * The sample records the AI made for the plan this attempt replaces,
+     * given back to it when no new plan is saved (the attempt stopped or
+     * failed first), so the old plan still finds what its pages need.
+     *
+     * @var ?list<array<string, mixed>>
+     */
+    protected ?array $previousRecords = null;
+
+    /**
+     * Whether this attempt saved its plan.
+     */
+    protected bool $planSaved = false;
+
+    /**
      * Execute the job.
      */
     public function handle(Planner $planner, Recorder $recorder, Encoder $encoder, Narrator $narrator, Speaker $speaker, Soundtrack $soundtrack): void
@@ -154,6 +168,8 @@ class GenerateVideo implements ShouldQueue
             return;
         }
         $video->update(['issues' => null]);
+        // The spending limit is for each attempt; the video's cost adds them all up.
+        $video->costBefore = (float) $video->cost;
         $dir = Recorder::workDir($video->workPath());
         $maxRepairs = (int) config('video-demo.limits.max_repairs', 2);
         $shouldStop = fn () => $video->stopRequested();
@@ -213,6 +229,7 @@ class GenerateVideo implements ShouldQueue
                     [$plan, $clips] = $clips !== null ? $this->voiceOver($video, $plan, $narrator, $speaker) : [$plan->withoutVoice(), null];
                     $plan = $plan->fitTo(min($video->target_seconds, (int) config('video-demo.limits.max_seconds', 300)), $video->playbackSpeed());
                     $video->update(['plan' => $plan->toArray()]);
+                    $this->planSaved = true;
                 }
 
                 $results = [];
@@ -270,6 +287,9 @@ class GenerateVideo implements ShouldQueue
 
             return;
         } finally {
+            if ($this->replan && ! $this->planSaved && $this->previousRecords !== null) {
+                $video->update(['sample_records' => $this->previousRecords]);
+            }
             $this->appErrors = [...$this->rehearsalErrors, ...$this->recordingErrors, ...($sandbox?->appErrors() ?? [])];
             $sandbox?->delete();
             $recorder->sandbox = null;
@@ -342,7 +362,7 @@ class GenerateVideo implements ShouldQueue
 
             // A voice that costs money mustn't take the video past its spending limit.
             $estimate = mb_strlen(implode(' ', $lines)) / 1000 * Voices::price($video->voice);
-            if ($estimate > 0 && $video->cost + $estimate > $video->spendLimit()) {
+            if ($estimate > 0 && $video->spentNow() + $estimate > $video->spendLimit()) {
                 $video->addLog(sprintf('The voice-over was left out: at about $%.3f it would take the video past its $%.2f limit.', $estimate, $video->spendLimit()));
 
                 return [$plan, null];
@@ -426,6 +446,7 @@ class GenerateVideo implements ShouldQueue
             ? 'Copying the sample database'
             : 'Building the sample database: running your migrations and seeders once (php artisan video-demo:sample-database does this ahead of time)');
         if ($this->replan) {
+            $this->previousRecords = $video->sample_records;
             $video->update(['sample_records' => null]);
         }
 

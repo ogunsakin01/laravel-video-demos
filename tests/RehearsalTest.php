@@ -5,6 +5,7 @@ namespace Ogunsakin01\VideoDemo\Tests;
 use Closure;
 use Illuminate\Support\Facades\File;
 use Ogunsakin01\VideoDemo\Ai\Planner;
+use Ogunsakin01\VideoDemo\Ai\PlanningFailed;
 use Ogunsakin01\VideoDemo\Ai\PlanningSession;
 use Ogunsakin01\VideoDemo\Enums\VideoStatus;
 use Ogunsakin01\VideoDemo\Jobs\GenerateVideo;
@@ -212,6 +213,32 @@ class RehearsalTest extends TestCase
         $this->make($this->video(['devices' => ['desktop']]));
         $this->assertSame([], $recorder->rehearsed);
         $this->assertSame(['Old button (desktop)'], $recorder->recorded);
+    }
+
+    public function test_a_new_plan_that_fails_first_leaves_the_old_plan_its_sample_records(): void
+    {
+        $this->fakeApp();
+        $records = [['table' => 'users', 'where' => ['id' => '@user_member'], 'data' => ['avatar' => '/images/me.jpg']]];
+        $video = $this->video(['devices' => ['desktop'], 'sample_records' => $records, 'plan' => ['title' => 'x', 'summary' => '', 'steps' => [['action' => 'goto', 'url' => '/']]]]);
+        // The new plan stops at once (its planner fails), as a spending limit would stop it.
+        $this->app->instance(Planner::class, new class extends Planner
+        {
+            public function __construct() {}
+
+            public function plan(Video $video, ?Sandbox $sandbox = null, array $problems = []): PlanningSession
+            {
+                throw new PlanningFailed('Stopped at $0.08, over the video\'s $0.05 limit for one attempt.');
+            }
+        });
+
+        try {
+            $this->make($video);
+            $this->fail('The planner should stop it.');
+        } catch (PlanningFailed) {
+        }
+
+        // So recording the same plan again still adds back the profile photo its pages need.
+        $this->assertSame($records, $video->fresh()->sample_records);
     }
 
     public function test_a_failed_rehearsal_keeps_its_screenshot_for_the_full_error_view(): void

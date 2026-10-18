@@ -126,12 +126,12 @@ class Planner
             }
             // Each request costs a little more than the last as the conversation grows,
             // so stop before one that would take the video over its limit.
-            if ($video->cost >= $maxCost) {
-                throw new PlanningFailed(sprintf('Stopped at $%.2f: this video has reached its $%.2f limit. Raise the limit to plan it again.', $video->cost, $maxCost));
+            if ($video->spentNow() >= $maxCost) {
+                throw new PlanningFailed(sprintf('Stopped at $%.2f: this attempt has reached the video\'s $%.2f limit. Raise the limit to plan it again.', $video->spentNow(), $maxCost));
             }
             $nextCost = $session->lastCost * self::GROWTH;
-            if ($session->lastCost > 0 && $video->cost + $nextCost > $maxCost) {
-                throw new PlanningFailed(sprintf('Stopped at $%.2f: the next request would take this video past its $%.2f limit. Raise the limit, or ask for a shorter video.', $video->cost, $maxCost));
+            if ($session->lastCost > 0 && $video->spentNow() + $nextCost > $maxCost) {
+                throw new PlanningFailed(sprintf('Stopped at $%.2f: the next request would take this attempt past the video\'s $%.2f limit. Raise the limit, or ask for a shorter video.', $video->spentNow(), $maxCost));
             }
 
             $session->turns++;
@@ -145,8 +145,8 @@ class Planner
             if ($turn->stop === Turn::MAX_TOKENS) {
                 throw new PlanningFailed('The plan was longer than one response allows. Ask for a shorter video or split the flow.');
             }
-            if ($video->cost > $maxCost) {
-                throw new PlanningFailed(sprintf('Stopped at $%.2f, over this video\'s $%.2f limit.', $video->cost, $maxCost));
+            if ($video->spentNow() > $maxCost) {
+                throw new PlanningFailed(sprintf('Stopped at $%.2f, over the video\'s $%.2f limit for one attempt.', $video->spentNow(), $maxCost));
             }
 
             if ($turn->stop !== Turn::TOOL_USE) {
@@ -348,7 +348,7 @@ class Planner
             "<video_request>\n{$video->prompt}\n</video_request>",
             "Target length: about {$video->target_seconds} seconds.",
             $video->max_steps ? "The plan may have at most {$video->max_steps} steps." : null,
-            sprintf('Budget: this video may spend at most $%.2f on AI requests, including any repairs. Read only the code you need.', $video->spendLimit()),
+            sprintf('Budget: this attempt may spend at most $%.2f on AI requests, including any repairs. Read only the code you need.', $video->spendLimit()),
             ! empty($video->style['direction']) ? "<style name=\"{$video->style['name']}\">\n{$video->style['direction']}\n</style>\nFollow this style for the tone, the captions and cards you use, and how much you explain." : null,
             $video->start_path ? "Start at: {$video->start_path}" : null,
             count($devices) > 1

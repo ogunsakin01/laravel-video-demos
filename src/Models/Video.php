@@ -358,6 +358,20 @@ class Video extends Model
     /**
      * Get the most this video may spend on AI: its own limit, else the configured one.
      */
+    /**
+     * What the video had cost when the attempt being made started.
+     */
+    public float $costBefore = 0;
+
+    /**
+     * Get what the attempt being made has spent: the spending limit is for
+     * each attempt, and the video's cost adds them all up.
+     */
+    public function spentNow(): float
+    {
+        return max(0.0, (float) $this->cost - $this->costBefore);
+    }
+
     public function spendLimit(): float
     {
         return (float) ($this->max_cost ?: config('video-demo.limits.max_cost_per_video', 0.5));

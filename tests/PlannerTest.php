@@ -212,7 +212,7 @@ class PlannerTest extends TestCase
             app(Planner::class)->plan($this->video());
             $this->fail('Expected the cost limit to stop planning.');
         } catch (PlanningFailed $e) {
-            $this->assertStringContainsString("over this video's \$0.01 limit", $e->getMessage());
+            $this->assertStringContainsString("over the video's \$0.01 limit for one attempt", $e->getMessage());
         }
 
         config(['video-demo.limits.max_cost_per_video' => 2.0]);
@@ -262,7 +262,7 @@ class PlannerTest extends TestCase
             app(Planner::class)->plan($video);
             $this->fail('Expected the spending limit to stop planning.');
         } catch (PlanningFailed $e) {
-            $this->assertStringContainsString('the next request would take this video past its $0.06 limit', $e->getMessage());
+            $this->assertStringContainsString('the next request would take this attempt past the video\'s $0.06 limit', $e->getMessage());
         }
         $this->assertFalse($this->sent(2));
         $this->assertLessThan(0.06, $video->fresh()->cost);
@@ -301,9 +301,14 @@ class PlannerTest extends TestCase
             app(Planner::class)->plan($video);
             $this->fail('Expected the spending limit to stop planning.');
         } catch (PlanningFailed $e) {
-            $this->assertStringContainsString('this video has reached its $0.05 limit', $e->getMessage());
+            $this->assertStringContainsString('this attempt has reached the video\'s $0.05 limit', $e->getMessage());
         }
         $this->assertFalse($this->sent(1));
+
+        // The limit is for each attempt: trying again starts from what earlier attempts spent.
+        $video->costBefore = 0.05;
+        $this->assertCount(1, app(Planner::class)->plan($video)->plan->steps);
+        $this->assertTrue($this->sent(1));
     }
 
     public function test_stop_ends_planning_before_the_next_request(): void

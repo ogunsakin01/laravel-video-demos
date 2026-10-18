@@ -165,7 +165,7 @@
           <div class="vd-row">
             <div class="vd-field">
               <div class="vd-label-line"><label for="max_cost">Spending limit <span class="vd-optional">US $</span></label>
-                <details class="vd-tip"><summary aria-label="About the spending limit">?</summary><div class="vd-tip-body">The AI is told its budget, plans within it and stops before going over.</div></details>
+                <details class="vd-tip"><summary aria-label="About the spending limit">?</summary><div class="vd-tip-body">For each attempt: the AI is told its budget, plans within it and stops before going over. Trying again gets the same budget; the video's cost adds the attempts up.</div></details>
               </div>
               <input type="number" id="max_cost" name="max_cost" step="0.01" min="0.01" max="100" inputmode="decimal" value="{{ old('max_cost', $defaults['max_cost']) }}">
               @error('max_cost')<span class="vd-error">{{ $message }}</span>@enderror

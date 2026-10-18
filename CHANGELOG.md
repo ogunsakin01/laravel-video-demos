@@ -2,6 +2,13 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/). While the version is 0.x, minor releases may include breaking changes; they will be listed here.
 
+## Unreleased
+
+### Fixed
+
+- **Trying again with a new plan that stopped early lost the old plan's sample data.** It cleared the records the AI had made (a profile photo, say) before planning, so when the new plan stopped (on the spending limit, say), recording the old plan again met the pages without them. They are now kept until a new plan replaces the old one.
+- **The spending limit is for each attempt.** It counted everything a video had ever spent, so a video that had been tried a few times stopped at once when tried again. Each attempt now gets the whole limit; the video's cost still adds them all up.
+
 ## v0.18.5 - 2026-10-18
 
 ### Fixed
