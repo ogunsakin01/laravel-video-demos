@@ -27,6 +27,7 @@ class DemoSeeder extends Seeder
      */
     public function run(Publisher $publisher): void
     {
+        $this->call(DemoUsersSeeder::class);
         Storage::disk('demo-videos')->deleteDirectory('video-demo');
         $work = Storage::disk(config('video-demo.storage.work_disk'));
         $styles = VideoStyle::options()->values();

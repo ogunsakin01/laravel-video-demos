@@ -36,7 +36,7 @@ class WorkbenchServiceProvider extends ServiceProvider
                 'throw' => true,
             ],
             'video-demo.storage.disk' => 'demo-videos',
-            // The demo app has no roles, so its types of user are listed here.
+            // The demo app has no roles, so its types of user are listed here (DemoUsersSeeder adds them).
             'video-demo.recorder.user_types' => ['Recruiter' => 'recruiter@acme.test', 'Hiring manager' => 'manager@acme.test'],
         ]);
 
