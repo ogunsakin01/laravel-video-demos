@@ -184,6 +184,10 @@ class RecordAs
      */
     public static function find(string $idOrEmail): Authenticatable
     {
+        if ($table = static::missingUsersTable()) {
+            throw new RuntimeException("The user [$idOrEmail] to record as can't be found: the database has no [$table] table. Run the app's migrations, or record the video as a guest.");
+        }
+
         $provider = static::provider();
         $user = ctype_digit($idOrEmail) ? $provider->retrieveById($idOrEmail) : $provider->retrieveByCredentials(['email' => $idOrEmail]);
 
@@ -218,6 +222,26 @@ class RecordAs
             ?? config('auth.providers.users.model');
 
         return $model && class_exists($model) && is_subclass_of($model, Model::class) ? $model : null;
+    }
+
+    /**
+     * Get the users table when the database doesn't have it (the app's
+     * migrations haven't made it), or null when it does, or when users
+     * aren't Eloquent models.
+     */
+    public static function missingUsersTable(): ?string
+    {
+        if (! $model = static::model()) {
+            return null;
+        }
+
+        $user = new $model;
+        try {
+            return Schema::connection($user->getConnectionName())->hasTable($user->getTable()) ? null : $user->getTable();
+        } catch (Throwable) {
+            // A database that can't be reached is reported where it is used.
+            return null;
+        }
     }
 
     /**

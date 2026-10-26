@@ -189,6 +189,35 @@ class SampleDataTest extends TestCase
         $this->assertSame(['ok' => true, 'id' => 2], $builder->signInUser(['record_as' => 'type:member', 'type' => ['key' => 'member', 'label' => 'Member', 'via' => 'column:role', 'role' => 'member']]));
     }
 
+    public function test_a_sample_database_with_no_users_table_says_so(): void
+    {
+        // The app's migrations make no users table, so no user can be found or made.
+        config(['auth.providers.users.model' => User::class]);
+        $builder = new Builder;
+        $type = ['key' => 'recruiter', 'label' => 'Recruiter', 'via' => 'configured', 'role' => 'recruiter@acme.test'];
+
+        $result = $builder->prepare(['record_as' => 'type:recruiter', 'type' => $type]);
+        $this->assertFalse($result['ok']);
+        $this->assertSame("The user to record as could not be made in the sample database: it has no [users] table, as the app's migrations don't make one. Record the video as a guest, or add a migration that makes the table.", $result['error']);
+        $this->assertStringContainsString('it has no [users] table', $builder->signInUser(['record_as' => 'type:recruiter', 'type' => $type])['error']);
+
+        // A guest needs no user.
+        $this->assertTrue($builder->prepare(['record_as' => 'guest'])['ok']);
+
+        // Recording on the app's own data wouldn't help a video that signs in: its database has no users table either.
+        $hint = fn (?string $as) => (new class(new Video(['record_as' => $as])) extends GenerateVideo
+        {
+            public function hint(): string
+            {
+                return $this->ownDataHint($this->video);
+            }
+        })->hint();
+        $this->assertSame('', $hint('type:recruiter'));
+        $this->assertStringContainsString('untick "Record on sample data"', $hint('guest'));
+        Schema::create('users', fn (Blueprint $table) => $table->id());
+        $this->assertStringContainsString('untick "Record on sample data"', $hint('type:recruiter'));
+    }
+
     public function test_a_base_database_is_built_once_and_copied_for_each_video(): void
     {
         $package = realpath(__DIR__.'/..');

@@ -593,8 +593,9 @@ class Recorder
 
         try {
             return RecordAs::find((string) $loginAs);
-        } catch (RuntimeException) {
-            throw new RuntimeException("The recorder's user [$loginAs] was not found. Check video-demo.recorder.login_as.");
+        } catch (RuntimeException $e) {
+            // With no users table, checking the setting wouldn't help.
+            throw RecordAs::missingUsersTable() ? $e : new RuntimeException("The recorder's user [$loginAs] was not found. Check video-demo.recorder.login_as.");
         }
     }
 

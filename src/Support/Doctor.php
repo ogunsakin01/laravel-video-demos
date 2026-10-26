@@ -202,10 +202,29 @@ class Doctor
 
     protected function users(): void
     {
-        $types = array_keys(RecordAs::types());
-        $types !== []
-            ? $this->add('ok', 'Types of user', implode(', ', array_map('strval', $types)))
-            : $this->add('warn', 'Types of user', 'None found, so videos can only be recorded signed in as one user or as a guest', 'List them in video-demo.recorder.user_types, or give users roles (spatie/laravel-permission, a role column…).');
+        $types = RecordAs::types();
+        $keys = implode(', ', array_map('strval', array_keys($types)));
+        if ($types === []) {
+            $this->add('warn', 'Types of user', 'None found, so videos can only be recorded signed in as one user or as a guest', 'List them in video-demo.recorder.user_types, or give users roles (spatie/laravel-permission, a role column…).');
+        } elseif ($table = RecordAs::missingUsersTable()) {
+            // A warning, not a failure: videos can still be recorded as a guest.
+            $this->add('warn', 'Types of user', "$keys are set, but the database has no [$table] table, so videos can only be recorded as a guest", "Run the app's migrations, so it has its [$table] table, or record videos as Guest.");
+        } else {
+            // Types with no such user yet. On sample data one is made for each video; on your own data it must exist.
+            $without = array_values(array_map(fn ($type) => $type['label'], array_filter($types, function ($type) {
+                try {
+                    return ($type['users'])() === null;
+                } catch (Throwable) {
+                    return true;
+                }
+            })));
+            $none = implode(' or ', $without);
+            match (true) {
+                $without === [] => $this->add('ok', 'Types of user', $keys),
+                (bool) config('video-demo.sample_data.default', true) => $this->add('ok', 'Types of user', "$keys (no user is a $none yet: one is made in the sample data for each video)"),
+                default => $this->add('warn', 'Types of user', "No user is a $none in your database, so videos on your own data can't be recorded as one", 'Add one to your local database (a seeder is a good place), or correct video-demo.recorder.user_types.'),
+            };
+        }
 
         try {
             $user = Recorder::loginUser();

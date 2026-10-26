@@ -126,6 +126,51 @@ class DoctorTest extends TestCase
         $this->assertStringContainsString('nobody@example.com', $checks['The default user']['found']);
     }
 
+    public function test_types_of_user_with_no_users_table_leave_only_guests(): void
+    {
+        // As in the demo app: types are set, but its migrations make no users table.
+        config(['auth.providers.users.model' => User::class, 'video-demo.recorder.user_types' => ['Recruiter' => 'recruiter@acme.test']]);
+
+        [$code, $checks] = $this->doctor();
+
+        $this->assertSame(0, $code);
+        $this->assertSame('warn', $checks['Types of user']['status']);
+        $this->assertSame('recruiter are set, but the database has no [users] table, so videos can only be recorded as a guest', $checks['Types of user']['found']);
+        $this->assertStringContainsString('migrations', $checks['Types of user']['fix']);
+        // A note, so the studio doesn't show it as something to fix.
+        $this->assertSame([], $this->getJson(route('video-demo.studio.setup').'?fresh=1')->json('problems'));
+
+        // The default user is looked for there too: the reason, not the database's error.
+        config(['video-demo.recorder.login_as' => 'ada@example.com']);
+        $check = $this->doctor()[1]['The default user'];
+        $this->assertSame('fail', $check['status']);
+        $this->assertSame("The user [ada@example.com] to record as can't be found: the database has no [users] table. Run the app's migrations, or record the video as a guest.", $check['found']);
+    }
+
+    public function test_types_of_user_with_no_such_user_are_noted(): void
+    {
+        Schema::create('users', function ($table) {
+            $table->id();
+            $table->string('email');
+            $table->string('password');
+            $table->timestamps();
+        });
+        config(['auth.providers.users.model' => User::class, 'video-demo.recorder.user_types' => ['Recruiter' => 'recruiter@acme.test', 'Hiring manager' => 'manager@acme.test']]);
+        User::forceCreate(['email' => 'manager@acme.test', 'password' => 'x']);
+
+        // On your own data, a video can't be recorded as a type no user has.
+        $check = $this->doctor()[1]['Types of user'];
+        $this->assertSame(['warn', "No user is a Recruiter in your database, so videos on your own data can't be recorded as one"], [$check['status'], $check['found']]);
+
+        // On sample data, one is made for each video.
+        config(['video-demo.sample_data.default' => true]);
+        $check = $this->doctor()[1]['Types of user'];
+        $this->assertSame(['ok', 'recruiter, hiring-manager (no user is a Recruiter yet: one is made in the sample data for each video)'], [$check['status'], $check['found']]);
+
+        User::forceCreate(['email' => 'recruiter@acme.test', 'password' => 'x']);
+        $this->assertSame(['ok', 'recruiter, hiring-manager'], [$this->doctor()[1]['Types of user']['status'], $this->doctor()[1]['Types of user']['found']]);
+    }
+
     public function test_the_studio_shows_what_must_be_fixed(): void
     {
         config(['video-demo.ai.api_key' => null]);

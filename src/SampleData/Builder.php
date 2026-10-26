@@ -148,6 +148,7 @@ class Builder
             return null;
         }
 
+        $this->ensureUsersTable();
         if ($m[1] === 'default') {
             $user = $this->user(['record_as' => null, 'login_as' => config('video-demo.recorder.login_as')]) ?? $this->makeUser(null);
         } else {
@@ -343,6 +344,7 @@ class Builder
         if ($wanted === '') {
             return null;
         }
+        $this->ensureUsersTable();
         try {
             return RecordAs::find($wanted);
         } catch (RuntimeException) {
@@ -357,6 +359,7 @@ class Builder
      */
     protected function userOfType(array $type): Authenticatable
     {
+        $this->ensureUsersTable();
         try {
             $found = (RecordAs::types()[$type['key']]['users'] ?? fn () => null)();
         } catch (Throwable) {
@@ -364,6 +367,18 @@ class Builder
         }
 
         return $found ?? $this->makeUser($type, $type['via'] === 'configured' && str_contains($type['role'], '@') ? $type['role'] : null);
+    }
+
+    /**
+     * Stop, saying why, when the sample database has no users table: no
+     * user can be found or made in it, and the reason is plainer than the
+     * database error that would follow.
+     */
+    protected function ensureUsersTable(): void
+    {
+        if ($table = RecordAs::missingUsersTable()) {
+            throw new RuntimeException("it has no [$table] table, as the app's migrations don't make one. Record the video as a guest, or add a migration that makes the table.");
+        }
     }
 
     /**

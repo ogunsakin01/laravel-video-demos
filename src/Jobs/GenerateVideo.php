@@ -23,6 +23,7 @@ use Ogunsakin01\VideoDemo\Recording\Camera;
 use Ogunsakin01\VideoDemo\Recording\Devices;
 use Ogunsakin01\VideoDemo\Recording\Encoder;
 use Ogunsakin01\VideoDemo\Recording\Plan;
+use Ogunsakin01\VideoDemo\Recording\RecordAs;
 use Ogunsakin01\VideoDemo\Recording\Recorder;
 use Ogunsakin01\VideoDemo\Recording\RecordingFailed;
 use Ogunsakin01\VideoDemo\Recording\RecordingResult;
@@ -453,11 +454,26 @@ class GenerateVideo implements ShouldQueue
         try {
             $sandbox = Sandbox::prepareFor($video, ! $this->replan, $video->addLog(...));
         } catch (RuntimeException $e) {
-            throw new RuntimeException($e->getMessage().' To record on your own local data instead, untick "Record on sample data" under "Make it again" (or set VIDEO_DEMO_SAMPLE_DATA=false).', 0, $e);
+            throw new RuntimeException($e->getMessage().$this->ownDataHint($video), 0, $e);
         }
         $recorder->sandbox = $sandbox;
 
         return $sandbox;
+    }
+
+    /**
+     * Get the hint, after the sample database failed, to record on the app's
+     * own data instead: none when the video signs in and the app's database
+     * has no users table, as it would fail there the same way.
+     */
+    protected function ownDataHint(Video $video): string
+    {
+        $signsIn = $video->record_as === RecordAs::GUEST ? false : ($video->record_as ?? '') !== '' || config('video-demo.recorder.login_as');
+        if ($signsIn && RecordAs::missingUsersTable()) {
+            return '';
+        }
+
+        return ' To record on your own local data instead, untick "Record on sample data" under "Make it again" (or set VIDEO_DEMO_SAMPLE_DATA=false).';
     }
 
     /**
