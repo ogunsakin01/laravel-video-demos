@@ -11,7 +11,9 @@
 // device (always this version), language (instead of the page's), library
 // (the library's address, when the script comes from somewhere else),
 // pause-when-away ("true" or "false": pause while the viewer is on another
-// tab or has scrolled it out of view, instead of what the app sets).
+// tab or has scrolled it out of view, instead of what the app sets),
+// remember-position ("true" or "false": start where the viewer left it last
+// time, kept in their browser, instead of what the app sets).
 // It renders nothing for a video that isn't published, or isn't public.
 //
 //   <video-demo-help></video-demo-help>
@@ -35,15 +37,21 @@
   };
 
   class VideoDemoPlayer extends HTMLElement {
-    static get observedAttributes() { return ['slug', 'device', 'language', 'library', 'pause-when-away']; }
+    static get observedAttributes() { return ['slug', 'device', 'language', 'library', 'pause-when-away', 'remember-position']; }
 
     connectedCallback() { this.load(); }
 
     disconnectedCallback() { this.stopWatching(); }
 
     stopWatching() {
-      if (this.unwatch) this.unwatch();
-      this.unwatch = null;
+      (this.unwatch || []).forEach(stop => stop());
+      this.unwatch = [];
+    }
+
+    // An attribute's "true" or "false", or else the app's setting sent with the video.
+    wants(attribute, setting, video) {
+      const value = this.getAttribute(attribute);
+      return value !== null ? value !== 'false' : Boolean(video.player && video.player[setting]);
     }
 
     attributeChangedCallback(name, before, after) {
@@ -90,10 +98,12 @@
       }
       this.stopWatching();
       root.replaceChildren(style, el);
-      // Paused while the viewer is away, when the app or this element asks for it.
-      const away = this.getAttribute('pause-when-away');
-      if (away !== null ? away !== 'false' : Boolean(video.player && video.player.pause_when_away)) {
-        if (window.VideoDemoAttention) this.unwatch = window.VideoDemoAttention.watch(el, { target: this });
+      // Paused while the viewer is away, and started where they left it, when the app or this element asks for it.
+      if (window.VideoDemoAttention && this.wants('pause-when-away', 'pause_when_away', video)) {
+        this.unwatch.push(window.VideoDemoAttention.watch(el, { target: this }));
+      }
+      if (window.VideoDemoResume && this.wants('remember-position', 'remember_position', video)) {
+        this.unwatch.push(window.VideoDemoResume.watch(el));
       }
       // A play and each quarter reached, once per page view, when the app counts them.
       if (video.stats && navigator.sendBeacon) {

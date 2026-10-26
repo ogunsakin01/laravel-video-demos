@@ -1,21 +1,22 @@
 {{--
-  For trying, by hand, the players that pause while the viewer is away
-  (video-demo.library.player.pause_when_away, here turned on per player).
-  Play a video, then switch to another tab, or scroll it out of view, and
-  come back. The log lists what each player did.
+  For trying, by hand, the players that pause while the viewer is away and
+  start where they left off (video-demo.library.player.pause_when_away and
+  remember_position, here turned on per player). Play a video, then switch to
+  another tab, or scroll it out of view, and come back; or stop partway and
+  load the page again. The log lists what each player did.
 --}}
 <x-workbench::layout title="Player">
   <section class="hero">
     <p class="eyebrow">Player</p>
     <h1>Pauses while you're away</h1>
-    <p class="lead">Play either video, then switch to another tab or scroll it out of view. It pauses, and plays again from the same place when you come back. Pausing it yourself stops that until you play it again.</p>
+    <p class="lead">Play either video, then switch to another tab or scroll it out of view. It pauses, and plays again from the same place when you come back. Pausing it yourself stops that until you play it again. Stop partway and load the page again: it continues from there.</p>
   </section>
 
   <div class="grid">
     <section class="card">
       <h2>Blade player</h2>
-      <p class="sub">&lt;x-video-demo::player slug="post-a-job" pause-when-away /&gt;</p>
-      <x-video-demo::player slug="post-a-job" pause-when-away />
+      <p class="sub">&lt;x-video-demo::player slug="post-a-job" pause-when-away remember-position /&gt;</p>
+      <x-video-demo::player slug="post-a-job" pause-when-away remember-position />
     </section>
 
     <aside class="card">
@@ -30,8 +31,8 @@
 
   <section class="card" style="max-width:720px">
     <h2>Web component, for frontends that aren't Blade</h2>
-    <p class="sub">&lt;video-demo-player slug="post-a-job" pause-when-away="true"&gt;</p>
-    <video-demo-player slug="post-a-job" pause-when-away="true"></video-demo-player>
+    <p class="sub">&lt;video-demo-player slug="post-a-job" pause-when-away="true" remember-position="true"&gt;</p>
+    <video-demo-player slug="post-a-job" pause-when-away="true" remember-position="true"></video-demo-player>
   </section>
 
   <script src="{{ route('video-demo.public.embed-script') }}" defer></script>

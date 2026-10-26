@@ -7,6 +7,7 @@ All notable changes to this package are listed here. The format follows [Keep a 
 ### Added
 
 - **Players can pause while the viewer is away.** With `VIDEO_DEMO_PAUSE_WHEN_AWAY=true` (`library.player.pause_when_away`), a playing video pauses when the viewer switches to another tab or scrolls it mostly out of view for a second, and plays again from the same place when they come back. A video the viewer paused, sought in or finished stays as they left it. It asks for no permissions and sends nothing anywhere. Off by default; one player can say otherwise with `<x-video-demo::player slug="…" pause-when-away />` (or `:pause-when-away="false"`), and `<video-demo-player pause-when-away="true">` in other frontends. The players fire `video-demo:auto-pause` (with the reason) and `video-demo:auto-resume`.
+- **Players can start where the viewer left off.** With `VIDEO_DEMO_REMEMBER_POSITION=true` (`library.player.remember_position`), a video the viewer left partway through starts at that place next time, with "Continues from 0:42 · Start over" under it. The place is kept in the viewer's browser (localStorage) for 30 days and sent nowhere. Each file has its own, so another version of the video, or a new recording of it, starts at the beginning. It needs a server that answers range requests (nginx, S3, R2…; not `php artisan serve`), and elsewhere starts at the beginning, without the note. Off by default; `<x-video-demo::player slug="…" remember-position />` and `<video-demo-player remember-position="true">` for one player.
 
 ## v0.18.6 - 2026-10-18
 

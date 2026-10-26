@@ -310,4 +310,22 @@ class LibraryTest extends TestCase
         config(['video-demo.library.player.pause_when_away' => false]);
         $this->assertFalse($this->getJson('/help/videos/post-a-job.json')->json('player.pause_when_away'));
     }
+
+    public function test_players_can_start_where_the_viewer_left_off(): void
+    {
+        app(Manifest::class)->put($this->manifestVideo());
+        $marked = '/<video[^>]*\sdata-vd-remember[\s>]/';
+        $render = fn (string $blade) => $this->blade($blade)->__toString();
+
+        $html = $render('<x-video-demo::player slug="post-a-job" />');
+        $this->assertDoesNotMatchRegularExpression($marked, $html);
+        $this->assertStringContainsString('VideoDemoResume', $html);
+        $this->assertMatchesRegularExpression($marked, $render('<x-video-demo::player slug="post-a-job" remember-position />'));
+        $this->assertFalse($this->getJson('/help/videos/post-a-job.json')->json('player.remember_position'));
+
+        config(['video-demo.library.player.remember_position' => true]);
+        $this->assertMatchesRegularExpression($marked, $render('<x-video-demo::player slug="post-a-job" collapsible />'));
+        $this->assertDoesNotMatchRegularExpression($marked, $render('<x-video-demo::player slug="post-a-job" :remember-position="false" />'));
+        $this->assertTrue($this->getJson('/help/videos/post-a-job.json')->json('player.remember_position'));
+    }
 }

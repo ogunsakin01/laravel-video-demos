@@ -69,11 +69,12 @@ With `laravel/mcp` installed (and the studio enabled), coding agents get the MCP
 <x-video-demo::player slug="post-a-job" collapsible />  {{-- a slim bar that opens into the video and minimises again --}}
 <x-video-demo::player slug="post-a-job" language="fr" />  {{-- by default, the version in the page's language when there is one --}}
 <x-video-demo::player slug="post-a-job" pause-when-away />  {{-- pauses on another tab or scrolled out of view, plays again on coming back; no permissions. For every player: VIDEO_DEMO_PAUSE_WHEN_AWAY=true --}}
+<x-video-demo::player slug="post-a-job" remember-position />  {{-- starts where the viewer left off, kept in their browser, with "Start over". For every player: VIDEO_DEMO_REMEMBER_POSITION=true --}}
 <x-video-demo::help />  {{-- in a layout: "Videos for this page", the published videos that show the current route; nothing when none --}}
 <x-video-demo::search placeholder="How do I…" />
 ```
 
-Library pages: `/help/videos` (public) and `/admin/videos` (private videos too). Each video page has a written step-by-step guide made from its plan (no AI; words translatable with `vendor:publish --tag=video-demo-lang`), link-preview tags and `VideoObject` structured data; `/help/videos/sitemap.xml` lists the public videos. Frontends that aren't Blade load `/help/videos/embed.js` and use `<video-demo-player slug="…">` (public videos; JSON at `/help/videos/{slug}.json`; `pause-when-away="true|false"` instead of the app's setting). Players fire `video-demo:auto-pause` (`detail.reason`: `hidden` or `out-of-view`) and `video-demo:auto-resume`.
+Library pages: `/help/videos` (public) and `/admin/videos` (private videos too). Each video page has a written step-by-step guide made from its plan (no AI; words translatable with `vendor:publish --tag=video-demo-lang`), link-preview tags and `VideoObject` structured data; `/help/videos/sitemap.xml` lists the public videos. Frontends that aren't Blade load `/help/videos/embed.js` and use `<video-demo-player slug="…">` (public videos; JSON at `/help/videos/{slug}.json`; `pause-when-away="true|false"` and `remember-position="true|false"` instead of the app's settings). Players fire `video-demo:auto-pause` (`detail.reason`: `hidden` or `out-of-view`) and `video-demo:auto-resume`.
 
 ## Key facts
 

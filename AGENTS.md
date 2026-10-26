@@ -10,7 +10,7 @@ Instructions for AI coding agents (and people) changing laravel-video-demos itse
 - `src/Library`: `Manifest` (the published videos, on the storage disk), `Publisher`, `Restorer` (brings back published videos the studio's database lost), `Stats` (watch counts) and `Guide` (the written guide under each library video, made from its plan; its words are in `resources/lang`).
 - `src/Mcp`: the "video-demos" MCP server and its tools, registered when the app has laravel/mcp.
 - `src/Support/Doctor.php`: the setup checks behind `video-demo:doctor` and the studio's setup notice.
-- `resources/embed/video-demo-player.js`: the `<video-demo-player>` web component, served by the library at `embed.js`. `resources/embed/attention.js` pauses a video while the viewer is away; the Blade player puts it in the page and `embed.js` starts with it (`Library\PlayerScripts`). Its rules are tested in `tests/js` with `node --test`, which `PlayerScriptsTest` runs when Node is installed.
+- `resources/embed/video-demo-player.js`: the `<video-demo-player>` web component, served by the library at `embed.js`. `resources/embed/attention.js` pauses a video while the viewer is away and `resume.js` starts it where they left off; the Blade player puts them in the page and `embed.js` starts with them (`Library\PlayerScripts`). Its rules are tested in `tests/js` with `node --test`, which `PlayerScriptsTest` runs when Node is installed.
 - `src/VideoDemo.php` and `src/Facades/VideoDemo.php`: the public API for apps that build their own screens.
 - `src/Http`, `routes`, `resources/views`: the studio (local only, behind `AuthorizeStudio`) and the library (production).
 - `workbench/`: a demo app (Testbench) with sample data, and the tour plans that record the README videos.

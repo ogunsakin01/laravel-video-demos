@@ -18,8 +18,12 @@
   scrolled it mostly out of view, and plays it again when they come back.
   It asks for no permissions. :pause-when-away="false" turns it off where
   video-demo.library.player.pause_when_away turns it on for every player.
+
+  remember-position starts the video where the viewer left it last time, kept
+  in their own browser, with "Start over" under it. :remember-position="false"
+  turns it off where video-demo.library.player.remember_position turns it on.
 --}}
-@props(['slug', 'area' => 'public', 'device' => null, 'collapsible' => false, 'open' => false, 'language' => null, 'pauseWhenAway' => null])
+@props(['slug', 'area' => 'public', 'device' => null, 'collapsible' => false, 'open' => false, 'language' => null, 'pauseWhenAway' => null, 'rememberPosition' => null])
 @php
   $manifest = app(\Ogunsakin01\VideoDemo\Library\Manifest::class);
   $video = $manifest->find($slug, $area);
@@ -40,6 +44,7 @@
           ? route("video-demo.$area.events", $video['slug'], false)
           : null;
       $away = (bool) ($pauseWhenAway ?? config('video-demo.library.player.pause_when_away'));
+      $remember = (bool) ($rememberPosition ?? config('video-demo.library.player.remember_position'));
   }
 @endphp
 @if ($video)
@@ -51,6 +56,9 @@
   @once
     <script>
       {!! \Ogunsakin01\VideoDemo\Library\PlayerScripts::attention() !!}
+    </script>
+    <script>
+      {!! \Ogunsakin01\VideoDemo\Library\PlayerScripts::resume() !!}
     </script>
     <script>
       // Play the recorded version closest to this screen: phone, tablet, desktop or TV.
@@ -77,6 +85,8 @@
         });
         // Paused while the viewer is away, where the app or the page asks for it.
         document.querySelectorAll('video[data-vd-away]').forEach(el => window.VideoDemoAttention.watch(el));
+        // Started where the viewer left it, where the app or the page asks for it.
+        document.querySelectorAll('video[data-vd-remember]').forEach(el => window.VideoDemoResume.watch(el));
         // Counts a play and each quarter reached, once per page view, when the app turns stats on.
         document.querySelectorAll('video[data-vd-stats]').forEach(el => {
           const sent = new Set();

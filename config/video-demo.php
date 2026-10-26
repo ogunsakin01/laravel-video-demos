@@ -87,6 +87,12 @@ return [
             // nothing anywhere. A player can say otherwise with
             // :pause-when-away="true" or "false".
             'pause_when_away' => (bool) env('VIDEO_DEMO_PAUSE_WHEN_AWAY', false),
+
+            // Start a video where the viewer left it last time, with "Start
+            // over" under it. The place is kept in the viewer's browser
+            // (localStorage) for 30 days, for each video file, and sent
+            // nowhere. A player can say otherwise with :remember-position.
+            'remember_position' => (bool) env('VIDEO_DEMO_REMEMBER_POSITION', false),
         ],
     ],
 

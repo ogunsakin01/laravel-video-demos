@@ -4,9 +4,9 @@ namespace Ogunsakin01\VideoDemo\Library;
 
 /**
  * The scripts the players run in the viewer's browser, from resources/embed:
- * the one that pauses a video while the viewer is away, which the Blade
- * player puts in the page, and embed.js, which defines <video-demo-player>
- * for any frontend and has the same one built in.
+ * the ones that pause a video while the viewer is away and remember where
+ * they got to, which the Blade player puts in the page, and embed.js, which
+ * defines <video-demo-player> for any frontend and has the same ones built in.
  */
 class PlayerScripts
 {
@@ -19,11 +19,19 @@ class PlayerScripts
     }
 
     /**
+     * Get the script that remembers where a viewer got to in a video.
+     */
+    public static function resume(): string
+    {
+        return static::read('resume.js');
+    }
+
+    /**
      * Get embed.js: <video-demo-player> and <video-demo-help>.
      */
     public static function embed(): string
     {
-        return static::attention()."\n".static::read('video-demo-player.js');
+        return static::attention()."\n".static::resume()."\n".static::read('video-demo-player.js');
     }
 
     /**

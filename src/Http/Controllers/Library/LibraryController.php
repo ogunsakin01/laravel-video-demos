@@ -89,7 +89,10 @@ class LibraryController extends Controller
             // Where a player counts plays and how far viewers get, when the app turns that on.
             'stats' => Stats::enabled() ? route("video-demo.$area.events", $video['slug']) : null,
             // How the player behaves, as the app sets it; the element's attributes can say otherwise.
-            'player' => ['pause_when_away' => (bool) config('video-demo.library.player.pause_when_away')],
+            'player' => [
+                'pause_when_away' => (bool) config('video-demo.library.player.pause_when_away'),
+                'remember_position' => (bool) config('video-demo.library.player.remember_position'),
+            ],
         ])->withHeaders($area === 'public'
             ? ['Access-Control-Allow-Origin' => '*', 'Cache-Control' => 'public, max-age=300']
             : ['Cache-Control' => 'private, no-store']);
