@@ -314,6 +314,15 @@ return [
         // doesn't work goes back to the AI first. It costs no AI and takes a
         // few seconds. Videos recorded on your own data aren't rehearsed.
         'rehearse' => (bool) env('VIDEO_DEMO_REHEARSE', true),
+
+        // How many versions (screens) of a video are rehearsed and recorded
+        // at once, up to 4. At 1 they go one after another. Each is a real
+        // browser recording in real time, so on a busy machine more at once
+        // can make the recordings stutter; watch the first few. The app must
+        // answer several browsers at once (php artisan serve needs
+        // PHP_CLI_SERVER_WORKERS=4 or more), and video-demo:work's workers
+        // each open this many.
+        'parallel_versions' => (int) env('VIDEO_DEMO_PARALLEL_VERSIONS', 1),
     ],
 
     /*

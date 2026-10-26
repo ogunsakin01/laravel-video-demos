@@ -4,6 +4,9 @@ namespace Ogunsakin01\VideoDemo\Recording;
 
 use Closure;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Contracts\Process\ProcessResult;
+use Illuminate\Process\FakeInvokedProcess;
+use Illuminate\Process\InvokedProcess;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
@@ -13,6 +16,7 @@ use Ogunsakin01\VideoDemo\Ai\VideoStopped;
 use Ogunsakin01\VideoDemo\Models\VideoStyle;
 use Ogunsakin01\VideoDemo\SampleData\Sandbox;
 use RuntimeException;
+use Throwable;
 
 /**
  * Runs the Node scripts in resources/recorder with Playwright.
@@ -37,6 +41,14 @@ class Recorder
     public ?string $locale = null;
 
     /**
+     * The errors the app reported on the copy of the sample database of the
+     * version that failed, from the last recordVersions() or verifyVersions().
+     *
+     * @var list<array<string, mixed>>
+     */
+    public array $versionErrors = [];
+
+    /**
      * The language of each page the last check opened, path => its lang
      * attribute, such as "fr" or "pt-BR".
      *
@@ -57,6 +69,19 @@ class Recorder
      * @param  array<string, float>  $voice
      */
     public function record(Plan $plan, string $dir, array $style = [], string $device = 'desktop', ?string $recordAs = null, ?Closure $shouldStop = null, ?float $speed = null, array $voice = []): RecordingResult
+    {
+        $job = $this->prepareRecording($plan, $dir, $style, $device, $recordAs, $speed, $voice);
+
+        return ($job['read'])($this->run($job['script'], $job['job'], $job['timeout'], $shouldStop));
+    }
+
+    /**
+     * Write the job that records one version, ready to run, with what reads its result.
+     *
+     * @param  array<string, float>  $voice
+     * @return array{script: string, job: string, timeout: int, read: Closure(string): RecordingResult}
+     */
+    protected function prepareRecording(Plan $plan, string $dir, array $style, string $device, ?string $recordAs, ?float $speed, array $voice): array
     {
         $speed = static::speed($speed);
         $screen = Devices::get($device);
@@ -84,8 +109,19 @@ class Recorder
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
         File::delete("$dir/result.json");
 
-        $output = $this->run(static::script('record.cjs'), "$dir/job.json", static::timeoutFor($plan, $speed), $shouldStop);
+        return [
+            'script' => static::script('record.cjs'),
+            'job' => "$dir/job.json",
+            'timeout' => static::timeoutFor($plan, $speed),
+            'read' => fn (string $output) => $this->readRecording($plan, $dir, $device, $speed, $output),
+        ];
+    }
 
+    /**
+     * Read what recording one version made.
+     */
+    protected function readRecording(Plan $plan, string $dir, string $device, float $speed, string $output): RecordingResult
+    {
         if (! File::exists("$dir/result.json")) {
             throw static::noResult('The recorder', $output);
         }
@@ -113,6 +149,18 @@ class Recorder
      */
     public function verify(Plan $plan, string $dir, array $style = [], string $device = 'desktop', ?string $recordAs = null, ?Closure $shouldStop = null): RecordingResult
     {
+        $job = $this->prepareCheck($plan, $dir, $style, $device, $recordAs);
+
+        return ($job['read'])($this->run($job['script'], $job['job'], $job['timeout'], $shouldStop));
+    }
+
+    /**
+     * Write the job that plays one version without recording it, ready to run, with what reads its result.
+     *
+     * @return array{script: string, job: string, timeout: int, read: Closure(string): RecordingResult}
+     */
+    protected function prepareCheck(Plan $plan, string $dir, array $style, string $device, ?string $recordAs): array
+    {
         $plan = $plan->forDevice($device);
 
         File::ensureDirectoryExists($dir);
@@ -128,13 +176,175 @@ class Recorder
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
         File::delete("$dir/result.json");
 
-        $output = $this->run(static::script('record.cjs'), "$dir/job.json", 120 + count($plan->steps) * 20, $shouldStop);
+        return [
+            'script' => static::script('record.cjs'),
+            'job' => "$dir/job.json",
+            'timeout' => 120 + count($plan->steps) * 20,
+            'read' => function (string $output) use ($dir, $device): RecordingResult {
+                if (! File::exists("$dir/result.json")) {
+                    throw static::noResult('The check', $output);
+                }
 
-        if (! File::exists("$dir/result.json")) {
-            throw static::noResult('The check', $output);
+                return RecordingResult::fromArray(json_decode(File::get("$dir/result.json"), true) ?: [], $device);
+            },
+        ];
+    }
+
+    /**
+     * Record the plan on several versions (screens), each into its own
+     * folder and on its own copy of the sample database (when $this->sandbox
+     * is set), up to $parallel at once. The first that fails stops the
+     * others, and is the last result; the app errors on its copy are kept in
+     * $versionErrors. $started and $finished are told about each version.
+     *
+     * @param  array<string, string>  $dirs  device => folder
+     * @param  array<string, float>  $voice
+     * @param  ?Closure(string): void  $started
+     * @param  ?Closure(string, RecordingResult): void  $finished
+     * @return array<string, RecordingResult> device => result, in the order they finished
+     */
+    public function recordVersions(Plan $plan, array $dirs, array $style = [], ?string $recordAs = null, ?float $speed = null, array $voice = [], int $parallel = 1, ?Closure $shouldStop = null, ?Closure $started = null, ?Closure $finished = null): array
+    {
+        return $this->eachVersion(
+            $dirs, $parallel, $shouldStop, $started, $finished,
+            fn (string $device, string $dir) => $this->record($plan, $dir, $style, $device, $recordAs, $shouldStop, $speed, $voice),
+            fn (string $device, string $dir) => $this->prepareRecording($plan, $dir, $style, $device, $recordAs, $speed, $voice),
+        );
+    }
+
+    /**
+     * Play the plan without recording it on several versions, the way
+     * recordVersions() records them.
+     *
+     * @param  array<string, string>  $dirs  device => folder
+     * @param  ?Closure(string): void  $started
+     * @param  ?Closure(string, RecordingResult): void  $finished
+     * @return array<string, RecordingResult> device => result, in the order they finished
+     */
+    public function verifyVersions(Plan $plan, array $dirs, array $style = [], ?string $recordAs = null, int $parallel = 1, ?Closure $shouldStop = null, ?Closure $started = null, ?Closure $finished = null): array
+    {
+        return $this->eachVersion(
+            $dirs, $parallel, $shouldStop, $started, $finished,
+            fn (string $device, string $dir) => $this->verify($plan, $dir, $style, $device, $recordAs, $shouldStop),
+            fn (string $device, string $dir) => $this->prepareCheck($plan, $dir, $style, $device, $recordAs),
+        );
+    }
+
+    /**
+     * Get how many versions of a video to record at once:
+     * video-demo.recorder.parallel_versions, no more than there are versions.
+     */
+    public static function parallelVersions(int $versions): int
+    {
+        return max(1, min((int) config('video-demo.recorder.parallel_versions', 1), $versions, 4));
+    }
+
+    /**
+     * Run each version, one at a time ($one) or up to $parallel at once
+     * (each $prepare'd, then run side by side), each on its own copy of the
+     * sample database, stopping at the first that fails.
+     *
+     * @param  array<string, string>  $dirs
+     * @param  Closure(string, string): RecordingResult  $one
+     * @param  Closure(string, string): array{script: string, job: string, timeout: int, read: Closure(string): RecordingResult}  $prepare
+     * @return array<string, RecordingResult>
+     */
+    protected function eachVersion(array $dirs, int $parallel, ?Closure $shouldStop, ?Closure $started, ?Closure $finished, Closure $one, Closure $prepare): array
+    {
+        $this->versionErrors = [];
+        $base = $this->sandbox;
+        $results = [];
+
+        // A version's copy, used while its job is written (and, one at a time, run); dropped if that fails.
+        $onCopy = function (Closure $use) use ($base) {
+            $copy = $base?->copy();
+            $this->sandbox = $copy;
+            try {
+                return [$use(), $copy];
+            } catch (Throwable $e) {
+                $copy?->delete();
+
+                throw $e;
+            } finally {
+                $this->sandbox = $base;
+            }
+        };
+        // Keep the app's errors when the version failed, then drop its copy.
+        $done = function (string $device, RecordingResult $result, ?Sandbox $copy) use (&$results, $finished) {
+            if (! $result->ok && $copy) {
+                $this->versionErrors = $copy->appErrors();
+            }
+            $copy?->delete();
+            $results[$device] = $result;
+            if ($finished) {
+                $finished($device, $result);
+            }
+        };
+
+        if ($parallel <= 1 || count($dirs) <= 1) {
+            foreach ($dirs as $device => $dir) {
+                if ($shouldStop && $shouldStop()) {
+                    throw new VideoStopped('Stopped by you.');
+                }
+                if ($started) {
+                    $started($device);
+                }
+                [$result, $copy] = $onCopy(fn () => $one($device, $dir));
+                $done($device, $result, $copy);
+                if (! $result->ok) {
+                    break;
+                }
+            }
+
+            return $results;
         }
 
-        return RecordingResult::fromArray(json_decode(File::get("$dir/result.json"), true) ?: [], $device);
+        $waiting = $dirs;
+        /** @var array<string, array{process: InvokedProcess|FakeInvokedProcess, read: Closure(string): RecordingResult, copy: ?Sandbox}> $running */
+        $running = [];
+        try {
+            while ($waiting !== [] || $running !== []) {
+                while ($waiting !== [] && count($running) < $parallel) {
+                    $device = (string) array_key_first($waiting);
+                    $dir = array_shift($waiting);
+                    if ($started) {
+                        $started($device);
+                    }
+                    [$job, $copy] = $onCopy(fn () => $prepare($device, $dir));
+                    $running[$device] = ['process' => $this->start($job['script'], $job['job'], $job['timeout']), 'read' => $job['read'], 'copy' => $copy];
+                }
+
+                if ($shouldStop && $shouldStop()) {
+                    throw new VideoStopped('Stopped by you.');
+                }
+
+                foreach ($running as $device => $version) {
+                    if ($version['process']->running()) {
+                        $version['process']->ensureNotTimedOut();
+
+                        continue;
+                    }
+                    unset($running[$device]);
+                    $done($device, ($version['read'])($this->output($version['process']->wait())), $version['copy']);
+                    if (! $results[$device]->ok) {
+                        // The plan goes back to the AI, and every version is played again.
+                        return $results;
+                    }
+                }
+
+                if ($running !== []) {
+                    usleep(500_000);
+                }
+            }
+
+            return $results;
+        } finally {
+            // Stopped, failed or done: nothing is left running, and no copy is left behind.
+            foreach ($running as $version) {
+                $this->end($version['process']);
+                $version['copy']?->delete();
+            }
+        }
     }
 
     /**
@@ -461,22 +671,11 @@ class Recorder
      */
     protected function run(string $script, string $job, int $timeout, ?Closure $shouldStop = null): string
     {
-        $process = Process::timeout($timeout)
-            ->env(['NODE_PATH' => implode(PATH_SEPARATOR, $this->nodePaths())])
-            ->start([config('video-demo.recorder.node'), $script, $job]);
+        $process = $this->start($script, $job, $timeout);
 
         while ($process->running()) {
             if ($shouldStop && $shouldStop()) {
-                if (defined('SIGTERM')) {
-                    $process->signal(SIGTERM);
-                    usleep(500_000);
-                    if ($process->running()) {
-                        $process->signal(SIGKILL);
-                    }
-                } else {
-                    // Windows has no signals: stop it the way it can be.
-                    $process->stop(0.5);
-                }
+                $this->end($process);
 
                 throw new VideoStopped('Stopped by you.');
             }
@@ -484,7 +683,44 @@ class Recorder
             usleep(500_000);
         }
 
-        $result = $process->wait();
+        return $this->output($process->wait());
+    }
+
+    /**
+     * Start a Node script, with Playwright where Node looks for it.
+     */
+    protected function start(string $script, string $job, int $timeout): InvokedProcess|FakeInvokedProcess
+    {
+        return Process::timeout($timeout)
+            ->env(['NODE_PATH' => implode(PATH_SEPARATOR, $this->nodePaths())])
+            ->start([config('video-demo.recorder.node'), $script, $job]);
+    }
+
+    /**
+     * End a script that is still running, and the browser it opened.
+     */
+    protected function end(InvokedProcess|FakeInvokedProcess $process): void
+    {
+        if (! $process->running()) {
+            return;
+        }
+        if (defined('SIGTERM')) {
+            $process->signal(SIGTERM);
+            usleep(500_000);
+            if ($process->running()) {
+                $process->signal(SIGKILL);
+            }
+        } else {
+            // Windows has no signals: stop it the way it can be.
+            $process->stop(0.5);
+        }
+    }
+
+    /**
+     * Get what a finished script printed, saying so when Playwright or the GIF encoder is missing.
+     */
+    protected function output(ProcessResult $result): string
+    {
         $output = trim($result->errorOutput() ?: $result->output());
         if (str_contains($output, "Cannot find module 'playwright'")) {
             throw new RuntimeException('Playwright is not installed. Run php artisan video-demo:install.');

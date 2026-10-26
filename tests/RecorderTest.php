@@ -102,6 +102,34 @@ class RecorderTest extends TestCase
         $this->assertSame([], glob($this->out.'/spots/2-*-top.jpg') ?: []);
     }
 
+    public function test_records_versions_side_by_side(): void
+    {
+        $plan = new Plan('Post a job', 'Posting a job.', [
+            $this->step('goto', ['url' => '/index.html']),
+            $this->step('type', ['target' => ['label' => 'Job title'], 'value' => 'Laravel developer']),
+            $this->step('click', ['target' => ['role' => 'button', 'name' => 'Publish job']]),
+            $this->step('wait', ['target' => ['text' => 'Your job is live.']]),
+        ]);
+        $events = [];
+
+        $results = (new Recorder)->recordVersions($plan, ['desktop' => "$this->out/desktop", 'mobile' => "$this->out/mobile"], parallel: 2,
+            started: function (string $device) use (&$events) {
+                $events[] = "start $device";
+            },
+            finished: function (string $device) use (&$events) {
+                $events[] = "finish $device";
+            },
+        );
+
+        // Both browsers were open at once.
+        $this->assertSame(['start desktop', 'start mobile'], array_slice($events, 0, 2));
+        foreach (['desktop' => [1280, 800], 'mobile' => [390, 844]] as $device => $size) {
+            $this->assertTrue($results[$device]->ok, $results[$device]->summary());
+            (new Encoder)->encode($results[$device]->video, "$this->out/$device.mp4", "$this->out/$device.jpg", $results[$device]->trimSeconds, Recorder::speed(), $results[$device]->timeline);
+            $this->assertSame($size, array_slice(getimagesize("$this->out/$device.jpg"), 0, 2));
+        }
+    }
+
     public function test_records_and_encodes_a_plan(): void
     {
         $plan = new Plan('Post a job', 'Posting a job.', [

@@ -3,7 +3,9 @@
 namespace Ogunsakin01\VideoDemo\Tests;
 
 use Closure;
+use Illuminate\Process\PendingProcess;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Route;
 use Ogunsakin01\VideoDemo\Ai\Planner;
 use Ogunsakin01\VideoDemo\Ai\PlanningFailed;
@@ -184,6 +186,46 @@ class RehearsalTest extends TestCase
         $recorder->pageProblems = [['path' => '/jobs/5', 'problem' => 'The page returned HTTP 404', 'status' => 404, 'url' => null, 'detail' => null]];
         $this->make($second = $this->video(['start_path' => '/jobs/5']));
         $this->assertSame(VideoStatus::Ready, $second->fresh()->status);
+    }
+
+    public function test_versions_rehearsed_and_recorded_side_by_side_are_fixed_and_made_the_same_way(): void
+    {
+        static::$deleted = [];
+        config(['video-demo.recorder.parallel_versions' => 2]);
+        $this->fakeApp();
+        // The browser, two versions at once: "Old button" isn't on the page; a recording leaves its video.
+        $runs = [];
+        Process::fake(function (PendingProcess $process) use (&$runs) {
+            $dir = dirname((string) $process->command[2]);
+            $job = json_decode(File::get("$dir/job.json"), true);
+            $button = json_decode(File::get($job['planPath']), true)['steps'][1]['target']['name'];
+            $kind = ! empty($job['dryRun']) ? 'rehearse' : 'record';
+            $runs[] = "$kind $button (".basename($dir).')';
+            File::put("$dir/raw.webm", 'webm');
+            File::put("$dir/result.json", json_encode($button === 'Old button'
+                ? ['ok' => false, 'failedStep' => 2, 'error' => 'Could not find a visible element with role "button", name "Old button".']
+                : ['ok' => true, 'video' => "$dir/raw.webm", 'durationMs' => 12_000, 'chapters' => []]));
+
+            return Process::describe()->iterations(1);
+        });
+        $video = $this->video();
+
+        $this->make($video);
+
+        // Both versions rehearsed at once, the fix rehearsed on both again, then both recorded at once.
+        $this->assertSame([
+            'rehearse Old button (desktop)', 'rehearse Old button (mobile)',
+            'rehearse New button (desktop)', 'rehearse New button (mobile)',
+            'record New button (desktop)', 'record New button (mobile)',
+        ], $runs);
+        $video = $video->fresh();
+        $this->assertSame(VideoStatus::Ready, $video->status);
+        $this->assertSame(['desktop', 'mobile'], array_keys($video->recordings));
+        $messages = collect($video->log)->pluck('message');
+        $this->assertContains('Rehearsing the plan, 2 versions at a time', $messages);
+        $this->assertContains('Recording 2 versions, 2 at a time', $messages);
+        // Every copy of the sample database was deleted: two per rehearsal, two for recording.
+        $this->assertCount(6, static::$deleted);
     }
 
     public function test_a_step_that_fails_in_rehearsal_is_fixed_before_anything_is_recorded(): void

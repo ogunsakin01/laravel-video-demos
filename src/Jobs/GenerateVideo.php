@@ -236,30 +236,33 @@ class GenerateVideo implements ShouldQueue
                 }
 
                 $results = [];
-                foreach ($failure ? [] : $devices as $device) {
+                if (! $failure) {
                     $this->stopIfAsked($video);
-                    $video->moveTo(VideoStatus::Recording, 'Recording the '.Devices::get($device)['label'].' version');
+                    $parallel = Recorder::parallelVersions(count($devices));
+                    if ($parallel > 1) {
+                        $video->moveTo(VideoStatus::Recording, sprintf('Recording %d versions, %d at a time', count($devices), $parallel));
+                    }
                     // Each version starts from the same sample data, on its own copy: what
                     // one version saves (a goal set, a job posted) mustn't change the next.
-                    $copy = $sandbox?->copy();
-                    $recorder->sandbox = $copy;
-                    try {
-                        // The style's end card goes after the last step; the plan itself keeps without it.
-                        $result = $recorder->record($plan->withEndCard($video->style ?? []), "$dir/$device", $video->style ?? [], $device, $video->record_as, $shouldStop, $video->playbackSpeed(), array_map(fn ($c) => $c['seconds'], $clips ?? []));
-                        if (! $result->ok && $copy) {
-                            $this->recordingErrors = $copy->appErrors();
+                    // The style's end card goes after the last step; the plan itself keeps without it.
+                    $recorder->sandbox = $sandbox;
+                    $recorded = $recorder->recordVersions(
+                        $plan->withEndCard($video->style ?? []),
+                        array_combine($devices, array_map(fn ($device) => "$dir/$device", $devices)),
+                        $video->style ?? [], $video->record_as, $video->playbackSpeed(), array_map(fn ($c) => $c['seconds'], $clips ?? []),
+                        $parallel, $shouldStop,
+                        started: fn (string $device) => $parallel > 1 ? null : $video->moveTo(VideoStatus::Recording, 'Recording the '.Devices::get($device)['label'].' version'),
+                        finished: fn (string $device, RecordingResult $result) => $video->addLog($result->summary()),
+                    );
+                    $failure = collect($recorded)->first(fn (RecordingResult $result) => ! $result->ok);
+                    if ($failure) {
+                        $this->recordingErrors = $recorder->versionErrors;
+                    } else {
+                        // In the order the versions were chosen, whichever finished first.
+                        foreach ($devices as $device) {
+                            $results[$device] = $recorded[$device];
                         }
-                    } finally {
-                        $recorder->sandbox = $sandbox;
-                        $copy?->delete();
                     }
-                    $video->addLog($result->summary());
-
-                    if (! $result->ok) {
-                        $failure = $result;
-                        break;
-                    }
-                    $results[$device] = $result;
                 }
 
                 if (! $failure) {
@@ -554,30 +557,27 @@ class GenerateVideo implements ShouldQueue
             return null;
         }
 
-        $video->moveTo(VideoStatus::Recording, 'Rehearsing the plan');
+        $parallel = Recorder::parallelVersions(count($devices));
+        $video->moveTo(VideoStatus::Recording, $parallel > 1 ? "Rehearsing the plan, $parallel versions at a time" : 'Rehearsing the plan');
         // The last failed rehearsal's screenshot is kept until now, for the video's full error view.
         File::deleteDirectory(Recorder::workDir($video->workPath('rehearsal')));
+        $dirs = [];
         foreach ($devices as $device) {
-            $this->stopIfAsked($video);
-            $copy = $sandbox->copy();
-            $recorder->sandbox = $copy;
-            $dir = Recorder::workDir($video->workPath("rehearsal/$device"));
-            try {
-                $run = $recorder->verify($plan, $dir, $video->style ?? [], $device, $video->record_as, $shouldStop);
-                if (! $run->ok) {
-                    $this->rehearsalErrors = $copy->appErrors();
-                    $video->addLog('Rehearsal: '.$run->summary());
-
-                    return $run;
-                }
-                File::deleteDirectory($dir);
-            } finally {
-                $recorder->sandbox = $sandbox;
-                $copy->delete();
-            }
+            $dirs[$device] = Recorder::workDir($video->workPath("rehearsal/$device"));
         }
 
-        return null;
+        // Each version is played on its own copy of the sample database; the first that fails stops the rest.
+        $recorder->sandbox = $sandbox;
+        $runs = $recorder->verifyVersions($plan, $dirs, $video->style ?? [], $video->record_as, $parallel, $shouldStop,
+            finished: fn (string $device, RecordingResult $run) => $run->ok ? File::deleteDirectory($dirs[$device]) : null,
+        );
+        $failure = collect($runs)->first(fn (RecordingResult $run) => ! $run->ok);
+        if ($failure) {
+            $this->rehearsalErrors = $recorder->versionErrors;
+            $video->addLog('Rehearsal: '.$failure->summary());
+        }
+
+        return $failure;
     }
 
     /**

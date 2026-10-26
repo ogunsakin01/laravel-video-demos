@@ -79,6 +79,7 @@ Library pages: `/help/videos` (public) and `/admin/videos` (private videos too).
 ## Key facts
 
 - Configuration: the package's `config/video-demo.php` (models and providers, prices, code folders the AI may read, styles, devices, speed, limits, storage, library routes), mostly set from `.env`. Install doesn't copy it into the app. An app's own copy (`vendor:publish --tag=video-demo-config`) is laid over it: the app's settings win, and new settings from the package still reach the app; `false` turns off a built-in style, model or device.
+- A video's screens are rehearsed and recorded one after another, or up to `VIDEO_DEMO_PARALLEL_VERSIONS` (`recorder.parallel_versions`, 1 by default, at most 4) at once, each on its own copy of the sample data; the first that fails stops the rest.
 - Plans can be edited by hand on a video's studio page; recording an edited plan is free, and a new AI plan starts from the edits.
 - Videos in other languages are separate videos linked by `source_video_id`, made from the original's plan (the AI translates only the words; targets are found again with the app in that language). The recorder sends the language in a `video_demo_locale` cookie, which the package turns into the app's locale where the studio is enabled.
 - Styles can add a logo in a corner of every frame and an end card after the last step.
