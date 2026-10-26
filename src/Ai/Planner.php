@@ -118,7 +118,7 @@ class Planner
         $maxTurns = (int) config('video-demo.limits.max_turns', 30);
         $maxCost = $video->spendLimit();
         $driver = $this->drivers->for($video->model);
-        $tools = [...$this->code->definitions(), ...($session->sampleData?->definitions() ?? []), ...($session->pages?->definitions() ?? []), $this->submitTool()];
+        $tools = [...$this->code->definitions(), ...($session->sampleData?->definitions() ?? []), ...($session->pages?->definitions() ?? []), $this->submitTool(), $this->cannotMakeTool()];
 
         while ($session->turns < $maxTurns) {
             if ($video->stopRequested()) {
@@ -150,7 +150,7 @@ class Planner
             }
 
             if ($turn->stop !== Turn::TOOL_USE) {
-                $driver->addUserText($session->messages, 'Call submit_plan with the finished plan now.');
+                $driver->addUserText($session->messages, "Call submit_plan with the finished plan now, or cannot_make_video if the app doesn't have this.");
 
                 continue;
             }
@@ -158,6 +158,14 @@ class Planner
             $results = [];
             $submitted = null;
             foreach ($turn->toolCalls as $call) {
+                // The app doesn't have what the request describes: say so rather than show something made up.
+                if ($call['name'] === 'cannot_make_video') {
+                    $reason = trim((string) ($call['input']['reason'] ?? ''));
+                    $video->addLog('The AI found the app doesn\'t have this');
+
+                    throw new PlanningFailed("The AI couldn't find this in the app, so nothing was recorded: ".($reason !== '' ? rtrim($reason, '.').'.' : 'it gave no reason.').' Describe a flow the app has, or check the start page.');
+                }
+
                 if ($call['name'] === 'submit_plan') {
                     $plan = Plan::fromArray($call['input']);
                     $problems = $this->problems($plan, $video->max_steps);
@@ -316,7 +324,8 @@ class Planner
      */
     public function problems(Plan $plan, ?int $maxSteps = null): array
     {
-        return $plan->problems($maxSteps);
+        // The model is pointed at its way out, rather than made to fill the video with something.
+        return array_map(fn ($problem) => $problem === Plan::NO_APP ? $problem." If the app doesn't have this flow, call cannot_make_video instead." : $problem, $plan->problems($maxSteps));
     }
 
     /**
@@ -328,6 +337,25 @@ class Planner
             'name' => 'submit_plan',
             'description' => 'Submit the finished video plan. The recorder plays it in a real browser; if a step fails you get the error and the page as it was, and can submit a corrected plan.',
             'schema' => Plan::schema(),
+        ];
+    }
+
+    /**
+     * Get the definition of the cannot_make_video tool.
+     */
+    protected function cannotMakeTool(): array
+    {
+        return [
+            'name' => 'cannot_make_video',
+            'description' => "Say the video can't be made because the app doesn't have what the request describes, instead of submitting a plan. Use it only when the routes and code show the flow isn't there. Nothing is recorded, and the developer sees the reason.",
+            'schema' => [
+                'type' => 'object',
+                'properties' => [
+                    'reason' => ['type' => 'string', 'description' => 'What you looked for and didn\'t find, and what the app has that is closest, in a sentence or two for the developer.'],
+                ],
+                'required' => ['reason'],
+                'additionalProperties' => false,
+            ],
         ];
     }
 
@@ -511,6 +539,8 @@ class Planner
         Identify elements the way a user sees them. Prefer role and name together (role "button", name "Post job"), then label for form fields, then visible text. Use a CSS selector only when nothing visible identifies the element. Labels must match what the rendered page shows, after translations and components are applied, so check the view and any component it uses.
 
         Pace the plan to the target length: a caption reads in about 3 seconds, a card in about 4, and each click or field takes 1 to 2 seconds. The recorder adjusts captions and pauses to land close to the target, so get the content right rather than the exact timing. Type realistic sample values that will pass validation. Mark the start of each part of the flow with chapter so viewers can jump to it.
+
+        Only show what the app has. If the routes and code show that the app doesn't have the flow the request describes (no page, route or feature for it), don't make it up with cards and captions, and don't show a different flow instead: call cannot_make_video, saying what you looked for and what the app has that is closest. Look as far as you need to be sure, then stop.
 
         Show what the video talks about: every page a caption or the voice-over describes must be on screen while it is described, not narrated over another page or an error. If a page can't be reached, leave it out. When a page needs the user to do something first that the video doesn't show, such as completing their profile, make the sample user meet it, and say so in a caption or line ("Once your profile is complete, you can message other members"), so viewers know.
 

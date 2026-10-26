@@ -34,6 +34,22 @@ class PlanTest extends TestCase
         ]);
     }
 
+    public function test_a_plan_must_show_the_app(): void
+    {
+        $cards = Plan::fromArray(['title' => 'x', 'summary' => '', 'steps' => [
+            ['action' => 'card', 'title' => 'Approve a holiday request'],
+            ['action' => 'caption', 'title' => 'Open the Time off inbox'],
+            ['action' => 'pause', 'ms' => 1000],
+        ]]);
+        $this->assertSame([Plan::NO_APP], $cards->problems());
+
+        $page = Plan::fromArray(['title' => 'x', 'summary' => '', 'steps' => [
+            ['action' => 'card', 'title' => 'Post a job'],
+            ['action' => 'goto', 'url' => '/jobs/create'],
+        ]]);
+        $this->assertSame([], $page->problems());
+    }
+
     public function test_fit_to_stretches_flexible_steps_towards_the_target(): void
     {
         $plan = $this->plan();

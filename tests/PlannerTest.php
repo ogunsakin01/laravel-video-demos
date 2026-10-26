@@ -98,7 +98,7 @@ class PlannerTest extends TestCase
         $this->assertSame(['type' => 'adaptive'], $first['body']['thinking']);
         $this->assertSame('high', $first['body']['output_config']['effort']);
         $this->assertSame(['type' => 'ephemeral'], $first['body']['cache_control']);
-        $this->assertSame(['list_files', 'read_file', 'search_code', 'look_at_page', 'submit_plan'], array_column($first['body']['tools'], 'name'));
+        $this->assertSame(['list_files', 'read_file', 'search_code', 'look_at_page', 'submit_plan', 'cannot_make_video'], array_column($first['body']['tools'], 'name'));
         $this->assertTrue($first['body']['tools'][3]['strict']);
         $this->assertArrayHasKey('input_schema', $first['body']['tools'][3]);
         $this->assertStringContainsString('How a recruiter posts a job', $first['body']['messages'][0]['content']);
@@ -140,6 +140,34 @@ class PlannerTest extends TestCase
 
         // The code it read is noted, so video-demo:verify --changed knows the video depends on it.
         $this->assertSame(['resources/views/jobs/create.blade.php'], $video->fresh()->source_files);
+    }
+
+    public function test_says_so_when_the_app_doesnt_have_the_flow(): void
+    {
+        // Reply 1 is a video of title cards about a feature the app doesn't have, which is refused.
+        $this->respond(1, [$this->submit('tu_cards', [
+            $this->step('card', ['title' => 'Approve a holiday request']),
+            $this->step('caption', ['title' => 'Open the Time off inbox']),
+        ])]);
+        // Reply 2 says what it looked for instead.
+        $this->respond(2, [['type' => 'tool_use', 'id' => 'tu_cannot', 'name' => 'cannot_make_video', 'input' => ['reason' => 'There is no time-off or holiday feature: the app has jobs and a job form only.']]]);
+
+        $video = $this->video();
+        try {
+            app(Planner::class)->plan($video);
+            $this->fail('Expected planning to stop.');
+        } catch (PlanningFailed $e) {
+            $this->assertSame("The AI couldn't find this in the app, so nothing was recorded: There is no time-off or holiday feature: the app has jobs and a job form only. Describe a flow the app has, or check the start page.", $e->getMessage());
+        }
+
+        // The cards were refused, with the way out named.
+        $refused = $this->request(2)['body']['messages'][2]['content'][0];
+        $this->assertTrue($refused['is_error']);
+        $this->assertStringContainsString('the video would show none of the app', $refused['content']);
+        $this->assertStringContainsString('call cannot_make_video instead', $refused['content']);
+        // The model is told to say so, not to make it up.
+        $this->assertStringContainsString('Only show what the app has.', $this->request(1)['body']['system'][0]['text'] ?? json_encode($this->request(1)['body']['system']));
+        $this->assertContains("The AI found the app doesn't have this", collect($video->fresh()->log)->pluck('message'));
     }
 
     public function test_looks_at_a_page_when_the_code_doesnt_settle_a_label(): void

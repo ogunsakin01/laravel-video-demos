@@ -30,6 +30,7 @@ use Ogunsakin01\VideoDemo\Recording\RecordingResult;
 use Ogunsakin01\VideoDemo\SampleData\Sandbox;
 use Ogunsakin01\VideoDemo\Studio\ErrorReport;
 use Ogunsakin01\VideoDemo\Support\Language;
+use Ogunsakin01\VideoDemo\Support\Routes;
 use Ogunsakin01\VideoDemo\VideoDemoServiceProvider;
 use Ogunsakin01\VideoDemo\Voice\Music;
 use Ogunsakin01\VideoDemo\Voice\Soundtrack;
@@ -190,6 +191,7 @@ class GenerateVideo implements ShouldQueue
                 // A broken start page would fail every plan, so check it first at no AI cost.
                 // On sample data the model is told instead, as it can add what the page needs.
                 $problems = $this->checkPages($recorder, $video, [$video->start_path ?: '/'], 'Checking the start page', fail: ! $sandbox);
+                $this->failIfNoSuchPage($video, $problems);
 
                 $video->moveTo(VideoStatus::Planning, 'The AI is reading the code');
                 $session = $planner->plan($video, $sandbox, $problems);
@@ -474,6 +476,30 @@ class GenerateVideo implements ShouldQueue
         }
 
         return ' To record on your own local data instead, untick "Record on sample data" under "Make it again" (or set VIDEO_DEMO_SAMPLE_DATA=false).';
+    }
+
+    /**
+     * Fail, before any AI is spent, when the start page isn't one of the
+     * app's pages: it answers 404 and no route matches it. Sample data can't
+     * make a page the app doesn't have; a page that is missing only a record
+     * (a job that doesn't exist yet, say) still has its route, and goes to the
+     * AI. A separate frontend's pages aren't Laravel routes, so it isn't asked.
+     *
+     * @param  list<array{path: string, problem: string, status: ?int, url: ?string, detail: ?string}>  $problems
+     */
+    protected function failIfNoSuchPage(Video $video, array $problems): void
+    {
+        if (config('video-demo.frontend.url')) {
+            return;
+        }
+
+        foreach ($problems as $problem) {
+            if ($problem['status'] === 404 && ! Routes::match((string) parse_url($problem['path'], PHP_URL_PATH))) {
+                $video->update(['issues' => [$problem]]);
+
+                throw new RuntimeException("The start page {$problem['path']} isn't one of the app's pages: it answers 404 and no route matches it, so nothing was planned or recorded. Choose a start page the app has, or describe a flow it has.");
+            }
+        }
     }
 
     /**

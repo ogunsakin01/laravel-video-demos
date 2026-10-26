@@ -11,6 +11,7 @@ All notable changes to this package are listed here. The format follows [Keep a 
 
 ### Fixed
 
+- **Videos of flows the app doesn't have.** Asked for something the app doesn't do, the AI could fill the video with title cards describing it, or search until it ran out of requests. It now says so instead: it has a way to report that the app doesn't have the flow, with what it looked for and what the app has that is closest, and the video fails with that reason and nothing recorded. A plan of only cards, captions and pauses isn't accepted, from the AI or edited by hand, as it would show none of the app. A start page that answers 404 with no route behind it fails before any AI is spent; a page whose route is there but whose record is missing still goes to the AI, which can add it on sample data.
 - **Recording as a type of user when the app has no users table.** The video failed with the database's own error (`no such table: users`). It now says the app has no users table and to run its migrations or record as a guest, on sample data and on your own data, and no longer suggests recording on your own data, which would fail the same way. `video-demo:doctor` warns about it too, and notes types of user (from `recorder.user_types` or roles) that no user has yet: fine on sample data, where one is made for each video, but needed for videos on your own data.
 
 ## v0.18.6 - 2026-10-18

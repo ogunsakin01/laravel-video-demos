@@ -9,6 +9,12 @@ namespace Ogunsakin01\VideoDemo\Recording;
  */
 final class Plan
 {
+    /**
+     * The problem with a plan made only of cards, captions and pauses: a
+     * video of the app that shows none of it.
+     */
+    public const NO_APP = 'The plan has only cards, captions and pauses, so the video would show none of the app. Add the steps that show it.';
+
     public const ACTIONS = ['goto', 'sign_in', 'click', 'type', 'select', 'check', 'press', 'hover', 'scroll', 'wait', 'caption', 'card', 'pause'];
 
     /**
@@ -352,6 +358,8 @@ final class Plan
         $limit = $maxSteps ?: 250;
         if ($this->steps === []) {
             $problems[] = 'The plan has no steps.';
+        } elseif (! $this->hasActions()) {
+            $problems[] = self::NO_APP;
         }
         if (count($this->steps) > $limit) {
             $problems[] = 'The plan has '.count($this->steps)." steps; the limit is $limit. Combine or drop steps to fit.";

@@ -97,7 +97,7 @@ class PrismDriverTest extends TestCase
             $this->assertSame('openai', $first->provider());
             $this->assertSame('test-gpt', $first->model());
             $this->assertSame(1, $first->maxSteps());
-            $this->assertSame(['list_files', 'read_file', 'search_code', 'look_at_page', 'submit_plan'], array_map(fn ($t) => $t->name(), $first->tools()));
+            $this->assertSame(['list_files', 'read_file', 'search_code', 'look_at_page', 'submit_plan', 'cannot_make_video'], array_map(fn ($t) => $t->name(), $first->tools()));
             $this->assertInstanceOf(UserMessage::class, $first->messages()[0]);
 
             // The file the model asked for came back as a tool result.

@@ -318,7 +318,7 @@ class SampleDataTest extends TestCase
             $session = $planner->plan($video, $sandbox, [['path' => '/dashboard/talents', 'problem' => 'The page returned HTTP 403', 'status' => 403, 'url' => null, 'detail' => 'Add your photo to meet people here']]);
 
             $first = $this->request(1)['body'];
-            $this->assertSame(['list_files', 'read_file', 'search_code', 'seed_data', 'query_data', 'look_at_page', 'submit_plan'], array_column($first['tools'], 'name'));
+            $this->assertSame(['list_files', 'read_file', 'search_code', 'seed_data', 'query_data', 'look_at_page', 'submit_plan', 'cannot_make_video'], array_column($first['tools'], 'name'));
             $brief = $first['messages'][0]['content'];
             $this->assertStringContainsString('<sample_data>', $brief);
             $this->assertStringContainsString('then these seeders: DatabaseSeeder', $brief);

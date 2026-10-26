@@ -4,6 +4,7 @@ namespace Ogunsakin01\VideoDemo\Tests;
 
 use Closure;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Route;
 use Ogunsakin01\VideoDemo\Ai\Planner;
 use Ogunsakin01\VideoDemo\Ai\PlanningFailed;
 use Ogunsakin01\VideoDemo\Ai\PlanningSession;
@@ -17,6 +18,7 @@ use Ogunsakin01\VideoDemo\Recording\RecordingFailed;
 use Ogunsakin01\VideoDemo\Recording\RecordingResult;
 use Ogunsakin01\VideoDemo\Recording\Timeline;
 use Ogunsakin01\VideoDemo\SampleData\Sandbox;
+use RuntimeException;
 
 /**
  * Before a plan is recorded it is played once without recording, on a copy
@@ -38,6 +40,9 @@ class RehearsalTest extends TestCase
             public array $recorded = [];
 
             public array $sandboxes = [];
+
+            /** @var list<array<string, mixed>> */
+            public array $pageProblems = [];
 
             public function __construct() {}
 
@@ -64,7 +69,7 @@ class RehearsalTest extends TestCase
 
             public function checkPages(array $paths, ?string $recordAs = null, string $device = 'desktop', ?Closure $shouldStop = null): array
             {
-                return [];
+                return array_values(array_filter($this->pageProblems, fn ($problem) => in_array($problem['path'], $paths, true)));
             }
         };
         $this->app->instance(Recorder::class, $recorder);
@@ -156,6 +161,29 @@ class RehearsalTest extends TestCase
             'title' => 'Post a job', 'prompt' => 'How to post a job', 'target_seconds' => 30, 'model' => 'claude-sonnet-5-5', 'effort' => 'high',
             'status' => VideoStatus::Queued, 'devices' => ['desktop', 'mobile'], 'sample_data' => true, ...$overrides,
         ]);
+    }
+
+    public function test_a_start_page_the_app_doesnt_have_fails_before_planning(): void
+    {
+        config(['video-demo.recorder.check_pages' => true]);
+        $recorder = $this->fakeApp();
+        $recorder->pageProblems = [['path' => '/time-off', 'problem' => 'The page returned HTTP 404', 'status' => 404, 'url' => null, 'detail' => null]];
+        $video = $this->video(['start_path' => '/time-off']);
+
+        try {
+            $this->make($video);
+            $this->fail('Expected the video to fail.');
+        } catch (RuntimeException $e) {
+            $this->assertSame("The start page /time-off isn't one of the app's pages: it answers 404 and no route matches it, so nothing was planned or recorded. Choose a start page the app has, or describe a flow it has.", $e->getMessage());
+        }
+        $this->assertSame([], $recorder->rehearsed);
+        $this->assertSame('/time-off', $video->fresh()->issues[0]['path']);
+
+        // A page with a route that answers 404 (its record isn't there yet) goes to the AI, which can add it on sample data.
+        Route::get('/jobs/{job}', fn () => abort(404));
+        $recorder->pageProblems = [['path' => '/jobs/5', 'problem' => 'The page returned HTTP 404', 'status' => 404, 'url' => null, 'detail' => null]];
+        $this->make($second = $this->video(['start_path' => '/jobs/5']));
+        $this->assertSame(VideoStatus::Ready, $second->fresh()->status);
     }
 
     public function test_a_step_that_fails_in_rehearsal_is_fixed_before_anything_is_recorded(): void
