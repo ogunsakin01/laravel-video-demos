@@ -62,6 +62,7 @@ Listen for `Ogunsakin01\VideoDemo\Events\VideoStatusChanged` (`$video`, `$from`,
 <x-video-demo::player slug="post-a-job" />                    {{-- the version that fits the screen --}}
 <x-video-demo::player slug="post-a-job" device="mobile" />
 <x-video-demo::player slug="post-a-job" collapsible />        {{-- a slim bar that opens into the video --}}
+<x-video-demo::player slug="post-a-job" pause-when-away />    {{-- pauses on another tab or scrolled away, plays again on coming back --}}
 <x-video-demo::help />                                        {{-- in a layout: the videos that show the current page --}}
 <x-video-demo::search placeholder="How do I…" />
 ```

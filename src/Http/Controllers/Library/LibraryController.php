@@ -10,6 +10,7 @@ use Illuminate\Routing\Controller;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Ogunsakin01\VideoDemo\Library\Manifest;
+use Ogunsakin01\VideoDemo\Library\PlayerScripts;
 use Ogunsakin01\VideoDemo\Library\Stats;
 use Ogunsakin01\VideoDemo\Models\VideoRequest;
 use SimpleXMLElement;
@@ -87,6 +88,8 @@ class LibraryController extends Controller
             'page' => route("video-demo.$area.show", $video['slug']),
             // Where a player counts plays and how far viewers get, when the app turns that on.
             'stats' => Stats::enabled() ? route("video-demo.$area.events", $video['slug']) : null,
+            // How the player behaves, as the app sets it; the element's attributes can say otherwise.
+            'player' => ['pause_when_away' => (bool) config('video-demo.library.player.pause_when_away')],
         ])->withHeaders($area === 'public'
             ? ['Access-Control-Allow-Origin' => '*', 'Cache-Control' => 'public, max-age=300']
             : ['Cache-Control' => 'private, no-store']);
@@ -123,7 +126,7 @@ class LibraryController extends Controller
      */
     public function embedScript(): Response
     {
-        return response((string) file_get_contents(__DIR__.'/../../../../resources/embed/video-demo-player.js'), 200, [
+        return response(PlayerScripts::embed(), 200, [
             'Content-Type' => 'application/javascript; charset=utf-8',
             'Cache-Control' => 'public, max-age=3600',
             'Access-Control-Allow-Origin' => '*',

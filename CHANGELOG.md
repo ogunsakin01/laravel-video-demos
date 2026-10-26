@@ -2,6 +2,12 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/). While the version is 0.x, minor releases may include breaking changes; they will be listed here.
 
+## Unreleased
+
+### Added
+
+- **Players can pause while the viewer is away.** With `VIDEO_DEMO_PAUSE_WHEN_AWAY=true` (`library.player.pause_when_away`), a playing video pauses when the viewer switches to another tab or scrolls it mostly out of view for a second, and plays again from the same place when they come back. A video the viewer paused, sought in or finished stays as they left it. It asks for no permissions and sends nothing anywhere. Off by default; one player can say otherwise with `<x-video-demo::player slug="…" pause-when-away />` (or `:pause-when-away="false"`), and `<video-demo-player pause-when-away="true">` in other frontends. The players fire `video-demo:auto-pause` (with the reason) and `video-demo:auto-resume`.
+
 ## v0.18.6 - 2026-10-18
 
 ### Fixed

@@ -77,6 +77,17 @@ return [
 
         // How long production caches the manifest, in seconds.
         'cache_seconds' => 300,
+
+        // How the players behave, in the library and wherever a video is
+        // shown (<x-video-demo::player> and <video-demo-player>).
+        'player' => [
+            // Pause a playing video while the viewer is on another tab or has
+            // scrolled it mostly out of view, and play it again from the same
+            // place when they come back. It asks for no permissions and sends
+            // nothing anywhere. A player can say otherwise with
+            // :pause-when-away="true" or "false".
+            'pause_when_away' => (bool) env('VIDEO_DEMO_PAUSE_WHEN_AWAY', false),
+        ],
     ],
 
     /*

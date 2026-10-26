@@ -40,6 +40,7 @@ class PackageConfig
         '971a49c899a231ccec5f82c98a0cca9fd897db65' => 'v0.18.0',
         '98b19d0fdb3d0e63ad72f3872c443236df9d2c30' => 'v0.18.1',
         'c17efec5e29cf775c6f287fc8764ca0b290e7dd7' => 'v0.18.2',
+        '0112491a59dc0e03c699de4f66d60ce858a5bd13' => 'v0.19.0',
     ];
 
     /**

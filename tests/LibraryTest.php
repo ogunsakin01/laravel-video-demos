@@ -286,4 +286,28 @@ class LibraryTest extends TestCase
         $this->assertStringContainsString('video-demo\\/d.mp4', $html);
         $this->assertSame('', trim($this->blade('<x-video-demo::player slug="missing" />')->__toString()));
     }
+
+    public function test_players_can_pause_while_the_viewer_is_away(): void
+    {
+        app(Manifest::class)->put($this->manifestVideo());
+        $marked = '/<video[^>]*\sdata-vd-away[\s>]/';
+        $render = fn (string $blade) => $this->blade($blade)->__toString();
+
+        // Off unless the app or the page turns it on, but the script is always there.
+        $html = $render('<x-video-demo::player slug="post-a-job" />');
+        $this->assertDoesNotMatchRegularExpression($marked, $html);
+        $this->assertStringContainsString('class AttentionTracker', $html);
+        $this->assertMatchesRegularExpression($marked, $render('<x-video-demo::player slug="post-a-job" pause-when-away />'));
+        $this->assertMatchesRegularExpression($marked, $render('<x-video-demo::player slug="post-a-job" collapsible :pause-when-away="true" />'));
+
+        // Turned on for every player, a page can still turn it off.
+        config(['video-demo.library.player.pause_when_away' => true]);
+        $this->assertMatchesRegularExpression($marked, $render('<x-video-demo::player slug="post-a-job" />'));
+        $this->assertDoesNotMatchRegularExpression($marked, $render('<x-video-demo::player slug="post-a-job" :pause-when-away="false" />'));
+
+        // <video-demo-player> gets the app's setting with the video.
+        $this->assertTrue($this->getJson('/help/videos/post-a-job.json')->json('player.pause_when_away'));
+        config(['video-demo.library.player.pause_when_away' => false]);
+        $this->assertFalse($this->getJson('/help/videos/post-a-job.json')->json('player.pause_when_away'));
+    }
 }

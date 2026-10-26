@@ -13,8 +13,13 @@
   A video made in other languages plays in the language of the page (the
   app's locale) when there is a version in it. language="fr" picks one;
   :language="false" always plays the video as named.
+
+  pause-when-away pauses the video while the viewer is on another tab or has
+  scrolled it mostly out of view, and plays it again when they come back.
+  It asks for no permissions. :pause-when-away="false" turns it off where
+  video-demo.library.player.pause_when_away turns it on for every player.
 --}}
-@props(['slug', 'area' => 'public', 'device' => null, 'collapsible' => false, 'open' => false, 'language' => null])
+@props(['slug', 'area' => 'public', 'device' => null, 'collapsible' => false, 'open' => false, 'language' => null, 'pauseWhenAway' => null])
 @php
   $manifest = app(\Ogunsakin01\VideoDemo\Library\Manifest::class);
   $video = $manifest->find($slug, $area);
@@ -34,6 +39,7 @@
       $stats = \Ogunsakin01\VideoDemo\Library\Stats::enabled() && \Illuminate\Support\Facades\Route::has("video-demo.$area.events")
           ? route("video-demo.$area.events", $video['slug'], false)
           : null;
+      $away = (bool) ($pauseWhenAway ?? config('video-demo.library.player.pause_when_away'));
   }
 @endphp
 @if ($video)
@@ -43,6 +49,9 @@
     @include('video-demo::partials.player-video', ['attributes' => $attributes, 'video' => $video, 'sources' => $sources, 'first' => $first, 'device' => $device])
   @endif
   @once
+    <script>
+      {!! \Ogunsakin01\VideoDemo\Library\PlayerScripts::attention() !!}
+    </script>
     <script>
       // Play the recorded version closest to this screen: phone, tablet, desktop or TV.
       window.videoDemoPick = window.videoDemoPick || function (sources, forced) {
@@ -66,6 +75,8 @@
         document.querySelectorAll('video[data-vd-sources]').forEach(el => {
           window.videoDemoShow(el, window.videoDemoPick(JSON.parse(el.dataset.vdSources), el.dataset.vdDevice));
         });
+        // Paused while the viewer is away, where the app or the page asks for it.
+        document.querySelectorAll('video[data-vd-away]').forEach(el => window.VideoDemoAttention.watch(el));
         // Counts a play and each quarter reached, once per page view, when the app turns stats on.
         document.querySelectorAll('video[data-vd-stats]').forEach(el => {
           const sent = new Set();
