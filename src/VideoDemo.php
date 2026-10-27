@@ -373,7 +373,7 @@ class VideoDemo
         $edited = Plan::fromArray([
             'title' => $plan['title'] ?? $video->plan['title'] ?? '',
             'summary' => $plan['summary'] ?? $video->plan['summary'] ?? '',
-            'steps' => array_map(Plan::clean(...), array_values($plan['steps'])),
+            'steps' => Plan::keepFitted(array_map(Plan::clean(...), array_values($plan['steps'])), array_values($video->plan['steps'] ?? [])),
         ]);
         if ($problems = $edited->problems($video->max_steps)) {
             throw new InvalidArgumentException(implode(' ', $problems));

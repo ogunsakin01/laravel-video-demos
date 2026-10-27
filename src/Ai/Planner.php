@@ -422,7 +422,8 @@ class Planner
         }
 
         $steps = array_map(function ($step) {
-            $kept = array_filter(array_diff_key($step, array_flip(['voice_ms', 'hold_ms', 'why'])), fn ($v) => $v !== null && $v !== '' && $v !== []);
+            // With the lengths it was planned with, not the last recording's fit.
+            $kept = array_filter(array_diff_key(Plan::unfitted($step), array_flip(['voice_ms', 'hold_ms', 'why'])), fn ($v) => $v !== null && $v !== '' && $v !== []);
             if (isset($kept['target'])) {
                 $kept['target'] = array_filter($kept['target'], fn ($v) => $v !== null && $v !== '');
             }

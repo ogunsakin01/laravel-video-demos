@@ -67,6 +67,44 @@ class PlanTest extends TestCase
         $this->assertNull($capped->steps[4]['ms']);
     }
 
+    public function test_a_plan_fitted_again_keeps_its_length(): void
+    {
+        // As a saved plan is loaded.
+        $plan = Plan::fromArray($this->plan()->toArray());
+
+        // Too short to reach the target, so stretched as far as it goes: again and again gives the same.
+        $once = $plan->fitTo(600);
+        $twice = Plan::fromArray(json_decode(json_encode($once->toArray()), true))->fitTo(600);
+        $this->assertSame($once->steps, $twice->steps);
+        $this->assertSame($once->steps, $twice->fitTo(600)->steps);
+        $this->assertSame(['from' => 3500, 'to' => 4900], $once->steps[0]['fitted']);
+
+        // Too long, so shrunk as far as it goes: the same.
+        $this->assertSame($plan->fitTo(1)->steps, $plan->fitTo(1)->fitTo(1)->steps);
+        // A caption with no length of its own is fitted from the default each time.
+        $default = (new Plan('x', '', [$this->step('caption', ['title' => 'Hi']), $this->step('goto', ['url' => '/'])]))->fitTo(600);
+        $this->assertSame(['from' => null, 'to' => 3500], $default->steps[0]['fitted']);
+        $this->assertSame($default->steps, $default->fitTo(600)->steps);
+        // A new target is fitted from the planned lengths, not the last fit.
+        $this->assertSame($plan->fitTo(20)->steps, $once->fitTo(20)->steps);
+    }
+
+    public function test_a_length_changed_by_hand_is_the_new_planned_length(): void
+    {
+        $fitted = $this->plan()->fitTo(600)->toArray()['steps'];
+
+        // The card is given 2 seconds; the caption is left as it was.
+        $edited = array_map(Plan::clean(...), $fitted);
+        $edited[0]['ms'] = 2000;
+        $steps = Plan::keepFitted($edited, $fitted);
+
+        $this->assertArrayNotHasKey('fitted', $steps[0]);
+        $this->assertSame($fitted[3]['fitted'], $steps[3]['fitted']);
+        $again = Plan::fromArray(['title' => 'x', 'summary' => '', 'steps' => $steps])->fitTo(600);
+        $this->assertSame(2800, $again->steps[0]['ms']);
+        $this->assertSame($fitted[3]['ms'], $again->steps[3]['ms']);
+    }
+
     public function test_chapters_come_from_steps(): void
     {
         $chapters = $this->plan()->chapters();

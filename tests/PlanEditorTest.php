@@ -159,6 +159,8 @@ class PlanEditorTest extends TestCase
                 ['action' => 'goto', 'why' => 'x', 'url' => '/jobs', 'target' => null, 'value' => '', 'title' => '', 'text' => '', 'ms' => 0, 'chapter' => '', 'say' => '', 'only_on' => []],
             ]]]]);
             $video = $this->video(['plan_edited_at' => now(), 'status' => VideoStatus::Planning]);
+            // A caption the last recording stretched from 3.5 to 4.9 seconds.
+            $video->update(['plan' => [...$video->plan, 'steps' => [...$video->plan['steps'], ['action' => 'caption', 'title' => 'Done', 'ms' => 4900, 'fitted' => ['from' => 3500, 'to' => 4900]]]]]);
 
             app(Planner::class)->plan($video);
 
@@ -167,6 +169,9 @@ class PlanEditorTest extends TestCase
             $this->assertStringContainsString('"title":"Publsh it"', $brief);
             $this->assertStringContainsString('"say":"Give it a clear title."', $brief);
             $this->assertStringNotContainsString('voice_ms', $brief);
+            // With the length it was planned with.
+            $this->assertStringContainsString('{"action":"caption","title":"Done","ms":3500}', $brief);
+            $this->assertStringNotContainsString('fitted', $brief);
             $this->assertStringContainsString('The developer edited the video\'s last plan by hand.', $brief);
 
             // Plans that weren't edited aren't sent.

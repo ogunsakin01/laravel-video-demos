@@ -231,13 +231,17 @@ final class Plan
      * target length.
      *
      * Actions keep their natural speed, and nothing is cut to less than half
-     * or stretched to more than three times its planned time.
+     * or stretched to more than 1.4 times its planned time. Each step keeps
+     * the length it was planned with ("fitted": from, to), and is fitted from
+     * that, so recording a plan again gives the same length every time.
      */
     public function fitTo(int $targetSeconds, float $speed = 1): self
     {
+        $planned = array_map(fn ($step) => $this->isFlexible($step) ? self::unfitted($step) : $step, $this->steps);
+
         $flexibleMs = 0;
         $fixedMs = 0;
-        foreach ($this->steps as $step) {
+        foreach ($planned as $step) {
             $this->isFlexible($step) ? $flexibleMs += $this->stepMs($step, $speed) : $fixedMs += $this->stepMs($step, $speed);
         }
 
@@ -251,13 +255,56 @@ final class Plan
 
         $steps = array_map(function ($step) use ($factor) {
             if ($this->isFlexible($step)) {
+                $from = $step['ms'] ?? null;
                 $step['ms'] = (int) round($this->stepMs($step) * $factor);
+                $step['fitted'] = ['from' => $from, 'to' => $step['ms']];
             }
 
             return $step;
-        }, $this->steps);
+        }, $planned);
 
         return new self($this->title, $this->summary, $steps);
+    }
+
+    /**
+     * Get a step with the length it was planned with, before any fitting. A
+     * length changed since it was fitted (by hand) is its new planned length.
+     *
+     * @param  array<string, mixed>  $step
+     * @return array<string, mixed>
+     */
+    public static function unfitted(array $step): array
+    {
+        $fitted = $step['fitted'] ?? null;
+        unset($step['fitted']);
+        if (is_array($fitted) && array_key_exists('from', $fitted) && ($step['ms'] ?? null) === ($fitted['to'] ?? false)) {
+            $step['ms'] = is_numeric($fitted['from']) ? (int) $fitted['from'] : null;
+        }
+
+        return $step;
+    }
+
+    /**
+     * Give each step edited by hand the planned length its old step had,
+     * when the edit left the step as it was, so recording it again doesn't
+     * stretch it further.
+     *
+     * @param  list<array<string, mixed>>  $edited
+     * @param  list<array<string, mixed>>  $old
+     * @return list<array<string, mixed>>
+     */
+    public static function keepFitted(array $edited, array $old): array
+    {
+        $key = fn (array $step) => array_map(fn ($field) => $step[$field] ?? null, ['action', 'title', 'text', 'ms']);
+
+        foreach ($edited as $i => $step) {
+            $before = $old[$i] ?? null;
+            if (is_array($before) && isset($before['fitted']) && $key($step) === $key($before)) {
+                $edited[$i]['fitted'] = $before['fitted'];
+            }
+        }
+
+        return $edited;
     }
 
     /**

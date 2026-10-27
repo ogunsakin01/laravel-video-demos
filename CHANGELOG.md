@@ -2,6 +2,12 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/).
 
+## v1.1.1 - 2026-10-27
+
+### Fixed
+
+- **Recording the same plan again made the video longer each time.** Captions, cards and pauses are stretched or shrunk toward the video's target length, and each recording did it again to the last one's lengths, so a 45-second video recorded at 28 seconds came out at 38, then 45. Each step now keeps the length it was planned with and is fitted from that, so a plan recorded again comes out the same length. A length you change by hand in the plan is the new starting point. A plan recorded before this fix starts from the lengths it has now.
+
 ## v1.1.0 - 2026-10-27
 
 ### Changed
