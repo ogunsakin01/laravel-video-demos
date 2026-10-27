@@ -214,19 +214,21 @@ class Recorder
 
     /**
      * Play the plan without recording it on several versions, the way
-     * recordVersions() records them.
+     * recordVersions() records them. $meanwhile is run once while the first
+     * versions play, for work that needn't wait for them (the voice-over).
      *
      * @param  array<string, string>  $dirs  device => folder
      * @param  ?Closure(string): void  $started
      * @param  ?Closure(string, RecordingResult): void  $finished
      * @return array<string, RecordingResult> device => result, in the order they finished
      */
-    public function verifyVersions(Plan $plan, array $dirs, array $style = [], ?string $recordAs = null, int $parallel = 1, ?Closure $shouldStop = null, ?Closure $started = null, ?Closure $finished = null): array
+    public function verifyVersions(Plan $plan, array $dirs, array $style = [], ?string $recordAs = null, int $parallel = 1, ?Closure $shouldStop = null, ?Closure $started = null, ?Closure $finished = null, ?Closure $meanwhile = null): array
     {
         return $this->eachVersion(
             $dirs, $parallel, $shouldStop, $started, $finished,
             fn (string $device, string $dir) => $this->verify($plan, $dir, $style, $device, $recordAs, $shouldStop),
             fn (string $device, string $dir) => $this->prepareCheck($plan, $dir, $style, $device, $recordAs),
+            $meanwhile,
         );
     }
 
@@ -236,20 +238,22 @@ class Recorder
      */
     public static function parallelVersions(int $versions): int
     {
-        return max(1, min((int) config('video-demo.recorder.parallel_versions', 1), $versions, 4));
+        return max(1, min((int) config('video-demo.recorder.parallel_versions', 4), $versions, 4));
     }
 
     /**
      * Run each version, one at a time ($one) or up to $parallel at once
      * (each $prepare'd, then run side by side), each on its own copy of the
-     * sample database, stopping at the first that fails.
+     * sample database, stopping at the first that fails. With $meanwhile,
+     * the versions run in the background, and $meanwhile runs once the first
+     * have started.
      *
      * @param  array<string, string>  $dirs
      * @param  Closure(string, string): RecordingResult  $one
      * @param  Closure(string, string): array{script: string, job: string, timeout: int, read: Closure(string): RecordingResult}  $prepare
      * @return array<string, RecordingResult>
      */
-    protected function eachVersion(array $dirs, int $parallel, ?Closure $shouldStop, ?Closure $started, ?Closure $finished, Closure $one, Closure $prepare): array
+    protected function eachVersion(array $dirs, int $parallel, ?Closure $shouldStop, ?Closure $started, ?Closure $finished, Closure $one, Closure $prepare, ?Closure $meanwhile = null): array
     {
         $this->versionErrors = [];
         $base = $this->sandbox;
@@ -281,7 +285,10 @@ class Recorder
             }
         };
 
-        if ($parallel <= 1 || count($dirs) <= 1) {
+        if ($dirs === [] && $meanwhile) {
+            $meanwhile();
+        }
+        if (! $meanwhile && ($parallel <= 1 || count($dirs) <= 1)) {
             foreach ($dirs as $device => $dir) {
                 if ($shouldStop && $shouldStop()) {
                     throw new VideoStopped('Stopped by you.');
@@ -312,6 +319,11 @@ class Recorder
                     }
                     [$job, $copy] = $onCopy(fn () => $prepare($device, $dir));
                     $running[$device] = ['process' => $this->start($job['script'], $job['job'], $job['timeout']), 'read' => $job['read'], 'copy' => $copy];
+                }
+
+                if ($meanwhile) {
+                    [$work, $meanwhile] = [$meanwhile, null];
+                    $work();
                 }
 
                 if ($shouldStop && $shouldStop()) {

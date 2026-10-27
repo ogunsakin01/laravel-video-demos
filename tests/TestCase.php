@@ -46,6 +46,8 @@ abstract class TestCase extends Orchestra
         $app['config']->set('video-demo.recorder.check_pages', false);
         // Sample data is on by default; tests of other features record on the test database.
         $app['config']->set('video-demo.sample_data.default', false);
+        // Versions go one at a time, so a test's fake verify() and record() are used; tests of side by side ask for it.
+        $app['config']->set('video-demo.recorder.parallel_versions', 1);
 
         // Files go to a folder of the test's own, never the demo app's storage:
         // a test video #1 deleting its files must not take the demo's video #1 with it.

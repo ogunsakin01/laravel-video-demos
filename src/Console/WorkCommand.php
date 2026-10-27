@@ -52,7 +52,8 @@ class WorkCommand extends Command
             $this->components->warn($warning);
         }
         $this->components->info("Making up to $count videos at once. Press Ctrl+C to stop.");
-        $this->line('<fg=gray>Each video opens its own browser, so your app must answer several requests at once: Herd, Valet, Sail or Octane do; with php artisan serve, set PHP_CLI_SERVER_WORKERS=4 or more.</>');
+        $screens = max(1, min(4, (int) config('video-demo.recorder.parallel_versions', 4)));
+        $this->line('<fg=gray>Each video opens '.($screens > 1 ? "a browser for each screen, up to $screens at once (VIDEO_DEMO_PARALLEL_VERSIONS)" : 'its own browser').', so your app must answer several requests at once: Herd, Valet, Sail or Octane do; with php artisan serve, set PHP_CLI_SERVER_WORKERS='.max(4, $count * $screens).' or more.</>');
 
         // Signals need pcntl, which Windows doesn't have; there Ctrl+C ends the workers with this command.
         if (defined('SIGINT')) {

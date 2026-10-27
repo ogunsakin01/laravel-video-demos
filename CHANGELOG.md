@@ -2,6 +2,17 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/).
 
+## v1.1.0 - 2026-10-27
+
+### Changed
+
+- **A video's screens are rehearsed and recorded at the same time by default**, up to 4, so a video for four screens takes about as long as one. A 38-second video on desktop, TV, tablet and mobile took 3 min 29 s one screen at a time and 1 min 7 s all at once, with the same length and frames in each screen's video. To record them one after another, set `VIDEO_DEMO_PARALLEL_VERSIONS=1` (or `false`). With `php artisan serve`, set `PHP_CLI_SERVER_WORKERS=8` or more, as each screen is its own browser.
+- **The voice-over is spoken while the plan is rehearsed**, instead of after, when that costs nothing even if the rehearsal fails: the plan has its lines and the voice is free (the local voices). A voice that costs money still waits for the rehearsal to pass.
+
+### Added
+
+- **How long each video took.** A finished video's log ends with the time it took and each stage of it, such as "Made in 1 min 7 s: sample data 1 s; checking pages 2 s; rehearsal 8 s; recording 49 s; encoding 8 s", so you can see where the time goes.
+
 ## v1.0.2 - 2026-10-27
 
 ### Fixed

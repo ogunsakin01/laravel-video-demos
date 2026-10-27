@@ -121,6 +121,18 @@ class GenerateVideo implements ShouldQueue
     protected bool $planSaved = false;
 
     /**
+     * How long each stage of this attempt took, in seconds, in the order they first ran.
+     *
+     * @var array<string, float>
+     */
+    protected array $took = [];
+
+    /**
+     * Whether the voice-over was made while the plan was rehearsed.
+     */
+    protected bool $voiceWhileRehearsing = false;
+
+    /**
      * Execute the job.
      */
     public function handle(Planner $planner, Recorder $recorder, Encoder $encoder, Narrator $narrator, Speaker $speaker, Soundtrack $soundtrack): void
@@ -162,6 +174,7 @@ class GenerateVideo implements ShouldQueue
     {
         $video = $this->video;
         $video->refresh();
+        $began = microtime(true);
 
         // Stopped while it was waiting in the queue.
         if ($video->status === VideoStatus::Stopped || $video->stop_requested) {
@@ -184,7 +197,7 @@ class GenerateVideo implements ShouldQueue
 
         try {
             if ($video->sample_data) {
-                $sandbox = $this->sampleDatabase($video, $recorder);
+                $sandbox = $this->timed('sample data', fn () => $this->sampleDatabase($video, $recorder));
             }
 
             if ($this->replan) {
@@ -194,7 +207,7 @@ class GenerateVideo implements ShouldQueue
                 $this->failIfNoSuchPage($video, $problems);
 
                 $video->moveTo(VideoStatus::Planning, 'The AI is reading the code');
-                $session = $planner->plan($video, $sandbox, $problems);
+                $session = $this->timed('planning', fn () => $planner->plan($video, $sandbox, $problems));
                 $plan = $session->plan;
                 // The new plan was made from the edits, and replaces them.
                 $video->update(['plan_edited_at' => null]);
@@ -213,23 +226,39 @@ class GenerateVideo implements ShouldQueue
                 $problems = $this->checkPages($recorder, $video, $plan->pathsBeforeSignIn(), 'Checking the pages in the plan', fail: ! $canRepair);
                 if ($problems !== []) {
                     $video->moveTo(VideoStatus::Planning, 'Asking the AI to fix the data or the plan');
-                    $planner->repairPages($session, $video, $problems);
+                    $this->timed('planning', fn () => $planner->repairPages($session, $video, $problems));
                     $plan = $session->plan;
 
                     continue;
                 }
 
+                // A voice that can't speak the video's language would read it out wrongly.
+                if ($clips !== null && ! $video->hasVoiceOver()) {
+                    $video->addLog(sprintf("%s doesn't speak %s, so the video is made without a voice-over. Choose a voice that does.", Voices::label($video->voice), Language::name($video->languageCode())));
+                    $clips = null;
+                }
+
+                // The voice-over is spoken while the plan is rehearsed when that costs
+                // nothing even if the rehearsal fails: the plan has its lines, and the
+                // voice is free. Otherwise it waits, so a plan that fails isn't paid for.
+                $voiced = null;
+                $meanwhile = $clips !== null && $plan->lines() !== [] && Voices::price($video->voice) <= 0
+                    ? function () use (&$voiced, $video, $plan, $narrator, $speaker) {
+                        $voiced = $this->timed('voice-over', fn () => $this->voiceOver($video, $plan, $narrator, $speaker));
+                    }
+                : null;
+
                 // A step that doesn't work is found by a quick rehearsal, before the
                 // voice-over is paid for or anything is recorded, while the AI can still fix it.
-                $failure = $this->rehearse($recorder, $video, $plan, $devices, $sandbox, $shouldStop);
+                $failure = $this->timed('rehearsal', fn () => $this->rehearse($recorder, $video, $plan, $devices, $sandbox, $shouldStop, $meanwhile));
 
                 if (! $failure) {
-                    // A voice that can't speak the video's language would read it out wrongly.
-                    if ($clips !== null && ! $video->hasVoiceOver()) {
-                        $video->addLog(sprintf("%s doesn't speak %s, so the video is made without a voice-over. Choose a voice that does.", Voices::label($video->voice), Language::name($video->languageCode())));
-                        $clips = null;
+                    if ($clips === null) {
+                        $plan = $plan->withoutVoice();
+                    } else {
+                        $this->voiceWhileRehearsing = $voiced !== null;
+                        [$plan, $clips] = $voiced ?? $this->timed('voice-over', fn () => $this->voiceOver($video, $plan, $narrator, $speaker));
                     }
-                    [$plan, $clips] = $clips !== null ? $this->voiceOver($video, $plan, $narrator, $speaker) : [$plan->withoutVoice(), null];
                     $plan = $plan->fitTo(min($video->target_seconds, (int) config('video-demo.limits.max_seconds', 300)), $video->playbackSpeed());
                     $video->update(['plan' => $plan->toArray()]);
                     $this->planSaved = true;
@@ -246,14 +275,14 @@ class GenerateVideo implements ShouldQueue
                     // one version saves (a goal set, a job posted) mustn't change the next.
                     // The style's end card goes after the last step; the plan itself keeps without it.
                     $recorder->sandbox = $sandbox;
-                    $recorded = $recorder->recordVersions(
+                    $recorded = $this->timed('recording', fn () => $recorder->recordVersions(
                         $plan->withEndCard($video->style ?? []),
                         array_combine($devices, array_map(fn ($device) => "$dir/$device", $devices)),
                         $video->style ?? [], $video->record_as, $video->playbackSpeed(), array_map(fn ($c) => $c['seconds'], $clips ?? []),
                         $parallel, $shouldStop,
                         started: fn (string $device) => $parallel > 1 ? null : $video->moveTo(VideoStatus::Recording, 'Recording the '.Devices::get($device)['label'].' version'),
                         finished: fn (string $device, RecordingResult $result) => $video->addLog($result->summary()),
-                    );
+                    ));
                     $failure = collect($recorded)->first(fn (RecordingResult $result) => ! $result->ok);
                     if ($failure) {
                         $this->recordingErrors = $recorder->versionErrors;
@@ -283,7 +312,7 @@ class GenerateVideo implements ShouldQueue
 
                 $this->stopIfAsked($video);
                 $video->moveTo(VideoStatus::Planning, 'Asking the AI to fix the plan');
-                $planner->repair($session, $video, $failure);
+                $this->timed('planning', fn () => $planner->repair($session, $video, $failure));
                 $plan = $session->plan;
             }
 
@@ -303,6 +332,7 @@ class GenerateVideo implements ShouldQueue
         }
 
         $video->moveTo(VideoStatus::Encoding, count($results) > 1 ? 'Encoding '.count($results).' versions' : 'Encoding the video');
+        $encoding = microtime(true);
         $work = Storage::disk(config('video-demo.storage.work_disk'));
         $recordings = [];
         foreach ($results as $device => $result) {
@@ -330,6 +360,9 @@ class GenerateVideo implements ShouldQueue
         foreach (array_diff($video->recordedDevices(), $devices) as $old) {
             $work->delete([$video->workFile($old), $video->workFile($old, 'poster'), $video->workFile($old, 'subtitles')]);
         }
+
+        $this->took['encoding'] = microtime(true) - $encoding;
+        $video->addLog($this->timeTaken(microtime(true) - $began));
 
         $primary = $recordings[Devices::primary($devices)];
         $video->update([
@@ -540,10 +573,11 @@ class GenerateVideo implements ShouldQueue
      * change twice. A plan the AI can't fix any more, such as one recorded
      * again as it was, is rehearsed too, so a step that no longer works stops
      * the video in seconds, not partway through recording. It costs no AI.
+     * $meanwhile runs while the versions play; it isn't run when there is no rehearsal.
      *
      * @param  list<string>  $devices
      */
-    protected function rehearse(Recorder $recorder, Video $video, Plan $plan, array $devices, ?Sandbox $sandbox, Closure $shouldStop): ?RecordingResult
+    protected function rehearse(Recorder $recorder, Video $video, Plan $plan, array $devices, ?Sandbox $sandbox, Closure $shouldStop, ?Closure $meanwhile = null): ?RecordingResult
     {
         $this->rehearsalErrors = [];
         if (! config('video-demo.recorder.rehearse', true) || ! $plan->hasActions()) {
@@ -570,6 +604,7 @@ class GenerateVideo implements ShouldQueue
         $recorder->sandbox = $sandbox;
         $runs = $recorder->verifyVersions($plan, $dirs, $video->style ?? [], $video->record_as, $parallel, $shouldStop,
             finished: fn (string $device, RecordingResult $run) => $run->ok ? File::deleteDirectory($dirs[$device]) : null,
+            meanwhile: $meanwhile,
         );
         $failure = collect($runs)->first(fn (RecordingResult $run) => ! $run->ok);
         if ($failure) {
@@ -578,6 +613,50 @@ class GenerateVideo implements ShouldQueue
         }
 
         return $failure;
+    }
+
+    /**
+     * Run a stage of the video, adding how long it took to $took.
+     *
+     * @template T
+     *
+     * @param  Closure(): T  $stage
+     * @return T
+     */
+    protected function timed(string $name, Closure $stage): mixed
+    {
+        $start = microtime(true);
+        try {
+            return $stage();
+        } finally {
+            $this->took[$name] = ($this->took[$name] ?? 0) + microtime(true) - $start;
+        }
+    }
+
+    /**
+     * Say how long the video took to make, and each stage that took a second or more,
+     * such as "Made in 1 min 42 s: planning 45 s, rehearsal 9 s, recording 38 s, encoding 3 s".
+     */
+    protected function timeTaken(float $seconds): string
+    {
+        $stages = [];
+        foreach ($this->took as $name => $took) {
+            if ($took >= 0.5) {
+                $stages[] = $name.' '.self::duration($took).($name === 'voice-over' && $this->voiceWhileRehearsing ? ', while rehearsing' : '');
+            }
+        }
+
+        return 'Made in '.self::duration($seconds).($stages ? ': '.implode('; ', $stages) : '');
+    }
+
+    /**
+     * Write a length of time as "42 s" or "1 min 42 s".
+     */
+    public static function duration(float $seconds): string
+    {
+        $seconds = (int) round($seconds);
+
+        return $seconds >= 60 ? sprintf('%d min %d s', intdiv($seconds, 60), $seconds % 60) : "$seconds s";
     }
 
     /**
@@ -594,7 +673,7 @@ class GenerateVideo implements ShouldQueue
 
         $this->stopIfAsked($video);
         $video->moveTo(VideoStatus::Checking, $message.' ('.count($paths).')');
-        $problems = $recorder->checkPages($paths, $video->record_as, $video->deviceList()[0], fn () => $video->stopRequested());
+        $problems = $this->timed('checking pages', fn () => $recorder->checkPages($paths, $video->record_as, $video->deviceList()[0], fn () => $video->stopRequested()));
         $this->notePageLanguage($video, $recorder->pageLanguages, $paths);
 
         if ($problems !== [] && ! $fail) {

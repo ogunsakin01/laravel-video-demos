@@ -173,6 +173,34 @@ class ParallelVersionsTest extends TestCase
         $this->assertEqualsCanonicalizing(static::$copies, static::$deleted);
     }
 
+    public function test_other_work_runs_while_the_versions_play(): void
+    {
+        foreach ([2, 1] as $parallel) {
+            static::$copies = static::$deleted = [];
+            $this->fakeBrowser(['desktop' => 3, 'mobile' => 1]);
+            $events = [];
+
+            $results = $this->recorder()->verifyVersions($this->plan(), $this->dirs(['desktop', 'mobile']), parallel: $parallel,
+                started: function (string $device) use (&$events) {
+                    $events[] = "start $device";
+                },
+                finished: function (string $device) use (&$events) {
+                    $events[] = "finish $device";
+                },
+                meanwhile: function () use (&$events) {
+                    $events[] = 'meanwhile';
+                },
+            );
+
+            // Run once, after the first versions started and before any finished.
+            $this->assertSame($parallel === 2
+                ? ['start desktop', 'start mobile', 'meanwhile', 'finish mobile', 'finish desktop']
+                : ['start desktop', 'meanwhile', 'finish desktop', 'start mobile', 'finish mobile'], $events);
+            $this->assertCount(2, $results);
+            $this->assertEqualsCanonicalizing(static::$copies, static::$deleted);
+        }
+    }
+
     public function test_stop_ends_every_version(): void
     {
         $this->fakeBrowser(['desktop' => 50, 'mobile' => 50]);
@@ -192,8 +220,17 @@ class ParallelVersionsTest extends TestCase
         $this->assertEqualsCanonicalizing(static::$copies, static::$deleted);
     }
 
-    public function test_one_at_a_time_is_the_default(): void
+    public function test_every_screen_at_once_is_the_default_and_one_turns_it_off(): void
     {
+        // Every screen at once, up to 4, unless the app says otherwise.
+        $shipped = (include __DIR__.'/../config/video-demo.php')['recorder']['parallel_versions'];
+        $this->assertSame(4, $shipped);
+        config(['video-demo.recorder.parallel_versions' => $shipped]);
+        $this->assertSame(3, Recorder::parallelVersions(3));
+        // VIDEO_DEMO_PARALLEL_VERSIONS=1 (or false) records them one at a time.
+        config(['video-demo.recorder.parallel_versions' => 1]);
+        $this->assertSame(1, Recorder::parallelVersions(3));
+        config(['video-demo.recorder.parallel_versions' => (int) false]);
         $this->assertSame(1, Recorder::parallelVersions(3));
         config(['video-demo.recorder.parallel_versions' => 2]);
         $this->assertSame(2, Recorder::parallelVersions(3));
@@ -203,6 +240,7 @@ class ParallelVersionsTest extends TestCase
         $this->assertSame(4, Recorder::parallelVersions(6));
 
         // One at a time, a failure stops the next version from starting.
+        config(['video-demo.recorder.parallel_versions' => 1]);
         $this->fakeBrowser(failing: ['desktop']);
         $started = [];
         $results = $this->recorder()->verifyVersions($this->plan(), $this->dirs(['desktop', 'mobile']),

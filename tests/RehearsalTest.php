@@ -20,6 +20,7 @@ use Ogunsakin01\VideoDemo\Recording\RecordingFailed;
 use Ogunsakin01\VideoDemo\Recording\RecordingResult;
 use Ogunsakin01\VideoDemo\Recording\Timeline;
 use Ogunsakin01\VideoDemo\SampleData\Sandbox;
+use Ogunsakin01\VideoDemo\Voice\Speaker;
 use RuntimeException;
 
 /**
@@ -226,6 +227,84 @@ class RehearsalTest extends TestCase
         $this->assertContains('Recording 2 versions, 2 at a time', $messages);
         // Every copy of the sample database was deleted: two per rehearsal, two for recording.
         $this->assertCount(6, static::$deleted);
+    }
+
+    /**
+     * Make a voiced video of two versions side by side, noting when each
+     * browser starts and when the voice-over is spoken, and return its log.
+     *
+     * @param  list<string>  $events
+     * @return list<string>
+     */
+    protected function makeVoiced(array &$events): array
+    {
+        config(['video-demo.recorder.parallel_versions' => 2]);
+        $this->fakeApp();
+        Process::fake(function (PendingProcess $process) use (&$events) {
+            $dir = dirname((string) $process->command[2]);
+            $job = json_decode(File::get("$dir/job.json"), true);
+            $events[] = (! empty($job['dryRun']) ? 'rehearse' : 'record').' ('.basename($dir).')';
+            File::put("$dir/raw.webm", 'webm');
+            File::put("$dir/result.json", json_encode(['ok' => true, 'video' => "$dir/raw.webm", 'durationMs' => 12_000, 'chapters' => []]));
+
+            return Process::describe()->iterations(2);
+        });
+        $this->app->instance(Speaker::class, new class($events) extends Speaker
+        {
+            public function __construct(protected array &$events) {}
+
+            public function speak(string $voice, array $lines, bool $mixable = true, string $tone = ''): array
+            {
+                $this->events[] = 'speak';
+                usleep(600_000);
+
+                return collect($lines)->mapWithKeys(fn ($l) => [$l => ['file' => "/clips/$l.wav", 'seconds' => 2.0]])->all();
+            }
+        });
+        $video = $this->video(['voice' => 'kokoro:af_heart', 'plan' => ['title' => 'Post a job', 'summary' => '', 'steps' => [
+            ['action' => 'goto', 'url' => '/jobs', 'say' => 'Open the jobs page.'],
+            ['action' => 'click', 'target' => ['role' => 'button', 'name' => 'New button'], 'say' => 'Then post a job.'],
+        ]]]);
+
+        $this->make($video, replan: false);
+        $video = $video->fresh();
+        $this->assertSame(VideoStatus::Ready, $video->status, (string) $video->error);
+
+        return array_column($video->log, 'message');
+    }
+
+    public function test_a_free_voice_is_spoken_while_the_plan_is_rehearsed(): void
+    {
+        $events = [];
+        $log = $this->makeVoiced($events);
+
+        // Spoken after both rehearsals started, and before anything was recorded.
+        $this->assertSame(['rehearse (desktop)', 'rehearse (mobile)', 'speak', 'record (desktop)', 'record (mobile)'], $events);
+        // How long each stage took, and that the voice-over didn't add to it.
+        $made = collect($log)->first(fn ($m) => str_starts_with($m, 'Made in '));
+        $this->assertNotNull($made, implode("\n", $log));
+        $this->assertStringContainsString('voice-over 1 s, while rehearsing', $made);
+        $this->assertStringContainsString('rehearsal ', $made);
+        $this->assertStringContainsString('recording ', $made);
+    }
+
+    public function test_a_voice_that_costs_money_waits_for_the_rehearsal_to_pass(): void
+    {
+        config(['video-demo.voice.providers.kokoro.price_per_1k_chars' => 0.3]);
+        $events = [];
+        $log = $this->makeVoiced($events);
+
+        $made = collect($log)->first(fn ($m) => str_starts_with($m, 'Made in '));
+        $this->assertStringContainsString('voice-over 1 s', $made);
+        $this->assertStringNotContainsString('while rehearsing', $made);
+    }
+
+    public function test_lengths_of_time_are_written_plainly(): void
+    {
+        $this->assertSame('0 s', GenerateVideo::duration(0.2));
+        $this->assertSame('42 s', GenerateVideo::duration(41.6));
+        $this->assertSame('1 min 0 s', GenerateVideo::duration(60));
+        $this->assertSame('3 min 5 s', GenerateVideo::duration(185));
     }
 
     public function test_a_step_that_fails_in_rehearsal_is_fixed_before_anything_is_recorded(): void
