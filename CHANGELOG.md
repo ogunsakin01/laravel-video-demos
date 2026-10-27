@@ -2,6 +2,12 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/).
 
+## v1.0.1 - 2026-10-27
+
+### Changed
+
+- **Needs `anthropic-ai/sdk` 0.59** (was 0.57), so apps can update to the newest Anthropic SDK. The tests also run on `prism-php/prism` 0.102.
+
 ## v1.0.0 - 2026-10-27
 
 ### Added
