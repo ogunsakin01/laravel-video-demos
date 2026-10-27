@@ -7,13 +7,13 @@ Use it when someone wants: how-to or tutorial videos of their Laravel app, onboa
 ## Install
 
 ```bash
-composer require ogunsakin01/laravel-video-demos:^0.18
+composer require ogunsakin01/laravel-video-demos:^1.0
 php artisan video-demo:install   # the package's migrations, Playwright and Chromium, the sample database; run it again after upgrading
 ```
 
 Needs Node.js 18+ and ffmpeg where videos are made (not in production), and `ANTHROPIC_API_KEY` (or `OPENAI_API_KEY`, `GEMINI_API_KEY` or local Ollama through `prism-php/prism`). Set `VIDEO_DEMO_LOGIN_AS` to the user the recorder signs in as by default, and `APP_URL` to the address the app is opened at. Run workers for the package's own queue: `php artisan video-demo:work` makes two videos at once (`--workers=N`, or `VIDEO_DEMO_WORKERS`); a plain `php artisan queue:work video-demo` makes one at a time.
 
-After updating the package, restart queue workers (`php artisan queue:restart`): a running worker keeps the old code. Below 1.0, a new minor version needs `composer require ogunsakin01/laravel-video-demos:^0.x`.
+After updating the package, restart queue workers (`php artisan queue:restart`): a running worker keeps the old code.
 
 ## Make videos (CLI, for agents and scripts)
 
