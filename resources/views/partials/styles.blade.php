@@ -401,6 +401,16 @@
   .vd-link { background: none; border: 0; padding: 0; font: inherit; color: var(--vd-strong); text-decoration: underline; cursor: pointer; }
   .vd-code { margin: 6px 0 0; padding: 10px 12px; background: var(--vd-muted); border: 1px solid var(--vd-border); border-radius: 8px; font: 12.5px/1.5 var(--vd-mono); white-space: pre-wrap; overflow-wrap: anywhere; color: var(--vd-strong); }
   .vd-code code { background: none; border: 0; padding: 0; font: inherit; color: inherit; }
+  /* Something that went wrong: a red mark by the title, the words in the page's own ink. */
+  .vd-problem h2, .vd-problem > strong { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 15px; color: var(--vd-strong); }
+  .vd-problem h2::before, .vd-problem > strong::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--vd-bad); }
+  .vd-problem-lead { margin: 0; font-weight: 500; color: var(--vd-strong); overflow-wrap: anywhere; }
+  .vd-problem-text { margin: 0; font-size: 14px; line-height: 1.6; color: var(--vd-ink); overflow-wrap: anywhere; }
+  .vd-problem [data-clamp]:not([data-open]) { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+  .vd-problem .vd-actions:not(:has(> :not([hidden]))) { display: none; }
+  .vd-problem-note { padding: 2px 0 2px 12px; border-left: 2px solid var(--vd-bad); color: var(--vd-ink); }
+  .vd-problem-note > strong { color: var(--vd-strong); }
+  .vd-fold-hint.vd-clamp-2, .vd-clamp-2 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
   .vd-issues { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
   .vd-issues li { display: grid; gap: 2px; }
   .vd-issues .vd-detail { font: 12.5px/1.5 var(--vd-mono); overflow-wrap: anywhere; opacity: .9; }

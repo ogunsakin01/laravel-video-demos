@@ -2,6 +2,12 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/).
 
+## v1.1.2 - 2026-10-27
+
+### Changed
+
+- **A failed video's error is calmer in the studio.** "What went wrong" sits right under the video as an ordinary card with a red mark, in the page's own ink instead of red on pink. Its headline is shown whole and the AI's longer explanation is folded to three lines, with **Show all**. The try-again buttons are only at the top of the page now, and the Progress card shows two lines of the error instead of all of it. "Does it still work?" and "A page in your app has a problem" no longer use a pink box either.
+
 ## v1.1.1 - 2026-10-27
 
 ### Fixed

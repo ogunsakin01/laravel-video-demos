@@ -34,7 +34,7 @@
       Every step worked{{ $devices ? ' on '.$devices : '' }}, {{ $video->verified_at?->diffForHumans() }}.
     </p>
   @elseif ($state === 'done')
-    <div class="vd-stack-sm" style="padding:12px 14px;border-radius:var(--vd-radius);background:var(--vd-bad-bg);color:var(--vd-bad)">
+    <div class="vd-stack-sm vd-problem-note">
       <strong>
         @if (! empty($check['step']))
           Step {{ $check['step'] }}{{ ! empty($check['action']) ? ' ('.$check['action'].')' : '' }} no longer works{{ ! empty($check['device']) ? ' on '.config('video-demo.devices.'.$check['device'].'.label', $check['device']) : '' }}

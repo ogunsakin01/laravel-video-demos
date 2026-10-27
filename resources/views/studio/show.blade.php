@@ -69,7 +69,7 @@
   @endif
 
   @if (! empty($video->issues))
-    <div class="vd-flash vd-flash-error vd-stack-sm" role="alert" id="vd-issues">
+    <div class="vd-card vd-problem vd-stack-sm" role="alert" id="vd-issues">
       <strong>{{ count($video->issues) === 1 ? 'A page in your app has a problem' : count($video->issues).' pages in your app have problems' }}, so the video wasn't recorded</strong>
       <ul class="vd-issues">
         @foreach ($video->issues as $issue)
@@ -128,6 +128,30 @@
         </div>
       @endif
 
+      @if ($video->error)
+        {{-- A short headline (the part before the first colon) and the rest folded to a few lines. --}}
+        @php([$headline, $explanation] = \Ogunsakin01\VideoDemo\Studio\Problem::split($video->error))
+        <section class="vd-card vd-problem vd-stack-sm" id="vd-error">
+          <h2>What went wrong</h2>
+          <p class="vd-problem-lead" @if ($explanation === '') data-clamp @endif>{{ $headline }}</p>
+          @if ($explanation !== '')
+            <p class="vd-problem-text" data-clamp>{{ $explanation }}</p>
+          @endif
+          <div class="vd-actions">
+            <button type="button" class="vd-btn vd-btn-sm" data-clamp-toggle hidden>Show all</button>
+            @if (! empty($video->error_details['exception']))
+              <button type="button" class="vd-btn vd-btn-sm" data-open-error>View full error</button>
+            @endif
+          </div>
+          @if (! empty($video->error_details['exception']))
+            @include('video-demo::studio.partials.error-details')
+          @endif
+          @if ($video->status === VideoStatus::Failed)
+            <p class="vd-small vd-muted" style="margin:0">Try again with the buttons at the top. They use what is in "Make it again", so change the description, style, versions or model there first.</p>
+          @endif
+        </section>
+      @endif
+
       @if ($video->isFinished())
         @include('video-demo::studio.partials.spots')
       @endif
@@ -146,28 +170,6 @@
 
       @if ($video->source_video_id || ($video->isReady() && $video->hasPlan()) || $video->translations()->exists())
         @include('video-demo::studio.partials.translations')
-      @endif
-
-      @if ($video->error)
-        <div class="vd-card vd-stack-sm" style="border-color:transparent;background:var(--vd-bad-bg)">
-          <h2 style="color:var(--vd-bad);margin:0">What went wrong</h2>
-          <p style="margin:0;color:var(--vd-bad);overflow-wrap:anywhere">{{ $video->error }}</p>
-          @if (! empty($video->error_details['exception']))
-            <div><button type="button" class="vd-btn" data-open-error>View full error</button></div>
-            @include('video-demo::studio.partials.error-details')
-          @endif
-          @if ($video->status === VideoStatus::Failed)
-            <p class="vd-small" style="margin:0;color:var(--vd-bad)">Trying again uses what is in "Make it again" below. Change the description, style, versions or model there first.</p>
-            @php($hasPlan = $video->hasPlan())
-        <div class="vd-actions">
-          {{-- Sends the "Make it again" form, so changes made there are used. --}}
-          <button class="vd-btn vd-btn-primary" form="vd-again" formaction="{{ route('video-demo.studio.again', [$video, 'plan' => 'new']) }}">{{ $hasPlan ? 'Try again with a new plan' : 'Try again' }}</button>
-          @if ($hasPlan)
-            <button class="vd-btn" form="vd-again" formaction="{{ route('video-demo.studio.again', [$video, 'plan' => 'same']) }}">Record the same plan again</button>
-          @endif
-        </div>
-          @endif
-        </div>
       @endif
 
       @if ($video->hasPlan())
@@ -401,7 +403,7 @@
         <summary>
           <span class="vd-fold-title">
             <h2>Progress</h2>
-            <span class="vd-fold-hint" data-closed-only>{{ \Illuminate\Support\Arr::last($video->log ?? [])['message'] ?? 'Nothing yet.' }}</span>
+            <span class="vd-fold-hint vd-clamp-2" data-closed-only>{{ \Illuminate\Support\Arr::last($video->log ?? [])['message'] ?? 'Nothing yet.' }}</span>
           </span>
         </summary>
         <div class="vd-fold-body">
@@ -417,6 +419,19 @@
   </div>
 
   <script>
+    // A long error is folded to a few lines; "Show all" opens it, when there is more to show.
+    (() => {
+      const card = document.getElementById('vd-error');
+      const text = card?.querySelector('[data-clamp]');
+      const toggle = card?.querySelector('[data-clamp-toggle]');
+      if (!text || !toggle) return;
+      toggle.hidden = text.scrollHeight <= text.clientHeight + 1;
+      toggle.addEventListener('click', () => {
+        const open = text.toggleAttribute('data-open');
+        toggle.textContent = open ? 'Show less' : 'Show all';
+      });
+    })();
+
     // Folded sections: each viewer's last choice is remembered, but a section
     // that needs attention (working, failed, a form error) stays open, as does
     // one the address points to or one whose form was just sent.
