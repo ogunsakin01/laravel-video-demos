@@ -6,7 +6,7 @@ All notable changes to this package are listed here. The format follows [Keep a 
 
 ### Changed
 
-- **Needs `anthropic-ai/sdk` 0.59** (was 0.57), so apps can update to the newest Anthropic SDK. The tests also run on `prism-php/prism` 0.102.
+- **Needs `anthropic-ai/sdk` 0.59** (was 0.57). The tests also run on `prism-php/prism` 0.102.
 
 ## v1.0.0 - 2026-10-27
 
