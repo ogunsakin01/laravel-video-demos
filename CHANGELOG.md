@@ -2,6 +2,12 @@
 
 All notable changes to this package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package uses [semantic versioning](https://semver.org/).
 
+## v1.0.2 - 2026-10-27
+
+### Fixed
+
+- **Videos refused for a flow the app has in another form.** Since 1.0.0, a request that described the app as it used to be, such as a step-by-step profile wizard that is now one page of cards, failed with "The AI couldn't find this in the app", naming the page it should have shown. The AI now records how the app does it now, and says in the plan's summary how that differs from the request. It still refuses only when the app can't do what was asked at all.
+
 ## v1.0.1 - 2026-10-27
 
 ### Changed

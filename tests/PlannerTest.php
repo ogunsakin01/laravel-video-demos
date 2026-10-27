@@ -167,6 +167,9 @@ class PlannerTest extends TestCase
         $this->assertStringContainsString('call cannot_make_video instead', $refused['content']);
         // The model is told to say so, not to make it up.
         $this->assertStringContainsString('Only show what the app has.', $this->request(1)['body']['system'][0]['text'] ?? json_encode($this->request(1)['body']['system']));
+        // But a flow the app has in another form (a wizard that is now one page) is shown as it is now.
+        $this->assertStringContainsString('When the app still lets the user do what the request is for, show how it does it now', json_encode($this->request(1)['body']['system']));
+        $this->assertStringContainsString('submit a plan of how it does it now instead', collect($this->request(1)['body']['tools'])->firstWhere('name', 'cannot_make_video')['description']);
         $this->assertContains("The AI found the app doesn't have this", collect($video->fresh()->log)->pluck('message'));
     }
 

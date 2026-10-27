@@ -347,7 +347,7 @@ class Planner
     {
         return [
             'name' => 'cannot_make_video',
-            'description' => "Say the video can't be made because the app doesn't have what the request describes, instead of submitting a plan. Use it only when the routes and code show the flow isn't there. Nothing is recorded, and the developer sees the reason.",
+            'description' => "Say the video can't be made because the app doesn't have what the request describes, instead of submitting a plan. Use it only when the routes and code show the app can't do what the request is for at all. If it can, in another way than the request describes (one page instead of steps, other names), submit a plan of how it does it now instead. Nothing is recorded, and the developer sees the reason.",
             'schema' => [
                 'type' => 'object',
                 'properties' => [
@@ -540,7 +540,7 @@ class Planner
 
         Pace the plan to the target length: a caption reads in about 3 seconds, a card in about 4, and each click or field takes 1 to 2 seconds. The recorder adjusts captions and pauses to land close to the target, so get the content right rather than the exact timing. Type realistic sample values that will pass validation. Mark the start of each part of the flow with chapter so viewers can jump to it.
 
-        Only show what the app has. If the routes and code show that the app doesn't have the flow the request describes (no page, route or feature for it), don't make it up with cards and captions, and don't show a different flow instead: call cannot_make_video, saying what you looked for and what the app has that is closest. Look as far as you need to be sure, then stop.
+        Only show what the app has. A request may describe the app as it used to be, or in other words than the app uses: a step-by-step wizard that is now one page, a button that was renamed, a form that moved. When the app still lets the user do what the request is for, show how it does it now, and say in the summary how that differs from the request. Only when the app can't do it at all (no page, route or feature for it) call cannot_make_video, saying what you looked for and what the app has that is closest; don't make it up with cards and captions, or show a flow for something else. Look as far as you need to be sure, then stop.
 
         Show what the video talks about: every page a caption or the voice-over describes must be on screen while it is described, not narrated over another page or an error. If a page can't be reached, leave it out. When a page needs the user to do something first that the video doesn't show, such as completing their profile, make the sample user meet it, and say so in a caption or line ("Once your profile is complete, you can message other members"), so viewers know.
 
