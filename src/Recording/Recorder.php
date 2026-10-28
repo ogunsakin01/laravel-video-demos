@@ -332,7 +332,7 @@ class Recorder
 
                 foreach ($running as $device => $version) {
                     if ($version['process']->running()) {
-                        $version['process']->ensureNotTimedOut();
+                        $this->ensureNotTimedOut($version['process']);
 
                         continue;
                     }
@@ -691,7 +691,7 @@ class Recorder
 
                 throw new VideoStopped('Stopped by you.');
             }
-            $process->ensureNotTimedOut();
+            $this->ensureNotTimedOut($process);
             usleep(500_000);
         }
 
@@ -706,6 +706,17 @@ class Recorder
         return Process::timeout($timeout)
             ->env(['NODE_PATH' => implode(PATH_SEPARATOR, $this->nodePaths())])
             ->start([config('video-demo.recorder.node'), $script, $job]);
+    }
+
+    /**
+     * Throw when a script has run longer than its timeout. A faked process
+     * never times out, and before later 12.x releases it has no such check.
+     */
+    protected function ensureNotTimedOut(InvokedProcess|FakeInvokedProcess $process): void
+    {
+        if ($process instanceof InvokedProcess) {
+            $process->ensureNotTimedOut();
+        }
     }
 
     /**
